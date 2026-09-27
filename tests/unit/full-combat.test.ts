@@ -23,6 +23,7 @@ import {
   nativeFullCombatLifeGauge,
   nativeMainChannelShadowBands,
   type FullCombatPhaseName,
+  type FullCombatSceneState,
   type FullCombatScript,
 } from "../../src/game/full-combat";
 import { emptyUnitStatuses } from "../../src/game/simulation/status";
@@ -88,7 +89,11 @@ interface ReferenceCommandStep {
   commands: readonly {
     token: string;
     parameters: readonly (number | string)[];
-    linkedStream?: { steps: readonly ReferenceCommandStep[] };
+    linkedStream?: {
+      firstStep: number;
+      steps: readonly ReferenceCommandStep[];
+      postHitContinuation?: { steps: readonly ReferenceCommandStep[] };
+    };
   }[];
   pose: { frame: number; deltaX: number; deltaY: number };
 }
@@ -104,7 +109,7 @@ const STREAM_KEYS = [
 
 type ReferenceSideStreams = Readonly<Record<
   (typeof STREAM_KEYS)[number],
-  { readonly steps: readonly ReferenceCommandStep[] }
+  { readonly address: string; readonly steps: readonly ReferenceCommandStep[] }
 >>;
 
 type ReferenceProfile = (typeof STAGE0_FULL_COMBAT_PROFILES)[keyof typeof STAGE0_FULL_COMBAT_PROFILES];
@@ -218,11 +223,7 @@ function referenceRedraws(channel: ReferenceChannelEnd, draws: number): number[]
   return frames;
 }
 
-/**
- * Fresh-channel frames from an explicit origin. The linked `G1..G5` streams
- * open with `:S`, and the remake still restarts their counters at the
- * post-hit hand-over.
- */
+/** Frames of one stream on a fresh `XN` channel with counter 0 at an explicit origin. */
 function referenceNativeFrames(
   steps: readonly ReferenceCommandStep[],
   initialX = 0,
@@ -458,28 +459,95 @@ function referencePresentationFrames(
 
 interface ReferenceLinkedCommand {
   token: "G1" | "G2" | "G3" | "G4" | "G5";
+  /** Parent substeps drawn before the channel's first parse of the stream. */
   offset: number;
   steps: readonly ReferenceCommandStep[];
+  /** Records still read after the strike, before a post-hit re-point takes over. */
+  postHitSteps: readonly ReferenceCommandStep[];
 }
 
 function referenceLinkedCommands(
   steps: readonly ReferenceCommandStep[],
 ): ReferenceLinkedCommand[] {
   const links: ReferenceLinkedCommand[] = [];
-  let offset = 0;
   for (const step of steps) {
     for (const command of step.commands) {
       if (/^G[1-5]$/u.test(command.token) && command.linkedStream) {
         links.push({
           token: command.token as ReferenceLinkedCommand["token"],
-          offset,
+          offset: steps.slice(0, command.linkedStream.firstStep)
+            .reduce((sum, parent) => sum + parent.rendererSubsteps, 0),
           steps: command.linkedStream.steps,
+          postHitSteps: command.linkedStream.postHitContinuation?.steps ?? [],
         });
       }
     }
-    offset += step.rendererSubsteps;
   }
   return links;
+}
+
+/**
+ * A linked channel through the post-hit stream. `A24D/A28E` re-point only
+ * the main channels, so the strike link keeps reading its own records until
+ * a post-hit `G` token takes over, and both carry the strike link's x, y,
+ * animation mode and counter.
+ */
+function referenceLinkedPostHit(
+  strikeLink: ReferenceLinkedCommand,
+  postSteps: readonly ReferenceCommandStep[],
+  strikeEnd: ReferenceChannelEnd,
+): ReferenceFrame[] {
+  const carried = referenceReplay(strikeLink.postHitSteps, strikeEnd);
+  const repoint = referenceLinkedCommands(postSteps)
+    .find(({ token }) => token === strikeLink.token);
+  if (!repoint) return carried.frames;
+  expect(repoint.offset).toBe(carried.frames.length);
+  return [...carried.frames, ...referenceReplay(repoint.steps, carried.end).frames];
+}
+
+/**
+ * One linked channel in a sampled scene. Records 20 and 22 draw their `G1`
+ * on the projectile and lance layers; every other linked channel is a `+50`
+ * sprite, dropped once its bitmap leaves the window.
+ */
+function expectLinkedChannel(
+  state: FullCombatSceneState,
+  record: number,
+  side: "left" | "right",
+  token: ReferenceLinkedCommand["token"],
+  expected: ReferenceFrame | undefined,
+): void {
+  if (record === 20 && token === "G1") {
+    expect(state.projectile).toEqual(expected && {
+      side,
+      classId: 20,
+      frame: expected.frame,
+      x: expected.x,
+      y: expected.y,
+    });
+    return;
+  }
+  const visible = expected !== undefined
+    && referenceFrameIntersectsViewport(side, record, "plus50", expected.frame, expected.x);
+  if (record === 22 && token === "G1") {
+    expect(state.lance).toEqual(visible
+      ? { side, frame: expected.frame, x: expected.x, y: expected.y }
+      : undefined);
+    return;
+  }
+  const actual = state.sprites.find(({ channel }) => channel === token);
+  if (!visible) {
+    expect(actual).toBeUndefined();
+    return;
+  }
+  expect(actual).toMatchObject({
+    side,
+    classId: record,
+    set: "plus50",
+    frame: expected.frame,
+    x: expected.x,
+    lift: referenceLift(expected.y),
+  });
 }
 
 function expectedVictimMark(record: number, side: "left" | "right"): number {
@@ -665,49 +733,26 @@ describe("Full-screen ordinary combat choreography", () => {
         expect(state.particles).toEqual(mainPresentation.frames[index].particles);
       }
 
+      // `B061/B1FD` start every channel of the acting side at the main channel's
+      // origin in mode `XN`, and each link opens with `:S`. A linked channel
+      // shows nothing before the step whose parse pass first reads it: `A7F4`
+      // and `A9FA` walk offsets 8,6,4,2,0, so `G5` waits one step.
+      const linkOrigin = referenceChannel(expectedActorMark(record, side));
       const mainLinks = referenceLinkedCommands(mainActor);
       expect(new Set(mainLinks.map(({ token }) => token)).size).toBe(mainLinks.length);
+      const strikeLinkEnds = new Map<ReferenceLinkedCommand["token"], ReferenceChannelEnd>();
       for (const link of mainLinks) {
-        const linkedFrames = referenceNativeFrames(link.steps);
-        for (let index = 0; index < linkedFrames.length; index += 1) {
-          const globalSubstep = link.offset + index;
-          if (globalSubstep >= mainActorFrames.length) break;
-          const state = script.sample(start + globalSubstep * 40 + 1);
-          const expected = linkedFrames[index];
-          if (record === 20) {
-            expect(state.projectile).toMatchObject({
-              side,
-              frame: expected.frame,
-              x: expected.x,
-              y: expected.y,
-            });
-          } else if (record === 22) {
-            expect(state.lance).toMatchObject({
-              side,
-              frame: expected.frame,
-              x: expected.x,
-              y: expected.y,
-            });
-          } else {
-            const actual = state.sprites.find(({ channel }) => channel === link.token);
-            if (!referenceFrameIntersectsViewport(
-              side,
-              record,
-              "plus50",
-              expected.frame,
-              expected.x,
-            )) {
-              expect(actual).toBeUndefined();
-            } else {
-              expect(actual).toMatchObject({
-                side,
-                classId: record,
-                frame: expected.frame,
-                x: expected.x,
-                lift: STAGE0_FULL_COMBAT_GEOMETRY.characterInitialization.actor.y - expected.y,
-              });
-            }
-          }
+        const linkReplay = referenceReplay(link.steps, linkOrigin);
+        strikeLinkEnds.set(link.token, linkReplay.end);
+        expect(link.offset + linkReplay.frames.length).toBe(mainActorFrames.length);
+        for (let substep = 0; substep < mainActorFrames.length; substep += 1) {
+          expectLinkedChannel(
+            script.sample(start + substep * 40 + 1),
+            record,
+            side,
+            link.token,
+            substep < link.offset ? undefined : linkReplay.frames[substep - link.offset],
+          );
         }
       }
 
@@ -836,49 +881,38 @@ describe("Full-screen ordinary combat choreography", () => {
           expect(state.particles).toEqual(expected.particles);
         }
 
+        // A linked channel keeps its strike state through the post-hit stream:
+        // it goes on reading its own records until a post-hit `G` token
+        // re-points it with the same x, y, mode and counter, and `A7C3`
+        // clears it before the hold, whose missing redraws alone leave its
+        // last post-hit image up.
         const postLinks = referenceLinkedCommands(actorSteps);
         expect(new Set(postLinks.map(({ token }) => token)).size).toBe(postLinks.length);
-        for (const link of postLinks) {
-          const strikeLink = mainLinks.find(({ token }) => token === link.token);
-          const strikeEnd = strikeLink
-            ? referenceNativeEnd(strikeLink.steps)
-            : { x: 0, y: 0 };
-          const linkedFrames = referenceNativeFrames(link.steps, strikeEnd.x, strikeEnd.y);
-          for (let index = 0; index < linkedFrames.length; index += 1) {
-            const globalSubstep = link.offset + index;
-            if (globalSubstep >= actorFrames.length) break;
-            const state = reactionScript.sample(reactionImpact + globalSubstep * 50 + 1);
-            const expected = linkedFrames[index];
-            if (record === 20) {
-              expect(state.projectile).toMatchObject({
-                side,
-                frame: expected.frame,
-                x: expected.x,
-                y: expected.y,
-              });
-            } else {
-              const actual = state.sprites.find(({ channel }) => channel === link.token);
-              if (
-                record === 22
-                || !referenceFrameIntersectsViewport(
-                  side,
-                  record,
-                  "plus50",
-                  expected.frame,
-                  expected.x,
-                )
-              ) {
-                expect(actual).toBeUndefined();
-              } else {
-                expect(actual).toMatchObject({
-                  side,
-                  classId: record,
-                  frame: expected.frame,
-                  x: expected.x,
-                  lift: STAGE0_FULL_COMBAT_GEOMETRY.characterInitialization.actor.y - expected.y,
-                });
-              }
-            }
+        expect(postLinks.every(({ token }) => strikeLinkEnds.has(token))).toBe(true);
+        for (const link of mainLinks) {
+          const strikeEnd = strikeLinkEnds.get(link.token);
+          if (!strikeEnd) throw new Error(`missing ${link.token} strike end`);
+          const linkedFrames = referenceLinkedPostHit(link, actorSteps, strikeEnd);
+          expect(linkedFrames).toHaveLength(actorFrames.length);
+          for (let substep = 0; substep < actorFrames.length; substep += 1) {
+            expect(linkedFrames[substep].frame)
+              .toBeLessThan(FULL_COMBAT_FRAME_META[side][record].plus50.length);
+            expectLinkedChannel(
+              reactionScript.sample(reactionImpact + substep * 50 + 1),
+              record,
+              side,
+              link.token,
+              linkedFrames[substep],
+            );
+          }
+          for (const offset of [1, 660]) {
+            expectLinkedChannel(
+              reactionScript.sample(reactionHold + offset),
+              record,
+              side,
+              link.token,
+              holdDraws === 0 ? linkedFrames.at(-1) : undefined,
+            );
           }
         }
       }
@@ -931,6 +965,10 @@ describe("Full-screen ordinary combat choreography", () => {
           for (const command of step.commands) {
             if (command.linkedStream) {
               assertFramesInRange(command.linkedStream.steps, actorAssets.plus50.length);
+              assertFramesInRange(
+                command.linkedStream.postHitContinuation?.steps ?? [],
+                actorAssets.plus50.length,
+              );
             }
           }
         }
@@ -1167,10 +1205,11 @@ describe("Full-screen ordinary combat choreography", () => {
       .toMatchObject({ frame: 2, x: 82, lift: 0 });
     expect(script.sample(startAt + 700).sprites.find(({ channel }) => channel === "actor"))
       .toMatchObject({ frame: 1, x: 202 });
+    // The hurt re-point keeps the strike link's `:X`, so frame 7 alternates with 8.
     expect(script.sample(impactAt).sprites.find(({ channel }) => channel === "G1"))
-      .toMatchObject({ frame: 7, x: 250, lift: 0 });
+      .toMatchObject({ frame: 8, x: 250, lift: 0 });
     expect(script.sample(impactAt + 100).sprites.find(({ channel }) => channel === "G1"))
-      .toMatchObject({ frame: 7, x: 330, lift: 0 });
+      .toMatchObject({ frame: 8, x: 330, lift: 0 });
     expect(script.sample(holdAt).sprites.find(({ channel }) => channel === "G1"))
       .toBeUndefined();
     expect(script.cues).toEqual(expect.arrayContaining([
@@ -1260,10 +1299,11 @@ describe("Full-screen ordinary combat choreography", () => {
       expect.objectContaining({ classId: 3, channel: "actor", frame: 1, x: 218 }),
       expect.objectContaining({ classId: 3, channel: "G1", frame: 2, x: 260, lift: 0 }),
     ]));
+    // The strike link's `:X` carries into the post-hit re-point: 3, 2, 3, ...
     expect(script.sample(impactAt).sprites.find(({ channel }) => channel === "G1"))
-      .toMatchObject({ classId: 3, frame: 2, x: 260, lift: 0 });
+      .toMatchObject({ classId: 3, frame: 3, x: 260, lift: 0 });
     expect(script.sample(impactAt + 100).sprites.find(({ channel }) => channel === "G1"))
-      .toMatchObject({ frame: 2, x: 330 });
+      .toMatchObject({ frame: 3, x: 330 });
     expect(script.sample(impactAt + 300).sprites.find(({ channel }) => channel === "victim"))
       .toMatchObject({ frame: 1, reaction: "hurt", lift: 96 });
     expect(script.sample(holdAt).sprites.find(({ channel }) => channel === "victim"))
@@ -1354,8 +1394,9 @@ describe("Full-screen ordinary combat choreography", () => {
       .toMatchObject({ classId: 5, frame: 6, x: 280, lift: 15 });
     expect(script.sample(startAt + 840).sprites.find(({ channel }) => channel === "G1"))
       .toMatchObject({ frame: 6, x: 280, lift: 19 });
+    // No post-hit stream re-points G1, so the orb keeps reading its records.
     expect(script.sample(impactAt).sprites.find(({ channel }) => channel === "G1"))
-      .toBeUndefined();
+      .toMatchObject({ frame: 6, x: 280, lift: 47 });
     expect(script.sample(impactAt + 50).sprites.find(({ channel }) => channel === "victim"))
       .toMatchObject({ frame: 1, reaction: "hurt", lift: 16 });
     expect(script.sample(holdAt).sprites.find(({ channel }) => channel === "actor"))
@@ -1555,6 +1596,329 @@ describe("Full-screen ordinary combat choreography", () => {
     expect([1, 51, 101, 151].map((age) => actorAt("flying-dragon-knight", "left", "fullImpact", age)?.frame))
       .toEqual([1, 2, 3, 0]);
     expect(actorAt("flying-dragon-knight", "left", "fullImpact", 1)).toMatchObject({ lift: 20 });
+  });
+
+  const singleStrike = (
+    classId: UnitClassId,
+    side: "left" | "right",
+    damage: number,
+    defenderLife = 180,
+  ): FullCombatScript => {
+    const attackerSide = side === "left" ? 1 : 2;
+    const defenderSide = attackerSide === 1 ? 2 : 1;
+    return buildFullCombatScript(
+      unit(attackerSide, attackerSide === 1 ? 0 : 48, "測試攻方", classId),
+      {
+        ...unit(defenderSide, defenderSide === 1 ? 0 : 48, "測試守方"),
+        life: defenderLife,
+      },
+      result({
+        attackerId: `${attackerSide}:${attackerSide === 1 ? 0 : 48}`,
+        defenderId: `${defenderSide}:${defenderSide === 1 ? 0 : 48}`,
+        damage,
+        counterOccurred: false,
+        counterDamage: 0,
+      }),
+    );
+  };
+
+  const linkedSprite = (
+    script: FullCombatScript,
+    token: "G1" | "G5",
+    t: number,
+  ): { frame: number; x: number; lift: number } | undefined => {
+    const sprite = script.sample(t).sprites.find(({ channel }) => channel === token);
+    return sprite && { frame: sprite.frame, x: sprite.x, lift: sprite.lift };
+  };
+
+  const postHitSprites = (
+    script: FullCombatScript,
+    token: "G1" | "G5",
+    substeps: number,
+  ) => Array.from(
+    { length: substeps },
+    (_, index) => linkedSprite(script, token, markTime(script, "fullImpact") + index * 50 + 1),
+  );
+
+  it("carries a linked channel's animation mode and counter into its post-hit re-point", () => {
+    // Record 1's strike link ends on frame 7 under `:X`. The hurt re-point
+    // (`DS:956B`/`DS:C0A3`) names no mode, so the sword wave keeps alternating
+    // with frame 8 as it flies off instead of freezing on frame 7.
+    expect(postHitSprites(singleStrike("magic-sword-warrior", "left", 24), "G1", 6)).toEqual(
+      [250, 290, 330, 370, 410, 450].map((x, index) => ({
+        frame: index % 2 === 0 ? 8 : 7,
+        x,
+        lift: 0,
+      })),
+    );
+    expect(postHitSprites(singleStrike("magic-sword-warrior", "right", 24), "G1", 6)).toEqual(
+      [250, 210, 170, 130, 90, 50].map((x, index) => ({
+        frame: index % 2 === 0 ? 8 : 7,
+        x,
+        lift: 0,
+      })),
+    );
+    // The guard re-point opens with `XN`, which clears the counter on its first
+    // draw, but its rising frame 4 still starts where the strike link stopped.
+    expect(postHitSprites(singleStrike("magic-sword-warrior", "left", 8), "G1", 3)).toEqual([
+      { frame: 4, x: 250, lift: 0 },
+      { frame: 4, x: 235, lift: 20 },
+      { frame: 4, x: 220, lift: 40 },
+    ]);
+    // Records 3, 6, 7 and 9 keep `:X`/`X4` the same way on both branches.
+    // Record 25 restates `X4`, but a mode token never resets the counter, so
+    // its orb stays one frame ahead of a fresh cycle.
+    const frames = (classId: UnitClassId, side: "left" | "right", damage: number, substeps: number) =>
+      postHitSprites(singleStrike(classId, side, damage), "G1", substeps)
+        .map((sprite) => sprite?.frame);
+    expect(frames("magic-priest", "left", 24, 2)).toEqual([3, 2]);
+    expect(frames("magician", "right", 8, 4)).toEqual([5, 6, 7, 4]);
+    expect(frames("great-axe-warrior", "left", 24, 2)).toEqual([6, 5]);
+    expect(frames("magic-armor-warrior", "right", 8, 2)).toEqual([6, 5]);
+    expect(frames("monk", "left", 24, 5)).toEqual([7, 8, 9, 10, 7]);
+  });
+
+  it("keeps reading record 5's G1 records after contact instead of dropping the orb", () => {
+    // Neither post-hit stream re-points record 5's G1, so the channel reads the
+    // three records after its strike block (`DS:99FD`/`DS:C535`): frame 6 rises
+    // 20 px a substep from the strike link's y=88 while drifting 24 px back.
+    const left = singleStrike("curse-master", "left", 24);
+    expect(postHitSprites(left, "G1", 5)).toEqual([280, 256, 232, 208, 184].map((x, index) => ({
+      frame: 6,
+      x,
+      lift: 47 + index * 20,
+    })));
+    expect(postHitSprites(singleStrike("curse-master", "right", 8), "G1", 5))
+      .toEqual([260, 284, 308, 332, 356].map((x, index) => ({
+        frame: 6,
+        x,
+        lift: 47 + index * 20,
+      })));
+    // `A7C3` clears the channel before the four hold redraws.
+    expect(linkedSprite(left, "G1", markTime(left, "fullHold") + 1)).toBeUndefined();
+  });
+
+  it("reads record 14's G5 stream one step after the strike issues it", () => {
+    for (const [side, firstX, launchX, postX] of [
+      ["left", 296, [104, 114, 184], [194, 234, 274, 314, 354, 394, 434, 474]],
+      ["right", 210, [402, 392, 322], [312, 272, 232, 192, 152, 112, 72, 32]],
+    ] as const) {
+      const script = singleStrike("demon-dragon-knight", side, 24);
+      const start = markTime(script, "fullWindup");
+      // `A7F4/A9FA` pass offset 8 before the main channel issues `G5` on step 0,
+      // so the orb's first record (with its `:S`) is read on step 1.
+      expect(linkedSprite(script, "G5", start + 1)).toBeUndefined();
+      expect(linkedSprite(script, "G5", start + 41)).toEqual({ frame: 1, x: firstX, lift: 43 });
+      // The slow 10 px launch record therefore spans the nine-substep final
+      // strike step, and the 40 px record is read on the first post-hit step
+      // before the post-hit `G5` re-point takes over, one step late as well.
+      expect([17, 18, 25].map((substep) => linkedSprite(script, "G5", start + substep * 40 + 1)))
+        .toEqual(launchX.map((x, index) => ({ frame: index === 1 ? 14 : 15, x, lift: 43 })));
+      expect(postHitSprites(script, "G5", 8)).toEqual(postX.map((x, index) => ({
+        frame: index % 2 === 0 ? 14 : 15,
+        x,
+        lift: 43,
+      })));
+      expect(linkedSprite(script, "G5", markTime(script, "fullHold") + 1)).toBeUndefined();
+    }
+  });
+
+  it("leaves the last post-hit linked images up when the hold draws nothing", () => {
+    // 234 - 24 leaves the target on exactly 210 life, so `AD36` never redraws:
+    // the arrow `A7C3` cleared is still in the target on the last image.
+    const archer = singleStrike("archer", "left", 24, 234);
+    const archerHold = markTime(archer, "fullHold");
+    expect(archer.sample(archerHold - 1).projectile)
+      .toEqual({ side: "left", classId: 20, frame: 5, x: 272, y: 106 });
+    for (const offset of [1, 660]) {
+      expect(archer.sample(archerHold + offset).projectile)
+        .toEqual(archer.sample(archerHold - 1).projectile);
+    }
+    const redrawn = singleStrike("archer", "left", 24);
+    expect(redrawn.sample(markTime(redrawn, "fullHold") + 1).projectile).toBeUndefined();
+    // Record 14's comet stays at the right window edge the same way.
+    const dragon = singleStrike("demon-dragon-knight", "left", 24, 234);
+    expect(linkedSprite(dragon, "G5", markTime(dragon, "fullHold") + 660))
+      .toEqual({ frame: 15, x: 474, lift: 43 });
+  });
+
+  it.skipIf(!EVIDENCE_AVAILABLE)("replays every linked channel like module 29's own channel machine", async () => {
+    // An independent model of `A77F` that reads the command bytes straight from
+    // the module image instead of the exporter's parsed streams: `A7F4/A9FA`
+    // parse offsets 8,6,4,2,0, `G` tokens only store a pointer, `ACC4` latches
+    // the poses, draws through `B1A8/B344` and accumulates after each substep.
+    // It pins the exporter's step alignment, not just its bytes.
+    const image = await readFile(
+      path.join(workspace, "reverse/unpacked/lzexe-modules/raw/0029-unpacked.bin"),
+    );
+    const dataBase = 0x1eba0;
+    const word = (offset: number) => image.readUInt16LE(dataBase + offset);
+    const signedWord = (offset: number) => image.readInt16LE(dataBase + offset);
+    const modeTokens = new Map<number, ReferenceAnimationMode>([
+      [0x583a, "alternate"],
+      [0x5834, "cycle4"],
+      [0x5836, "cycle6"],
+      [0x4e58, "none"],
+    ]);
+    const plainTokens = new Set([
+      0x523a, 0x4c3a, 0x4a3a, 0x5944, 0x4e44, 0x5631, 0x5632, 0x5633, 0x5634, 0x5635,
+      0x4559, 0x454e, 0x4555,
+    ]);
+    const offsets = [8, 6, 4, 2, 0] as const;
+    interface MachineChannel extends ReferenceChannel {
+      pointer: number;
+      latched: number;
+      pose: number;
+      dx: number;
+      dy: number;
+      /** False from a `G` token waking the channel until its own parse reads a pose. */
+      read: boolean;
+    }
+    type MachineSide = Map<number, MachineChannel>;
+    // `B061/B1FD`: one x for the whole side, y=135, mode `XN`; a fresh start
+    // leaves the pose words and counters at the module's initial zeros.
+    const machineSide = (x: number): MachineSide => new Map(offsets.map((offset) => [offset, {
+      pointer: 0, x, y: GROUND_Y, mode: "none", counter: 0,
+      latched: 0, pose: 0, dx: 0, dy: 0, read: true,
+    }]));
+    const parse = (side: MachineSide, channel: MachineChannel): void => {
+      for (;;) {
+        const token = word(channel.pointer);
+        const mode = modeTokens.get(token);
+        if (token === 0x533a) {
+          channel.x = signedWord(channel.pointer + 2);
+          channel.y = signedWord(channel.pointer + 4);
+          channel.pointer += 6;
+        } else if (mode) {
+          channel.mode = mode;
+          channel.pointer += 2;
+        } else if (token >= 0x4731 && token <= 0x4735) {
+          const target = side.get((token - 0x4731) * 2);
+          if (!target) throw new Error(`unknown linked channel ${token}`);
+          if (target.pointer === 0) target.read = false;
+          target.pointer = word(channel.pointer + 2);
+          channel.pointer += 4;
+        } else if (plainTokens.has(token)) {
+          channel.pointer += 2;
+        } else {
+          channel.pose = signedWord(channel.pointer);
+          channel.dx = signedWord(channel.pointer + 2);
+          channel.dy = signedWord(channel.pointer + 4);
+          channel.pointer += 6;
+          channel.read = true;
+          return;
+        }
+      }
+    };
+    type MachineDraw = ReferenceFrame & { read: boolean };
+    const run = (
+      sides: readonly MachineSide[],
+      stepCounts: readonly number[],
+      actor: MachineSide,
+    ): Map<number, MachineDraw>[] => {
+      const draws: Map<number, MachineDraw>[] = [];
+      for (const count of stepCounts) {
+        for (const side of sides) {
+          for (const offset of offsets) {
+            const channel = side.get(offset);
+            if (channel && channel.pointer !== 0) parse(side, channel);
+          }
+        }
+        const active = sides.flatMap((side) => [...side.values()])
+          .filter((channel) => channel.pointer !== 0);
+        for (const channel of active) channel.latched = channel.pose;
+        for (let substep = 0; substep < count; substep += 1) {
+          for (const channel of active) {
+            channel.counter = nextReferenceCounter(channel.mode, channel.counter);
+          }
+          draws.push(new Map(offsets.flatMap((offset) => {
+            const channel = actor.get(offset);
+            return channel && channel.pointer !== 0
+              ? [[offset, {
+                frame: channel.latched + channel.counter,
+                x: channel.x,
+                y: channel.y,
+                read: channel.read,
+              }] as const]
+              : [];
+          })));
+          for (const channel of active) {
+            channel.x += channel.dx;
+            channel.y += channel.dy;
+          }
+        }
+      }
+      return draws;
+    };
+    const address = (value: string) => Number.parseInt(value.slice(3), 16);
+    const initialization = STAGE0_FULL_COMBAT_GEOMETRY.characterInitialization;
+    let checkedDraws = 0;
+    let hiddenFirstDraws = 0;
+    for (const [classId, profile] of Object.entries(STAGE0_FULL_COMBAT_PROFILES)) {
+      for (const side of reachableSides(profile)) {
+        if (profile.nativeRecord === 35 && side === "left") continue;
+        const streams = sideStreams(profile, side);
+        const stepCounts = (key: "strikeStepCounts" | "postHitStepCounts") => {
+          const counts = (profile[key] as Partial<Record<"left" | "right", readonly number[]>>)[side];
+          if (!counts) throw new Error(`record ${profile.nativeRecord} has no ${side} ${key}`);
+          return counts;
+        };
+        for (const [reaction, damage] of [["hurt", 24], ["guard", 8]] as const) {
+          const actor = machineSide(initialization.actor.x);
+          const opponent = machineSide(initialization.opponentByActorSide[side].x);
+          const sides = side === "left" ? [actor, opponent] : [opponent, actor];
+          const actorMain = actor.get(6);
+          const opponentMain = opponent.get(6);
+          if (!actorMain || !opponentMain) throw new Error("missing main channel");
+          actorMain.pointer = address(streams.mainLeftOrAttacker.address);
+          opponentMain.pointer = address(streams.mainRightOrDefender.address);
+          const strike = run(sides, stepCounts("strikeStepCounts"), actor);
+          // `A24D/A28E` re-point only the two main channels.
+          actorMain.pointer = address(
+            streams[reaction === "hurt" ? "auxiliaryA" : "auxiliaryC"].address,
+          );
+          opponentMain.pointer = address(
+            streams[reaction === "hurt" ? "auxiliaryB" : "auxiliaryD"].address,
+          );
+          const post = run(sides, stepCounts("postHitStepCounts"), actor);
+          const script = singleStrike(classId as UnitClassId, side, damage);
+          const phases = [
+            { draws: strike, start: markTime(script, "fullWindup"), substep: 40 },
+            { draws: post, start: markTime(script, "fullImpact"), substep: 50 },
+          ];
+          for (const phase of phases) {
+            phase.draws.forEach((draws, index) => {
+              const state = script.sample(phase.start + index * phase.substep + 1);
+              for (const offset of [0, 2, 4, 8] as const) {
+                const token = `G${offset / 2 + 1}` as ReferenceLinkedCommand["token"];
+                const draw = draws.get(offset);
+                if (draw && !draw.read) {
+                  // The issuing step of `G5` draws the pose the channel last
+                  // read; on a fresh start that is the main channel's own
+                  // image, which the main channel then draws over.
+                  const main = draws.get(6);
+                  expect(main && { frame: main.frame, x: main.x, y: main.y })
+                    .toEqual({ frame: draw.frame, x: draw.x, y: draw.y });
+                  hiddenFirstDraws += 1;
+                }
+                expectLinkedChannel(
+                  state,
+                  profile.nativeRecord,
+                  side,
+                  token,
+                  draw?.read ? draw : undefined,
+                );
+                if (draw?.read) checkedDraws += 1;
+              }
+            });
+          }
+        }
+      }
+    }
+    // 1,986 linked-channel draws across the 14 records that use one.
+    expect(checkedDraws).toBe(1986);
+    // Record 14 on both sides and both branches is the only `G5` user.
+    expect(hiddenFirstDraws).toBe(4);
   });
 
   it("redraws the nonfatal hold without dust until the 20th draw since impact", () => {

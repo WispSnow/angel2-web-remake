@@ -402,12 +402,23 @@ test("record 1 magic sword warrior keeps its body and G1 effect channels synchro
 
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_760));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
+  // The hurt re-point names no mode, so the strike link's `:X` keeps the
+  // sword wave alternating between frames 8 and 7 as it flies off.
   await expect(page.getByTestId("full-effect-G1-sprite"))
-    .toHaveAttribute("data-frame-source", /left\/magic-sword-warrior\/plus50\/07$/);
+    .toHaveAttribute("data-frame-source", /left\/magic-sword-warrior\/plus50\/08$/);
+  await expect(page.getByTestId("full-effect-G1-sprite")).toHaveAttribute("data-x", "250");
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-01-hurt.png",
     fullPage: true,
   });
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_810));
+  await expect(page.getByTestId("full-effect-G1-sprite"))
+    .toHaveAttribute("data-frame-source", /left\/magic-sword-warrior\/plus50\/07$/);
+  await expect(page.getByTestId("full-effect-G1-sprite")).toHaveAttribute("data-x", "290");
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_860));
+  await expect(page.getByTestId("full-effect-G1-sprite"))
+    .toHaveAttribute("data-frame-source", /left\/magic-sword-warrior\/plus50\/08$/);
+  await expect(page.getByTestId("full-effect-G1-sprite")).toHaveAttribute("data-x", "330");
 
   await page.getByTestId("combat-lab-reaction").selectOption("guard");
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_800));
@@ -570,11 +581,26 @@ test("record 5 curse master passes late G1, reaction and death visual gates", as
 
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_720));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
-  await expect(page.getByTestId("full-effect-G1-sprite")).toBeHidden();
+  // No post-hit stream re-points G1: the orb keeps reading the records after
+  // its strike block, rising 20 px and drifting 24 px back per substep.
+  await expect(page.getByTestId("full-effect-G1-sprite"))
+    .toHaveAttribute("data-frame-source", /left\/curse-master\/plus50\/06$/);
+  await expect(page.getByTestId("full-effect-G1-sprite")).toHaveAttribute("data-x", "280");
+  await expect(page.getByTestId("full-effect-G1-sprite")).toHaveAttribute("data-lift", "47");
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-05-hurt.png",
     fullPage: true,
   });
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_870));
+  await expect(page.getByTestId("full-effect-G1-sprite")).toHaveAttribute("data-x", "208");
+  await expect(page.getByTestId("full-effect-G1-sprite")).toHaveAttribute("data-lift", "107");
+  await captureVisualAudit(page, {
+    path: "artifacts/playwright/combat-lab-record-05-orb-exit.png",
+    fullPage: true,
+  });
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(2_521));
+  await expect(page.getByTestId("combat-lab-phase")).toHaveText("fullHold");
+  await expect(page.getByTestId("full-effect-G1-sprite")).toBeHidden();
 
   await page.getByTestId("combat-lab-reaction").selectOption("guard");
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_770));
@@ -590,6 +616,49 @@ test("record 5 curse master passes late G1, reaction and death visual gates", as
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-05-death.png",
+    fullPage: true,
+  });
+});
+
+test("record 14 demon dragon knight reads its G5 orb one step after issuing it", async ({ page }) => {
+  await page.goto(
+    "/combat-lab.html?attacker=demon-dragon-knight&defender=soldier&reaction=hurt&speed=4",
+  );
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+  const state = await labState(page);
+  const startAt = state.marks.find(({ phase }) => phase === "fullWindup")?.t;
+  const impactAt = state.marks.find(({ phase }) => phase === "fullImpact")?.t;
+  expect(startAt).toBeDefined();
+  expect(impactAt).toBeDefined();
+  const orb = page.getByTestId("full-effect-G5-sprite");
+
+  // `A7F4` passes channel offset 8 before the main channel issues `G5`, so
+  // the orb's first record is only read on the second strike step.
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), startAt! + 1);
+  await expect(orb).toBeHidden();
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), startAt! + 41);
+  await expect(orb).toHaveAttribute("data-frame-source", /left\/demon-dragon-knight\/plus50\/01$/);
+  await expect(orb).toHaveAttribute("data-x", "296");
+  await expect(orb).toHaveAttribute("data-lift", "43");
+
+  // The slow launch record fills the nine-substep final strike step...
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! - 39);
+  await expect(orb).toHaveAttribute("data-frame-source", /left\/demon-dragon-knight\/plus50\/15$/);
+  await expect(orb).toHaveAttribute("data-x", "184");
+  await waitForVisibleSpriteImages(page);
+  await captureVisualAudit(page, {
+    path: "artifacts/playwright/combat-lab-record-14-g5-launch.png",
+    fullPage: true,
+  });
+
+  // ...so the comet crosses the target while it reels from the hit.
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 101);
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
+  await expect(orb).toHaveAttribute("data-frame-source", /left\/demon-dragon-knight\/plus50\/14$/);
+  await expect(orb).toHaveAttribute("data-x", "274");
+  await waitForVisibleSpriteImages(page);
+  await captureVisualAudit(page, {
+    path: "artifacts/playwright/combat-lab-record-14-g5-contact.png",
     fullPage: true,
   });
 });
@@ -1141,6 +1210,37 @@ test("record 20 archer passes release, flight, guard, hurt and death visual gate
     path: "artifacts/playwright/combat-lab-record-20-death.png",
     fullPage: true,
   });
+});
+
+test("a hold without redraws keeps the archer's arrow in its target", async ({ page }) => {
+  // 234 - 24 leaves exactly 210 life, the first gauge tier boundary: `AD36`
+  // never redraws, so the last post-hit image, arrow included, stays up.
+  await page.goto(
+    "/combat-lab.html?attacker=archer&defender=soldier&reaction=hurt&defenderLife=234&speed=4",
+  );
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+  const holdAt = (await labState(page)).marks.find(({ phase }) => phase === "fullHold")?.t;
+  expect(holdAt).toBeDefined();
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), holdAt! + 300);
+  await expect(page.getByTestId("combat-lab-phase")).toHaveText("fullHold");
+  await expect(page.getByTestId("full-combat-projectile")).toBeVisible();
+  await expect(page.getByTestId("full-combat-projectile"))
+    .toHaveAttribute("data-frame-source", /left\/archer\/plus50\/05$/);
+  await waitForVisibleSpriteImages(page);
+  await captureVisualAudit(page, {
+    path: "artifacts/playwright/combat-lab-record-20-hold-without-redraw.png",
+    fullPage: true,
+  });
+
+  // With life left over the hold redraws without the cleared arrow channel.
+  await page.goto("/combat-lab.html?attacker=archer&defender=soldier&reaction=hurt&speed=4");
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+  const redrawnHoldAt = (await labState(page)).marks
+    .find(({ phase }) => phase === "fullHold")?.t;
+  expect(redrawnHoldAt).toBeDefined();
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), redrawnHoldAt! + 300);
+  await expect(page.getByTestId("combat-lab-phase")).toHaveText("fullHold");
+  await expect(page.getByTestId("full-combat-projectile")).toBeHidden();
 });
 
 test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates", async ({ page }) => {

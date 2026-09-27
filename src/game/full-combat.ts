@@ -303,9 +303,6 @@ interface StrikeTimes {
   holdDraws: number;
   /** Last moment the strike changes: the final hold draw or the death stream's end. */
   settle: number;
-  throwAt?: number;
-  lanceFrom?: number;
-  lanceTo?: number;
 }
 
 const isRanged = (classId: FullCombatClass): boolean =>
@@ -316,22 +313,30 @@ interface NativeCommandStep {
   commands: readonly {
     token: string;
     parameters: readonly (number | string)[];
-    linkedStream?: {
-      steps: readonly NativeCommandStep[];
-      /**
-       * Records the weapon channel keeps reading once the strike stream ends.
-       * Present only when no post-hit stream re-issues the same G token, which
-       * is exactly when the native channel survives contact instead of being
-       * re-pointed.
-       */
-      postHitContinuation?: { steps: readonly NativeCommandStep[] };
-    };
+    linkedStream?: NativeLinkedStream;
   }[];
   pose: {
     frame: number;
     deltaX: number;
     deltaY: number;
   };
+}
+
+/** The records a `G1..G5` token points its linked channel at. */
+interface NativeLinkedStream {
+  /**
+   * Parent step whose parse pass first reads this stream. `A7F4/A9FA` walk a
+   * side's channel offsets 8,6,4,2,0, so a main-channel `G1` is read in its
+   * own step while `G5` (offset 8) waits for the next one.
+   */
+  firstStep: number;
+  steps: readonly NativeCommandStep[];
+  /**
+   * Records the channel keeps reading after the strike, before a post-hit
+   * `G` token re-points it: the whole post-hit stream when none does, one
+   * step for `G5`, and absent when a `G1` is re-pointed at once.
+   */
+  postHitContinuation?: { steps: readonly NativeCommandStep[] };
 }
 
 /**
@@ -416,66 +421,6 @@ function nativeReactionStream(
   return nativeSideStreams(classRecord, side)[key].steps;
 }
 
-const NATIVE_G1_EFFECT_STREAMS = {
-  1: {
-    left: {
-      strike: STAGE0_FULL_COMBAT_PROFILES["magic-sword-warrior"]
-        .commandStreams.left.mainLeftOrAttacker.steps[0].commands[0].linkedStream.steps,
-      hurt: STAGE0_FULL_COMBAT_PROFILES["magic-sword-warrior"]
-        .commandStreams.left.auxiliaryA.steps[0].commands[1].linkedStream.steps,
-      guard: STAGE0_FULL_COMBAT_PROFILES["magic-sword-warrior"]
-        .commandStreams.left.auxiliaryC.steps[0].commands[1].linkedStream.steps,
-    },
-    right: {
-      strike: STAGE0_FULL_COMBAT_PROFILES["magic-sword-warrior"]
-        .commandStreams.right.mainLeftOrAttacker.steps[0].commands[0].linkedStream.steps,
-      hurt: STAGE0_FULL_COMBAT_PROFILES["magic-sword-warrior"]
-        .commandStreams.right.auxiliaryA.steps[0].commands[1].linkedStream.steps,
-      guard: STAGE0_FULL_COMBAT_PROFILES["magic-sword-warrior"]
-        .commandStreams.right.auxiliaryC.steps[0].commands[1].linkedStream.steps,
-    },
-  },
-  3: {
-    left: {
-      strike: STAGE0_FULL_COMBAT_PROFILES["magic-priest"]
-        .commandStreams.left.mainLeftOrAttacker.steps[0].commands[0].linkedStream.steps,
-      hurt: STAGE0_FULL_COMBAT_PROFILES["magic-priest"]
-        .commandStreams.left.auxiliaryA.steps[0].commands[1].linkedStream.steps,
-      guard: STAGE0_FULL_COMBAT_PROFILES["magic-priest"]
-        .commandStreams.left.auxiliaryC.steps[0].commands[1].linkedStream.steps,
-    },
-    right: {
-      strike: STAGE0_FULL_COMBAT_PROFILES["magic-priest"]
-        .commandStreams.right.mainLeftOrAttacker.steps[0].commands[0].linkedStream.steps,
-      hurt: STAGE0_FULL_COMBAT_PROFILES["magic-priest"]
-        .commandStreams.right.auxiliaryA.steps[0].commands[1].linkedStream.steps,
-      guard: STAGE0_FULL_COMBAT_PROFILES["magic-priest"]
-        .commandStreams.right.auxiliaryC.steps[0].commands[1].linkedStream.steps,
-    },
-  },
-} as const;
-
-const ARCHER_FLIGHT_STREAMS = {
-  left: STAGE0_FULL_COMBAT_PROFILES.archer.commandStreams.left
-    .mainLeftOrAttacker.steps[3].commands[1].linkedStream.steps,
-  right: STAGE0_FULL_COMBAT_PROFILES.archer.commandStreams.right
-    .mainLeftOrAttacker.steps[3].commands[1].linkedStream.steps,
-} as const;
-
-const ARCHER_HURT_PROJECTILE_STREAMS = {
-  left: STAGE0_FULL_COMBAT_PROFILES.archer.commandStreams.left
-    .auxiliaryA.steps[0].commands[0].linkedStream.steps,
-  right: STAGE0_FULL_COMBAT_PROFILES.archer.commandStreams.right
-    .auxiliaryA.steps[0].commands[0].linkedStream.steps,
-} as const;
-
-const ARCHER_GUARD_PROJECTILE_STREAMS = {
-  left: STAGE0_FULL_COMBAT_PROFILES.archer.commandStreams.left
-    .auxiliaryC.steps[0].commands[0].linkedStream.steps,
-  right: STAGE0_FULL_COMBAT_PROFILES.archer.commandStreams.right
-    .auxiliaryC.steps[0].commands[0].linkedStream.steps,
-} as const;
-
 function nativeStreamDuration(
   steps: readonly NativeCommandStep[],
   substepDuration: number,
@@ -499,27 +444,30 @@ function nativeCommandOffset(
   return undefined;
 }
 
+type NativeLinkedToken = "G1" | "G2" | "G3" | "G4" | "G5";
+
+const NATIVE_LINKED_TOKENS: readonly NativeLinkedToken[] = ["G1", "G2", "G3", "G4", "G5"];
+
+/** A linked stream and when, from the parent stream's start, its channel first reads it. */
 function nativeLinkedCommand(
   steps: readonly NativeCommandStep[],
-  token: "G1" | "G2" | "G3" | "G4" | "G5",
+  token: NativeLinkedToken,
   substepDuration: number,
 ): {
   offset: number;
   steps: readonly NativeCommandStep[];
   postHitSteps?: readonly NativeCommandStep[];
 } | undefined {
-  let offset = 0;
   for (const step of steps) {
-    const command = step.commands.find((candidate) =>
-      candidate.token === token && candidate.linkedStream);
-    if (command?.linkedStream) {
+    const linked = step.commands.find((candidate) =>
+      candidate.token === token && candidate.linkedStream)?.linkedStream;
+    if (linked) {
       return {
-        offset,
-        steps: command.linkedStream.steps,
-        postHitSteps: command.linkedStream.postHitContinuation?.steps,
+        offset: nativeStreamDuration(steps.slice(0, linked.firstStep), substepDuration),
+        steps: linked.steps,
+        postHitSteps: linked.postHitContinuation?.steps,
       };
     }
-    offset += step.rendererSubsteps * substepDuration;
   }
   return undefined;
 }
@@ -899,7 +847,7 @@ function strikeTimes(spec: StrikeSpec): StrikeTimes {
     ?? nativeCommandOffset(stream, ":L", NATIVE_STRIKE_SUBSTEP)
     ?? 0;
   const linked = nativeLinkedCommand(stream, "G1", NATIVE_STRIKE_SUBSTEP);
-  const releaseOffset = spec.actorClass === 20 || spec.actorClass === 22
+  const releaseOffset = isRanged(spec.actorClass)
     ? linked?.offset ?? directionOffset
     : directionOffset;
   const deathDuration = nativeStreamDuration(
@@ -927,11 +875,6 @@ function strikeTimes(spec: StrikeSpec): StrikeTimes {
     settle: spec.victimDies
       ? end
       : holdStart + Math.max(0, holdDraws - 1) * NATIVE_HOLD_DRAW,
-    ...(linked && isRanged(spec.actorClass) ? {
-      throwAt: t0 + linked.offset,
-      lanceFrom: t0 + linked.offset,
-      lanceTo: impact,
-    } : {}),
   };
 }
 
@@ -1156,64 +1099,81 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
   );
 }
 
-/** Linked `G1..G5` streams all open with `:S`, so their origin never shows. */
-const LINKED_ORIGIN = initialNativeChannel(0, 0);
-
 /**
- * Where a linked channel's post-hit stream takes over from its strike stream.
- * Module 29 carries the animation mode and counter across this hand-over too
- * (records 1, 3, 6, 7, 9 and 25 show it), and record 5's G1 keeps running its
- * post-hit continuation; the linked channels do not replay either yet.
+ * One linked channel (`G1..G5`) through a strike. A `G` token only stores a
+ * stream pointer, so the channel reads its strike records from the step whose
+ * parse pass first reaches it. `A24D/A28E` then re-point only the two main
+ * channels: the linked channel goes on reading the records after its strike
+ * block until a post-hit `G` token re-points it, and every stream it reads
+ * continues the same x, y, animation mode and counter. `A7C3` (hold) and
+ * `B683/B6BD` (death) clear it, so only a hold without a single `AD51` redraw
+ * leaves its last post-hit image on screen.
  */
-function linkedHandOver(end: NativeChannelState): NativeChannelState {
-  return initialNativeChannel(end.x, end.y);
-}
-
-function lanceAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSceneState["lance"] {
-  if (spec.actorClass !== 22 || times.lanceFrom === undefined || times.lanceTo === undefined) return undefined;
-  if (t < times.lanceFrom) return undefined;
-  const main = nativeMainStream(spec.actorClass, spec.actorSide, "mainLeftOrAttacker");
-  const linked = nativeLinkedCommand(main, "G1", NATIVE_STRIKE_SUBSTEP);
-  if (!linked) return undefined;
-  const present = (pose: NativeStreamSample, x: number): FullCombatSceneState["lance"] =>
-    nativeFrameIntersectsViewport(spec.actorSide, spec.actorClass, "plus50", pose.frame, x)
-      ? { x, y: pose.y, frame: pose.frame, side: spec.actorSide }
-      : undefined;
-
-  if (t < times.lanceTo) {
-    const pose = sampleNativeStream(linked.steps, t - times.lanceFrom, NATIVE_STRIKE_SUBSTEP, LINKED_ORIGIN);
-    return present(pose, pose.x);
-  }
-  const deflection = cavalryLanceDeflection(linked, times, t);
-  if (!deflection) return undefined;
-  return present(deflection, deflection.x);
-}
-
-/**
- * Record 22's post-hit command stream never re-issues `G1`, so the weapon
- * channel survives contact and keeps reading its own records: four
- * `frame 6, (+-30,-16)` substeps that cant the lance back up and carry it out of
- * the battle window. Clearing the channel at contact left the lance stuck in the
- * ground instead of deflecting away.
- */
-function cavalryLanceDeflection(
-  linked: NonNullable<ReturnType<typeof nativeLinkedCommand>>,
+function nativeLinkedChannelSample(
+  spec: StrikeSpec,
   times: StrikeTimes,
+  token: NativeLinkedToken,
   t: number,
-): (NativeStreamSample & { contactX: number }) | undefined {
-  const continuation = linked.postHitSteps;
-  if (!continuation || times.lanceTo === undefined) return undefined;
-  if (t >= times.lanceTo + nativeStreamDuration(continuation, NATIVE_POST_HIT_SUBSTEP)) {
-    return undefined;
+): NativeStreamSample | undefined {
+  if (t >= times.holdStart) {
+    if (spec.victimDies || times.holdDraws > 0) return undefined;
+    return nativeLinkedChannelSample(spec, times, token, times.holdStart - 1);
   }
-  const contact = nativeStreamEnd(linked.steps, LINKED_ORIGIN);
-  const pose = sampleNativeStream(
-    continuation,
-    t - times.lanceTo,
-    NATIVE_POST_HIT_SUBSTEP,
-    linkedHandOver(contact),
+  const strike = nativeLinkedCommand(
+    nativeMainStream(spec.actorClass, spec.actorSide, "mainLeftOrAttacker"),
+    token,
+    NATIVE_STRIKE_SUBSTEP,
   );
-  return { ...pose, contactX: contact.x };
+  if (!strike || t < spec.start + strike.offset) return undefined;
+  // `B061/B1FD` start every channel of a side where its main channel starts,
+  // in mode `XN`; each strike link opens with `:S`.
+  const origin = initialNativeChannel(spec.actorX);
+  if (t < times.impact) {
+    return sampleNativeStream(
+      strike.steps,
+      t - spec.start - strike.offset,
+      NATIVE_STRIKE_SUBSTEP,
+      origin,
+    );
+  }
+  const age = t - times.impact;
+  const contact = nativeStreamEnd(strike.steps, origin);
+  const carried = strike.postHitSteps ?? [];
+  if (age < nativeStreamDuration(carried, NATIVE_POST_HIT_SUBSTEP)) {
+    return sampleNativeStream(carried, age, NATIVE_POST_HIT_SUBSTEP, contact);
+  }
+  const post = nativeLinkedCommand(
+    nativeReactionStream(
+      spec.actorClass,
+      spec.actorSide,
+      spec.damage <= 10 ? "guard" : "hurt",
+      "actor",
+    ),
+    token,
+    NATIVE_POST_HIT_SUBSTEP,
+  );
+  if (!post || age < post.offset) return undefined;
+  return sampleNativeStream(
+    post.steps,
+    age - post.offset,
+    NATIVE_POST_HIT_SUBSTEP,
+    nativeStreamEnd(carried, contact),
+  );
+}
+
+/**
+ * Record 22's post-hit streams never re-issue `G1`, so its lance survives
+ * contact and keeps reading its own records: four `frame 6, (+-30,-16)`
+ * substeps that cant it back up and carry it out of the battle window.
+ */
+function lanceAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSceneState["lance"] {
+  if (spec.actorClass !== 22) return undefined;
+  const pose = nativeLinkedChannelSample(spec, times, "G1", t);
+  if (
+    !pose
+    || !nativeFrameIntersectsViewport(spec.actorSide, spec.actorClass, "plus50", pose.frame, pose.x)
+  ) return undefined;
+  return { x: pose.x, y: pose.y, frame: pose.frame, side: spec.actorSide };
 }
 
 function archerProjectileAt(
@@ -1221,24 +1181,9 @@ function archerProjectileAt(
   times: StrikeTimes,
   t: number,
 ): FullCombatSceneState["projectile"] {
-  if (spec.actorClass !== 20 || times.lanceFrom === undefined || times.lanceTo === undefined) return undefined;
-  if (t < times.lanceFrom || t >= times.holdStart) return undefined;
-  const flightStream = ARCHER_FLIGHT_STREAMS[spec.actorSide];
-  const pose = t < times.lanceTo
-    ? sampleNativeStream(
-      flightStream,
-      t - times.lanceFrom,
-      NATIVE_STRIKE_SUBSTEP,
-      LINKED_ORIGIN,
-    )
-    : sampleNativeStream(
-      spec.damage <= 10
-        ? ARCHER_GUARD_PROJECTILE_STREAMS[spec.actorSide]
-        : ARCHER_HURT_PROJECTILE_STREAMS[spec.actorSide],
-      t - times.lanceTo,
-      NATIVE_POST_HIT_SUBSTEP,
-      linkedHandOver(nativeStreamEnd(flightStream, LINKED_ORIGIN)),
-    );
+  if (spec.actorClass !== 20) return undefined;
+  const pose = nativeLinkedChannelSample(spec, times, "G1", t);
+  if (!pose) return undefined;
   return {
     x: pose.x,
     y: pose.y,
@@ -1248,118 +1193,34 @@ function archerProjectileAt(
   };
 }
 
-function nativeG1EffectSprite(
-  spec: StrikeSpec,
-  times: StrikeTimes,
-  t: number,
-): FullCombatSpriteState | undefined {
-  if (
-    (spec.actorClass !== 1 && spec.actorClass !== 3)
-    || t < spec.start
-    || t >= times.holdStart
-  ) {
-    return undefined;
-  }
-  const streams = NATIVE_G1_EFFECT_STREAMS[spec.actorClass][spec.actorSide];
-  const pose = t < times.impact
-    ? sampleNativeStream(
-      streams.strike,
-      t - spec.start,
-      NATIVE_STRIKE_SUBSTEP,
-      LINKED_ORIGIN,
-    )
-    : sampleNativeStream(
-      spec.damage <= 10 ? streams.guard : streams.hurt,
-      t - times.impact,
-      NATIVE_POST_HIT_SUBSTEP,
-      linkedHandOver(nativeStreamEnd(streams.strike, LINKED_ORIGIN)),
-    );
-  if (!nativeFrameIntersectsViewport(
-    spec.actorSide,
-    spec.actorClass,
-    "plus50",
-    pose.frame,
-    pose.x,
-  )) return undefined;
-  return {
-    side: spec.actorSide,
-    classId: spec.actorClass,
-    set: "plus50",
-    channel: "G1",
-    frame: pose.frame,
-    x: pose.x,
-    lift: FULL_SCENE.groundY - pose.y,
-    mirror: false,
-    opacity: 1,
-  };
-}
-
-function genericNativeLinkedEffectSprites(
+/**
+ * The linked channels drawn as `+50` sprites. Records 20 and 22 draw their
+ * `G1` arrow and lance on the dedicated projectile and lance layers instead.
+ */
+function nativeLinkedEffectSprites(
   spec: StrikeSpec,
   times: StrikeTimes,
   t: number,
 ): FullCombatSpriteState[] {
-  if (
-    spec.actorClass === 1
-    || spec.actorClass === 3
-    || spec.actorClass === 20
-    || spec.actorClass === 22
-    || t < spec.start
-    || t >= times.holdStart
-  ) {
-    return [];
-  }
-  const reaction = spec.damage <= 10 ? "guard" : "hurt";
-  const main = nativeMainStream(spec.actorClass, spec.actorSide, "mainLeftOrAttacker");
-  const post = nativeReactionStream(spec.actorClass, spec.actorSide, reaction, "actor");
-  const result: FullCombatSpriteState[] = [];
-  for (const token of ["G1", "G2", "G3", "G4", "G5"] as const) {
-    const strikeLinked = nativeLinkedCommand(main, token, NATIVE_STRIKE_SUBSTEP);
-    const postLinked = nativeLinkedCommand(post, token, NATIVE_POST_HIT_SUBSTEP);
-    let pose: NativeStreamSample | undefined;
-    if (t < times.impact) {
-      const age = t - spec.start - (strikeLinked?.offset ?? 0);
-      if (strikeLinked && age >= 0) {
-        pose = sampleNativeStream(
-          strikeLinked.steps,
-          age,
-          NATIVE_STRIKE_SUBSTEP,
-          LINKED_ORIGIN,
-        );
-      }
-    } else if (postLinked && t - times.impact >= postLinked.offset) {
-      pose = sampleNativeStream(
-        postLinked.steps,
-        t - times.impact - postLinked.offset,
-        NATIVE_POST_HIT_SUBSTEP,
-        linkedHandOver(strikeLinked
-          ? nativeStreamEnd(strikeLinked.steps, LINKED_ORIGIN)
-          : LINKED_ORIGIN),
-      );
-    }
+  return NATIVE_LINKED_TOKENS.flatMap((token) => {
+    if (token === "G1" && isRanged(spec.actorClass)) return [];
+    const pose = nativeLinkedChannelSample(spec, times, token, t);
     if (
       !pose
-      || !nativeFrameIntersectsViewport(
-        spec.actorSide,
-        spec.actorClass,
-        "plus50",
-        pose.frame,
-        pose.x,
-      )
-    ) continue;
-    result.push({
+      || !nativeFrameIntersectsViewport(spec.actorSide, spec.actorClass, "plus50", pose.frame, pose.x)
+    ) return [];
+    return [{
       side: spec.actorSide,
       classId: spec.actorClass,
       set: "plus50",
       channel: token,
       frame: pose.frame,
       x: pose.x,
-      lift: FULL_SCENE.groundY - pose.y,
+      lift: nativeLift(pose.y),
       mirror: false,
       opacity: 1,
-    });
-  }
-  return result;
+    }];
+  });
 }
 
 type NativeEffectMode = "N" | "Y" | "U";
@@ -1798,13 +1659,10 @@ function sampleStrike(spec: StrikeSpec, times: StrikeTimes, t: number): Pick<
   const victimChannel = victimSprite(spec, times, t);
   const actor = visibleChannelSprite(actorChannel);
   const victim = visibleChannelSprite(victimChannel);
-  const nativeG1Effect = nativeG1EffectSprite(spec, times, t);
-  const nativeLinkedEffects = genericNativeLinkedEffectSprites(spec, times, t);
   const nativePresentation = nativePresentationAt(spec, times, t);
   if (victim) sprites.push(victim);
   if (actor) sprites.push(actor);
-  if (nativeG1Effect) sprites.push(nativeG1Effect);
-  sprites.push(...nativeLinkedEffects);
+  sprites.push(...nativeLinkedEffectSprites(spec, times, t));
   const shadows = [victimChannel, actorChannel].flatMap((channel) => {
     const shadow = nativeMainChannelShadow(channel);
     return shadow ? [shadow] : [];

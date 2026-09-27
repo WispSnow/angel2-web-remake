@@ -68,6 +68,23 @@ if (
 }
 
 const classRecords = combatPresentations.fullScreenPresentation.classRecords;
+// full-combat.ts places every linked channel by `firstStep` (REMAKE-168). An
+// export from an older angel2-combat-presentations.mjs lacks it and would
+// silently push every G1..G5 channel past the end of its strike.
+for (const record of classRecords) {
+  for (const side of [record.side1, record.side2]) {
+    for (const stream of Object.values(side.commandStreams ?? {})) {
+      for (const command of stream.steps.flatMap((step) => step.commands)) {
+        if (command.linkedStream && !Number.isInteger(command.linkedStream.firstStep)) {
+          throw new Error(
+            `record ${record.record} ${command.token} link has no firstStep; `
+            + "rerun reverse/tools/angel2-combat-presentations.mjs",
+          );
+        }
+      }
+    }
+  }
+}
 const fullCombatGeometry = combatPresentations.fullScreenPresentation.coordinateSystem;
 const classSpecs = classIds.map((id, nativeRecord) => ({ id, nativeRecord }));
 const fullCombatProfiles = {};

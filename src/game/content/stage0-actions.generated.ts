@@ -954,6 +954,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:952F"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:952F",
                     "bytesConsumed": 60,
                     "steps": [
@@ -1273,6 +1275,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:956B"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:956B",
                     "bytesConsumed": 24,
                     "steps": [
@@ -1424,6 +1428,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:9583"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:9583",
                     "bytesConsumed": 26,
                     "steps": [
@@ -1584,6 +1590,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:C067"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:C067",
                     "bytesConsumed": 60,
                     "steps": [
@@ -1903,6 +1911,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:C0A3"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:C0A3",
                     "bytesConsumed": 24,
                     "steps": [
@@ -2054,6 +2064,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:C0BB"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:C0BB",
                     "bytesConsumed": 26,
                     "steps": [
@@ -3076,6 +3088,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:9791"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:9791",
                     "bytesConsumed": 38,
                     "steps": [
@@ -3268,6 +3282,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:97B7"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:97B7",
                     "bytesConsumed": 18,
                     "steps": [
@@ -3389,6 +3405,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:97C9"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:97C9",
                     "bytesConsumed": 18,
                     "steps": [
@@ -3513,6 +3531,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:C2C9"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:C2C9",
                     "bytesConsumed": 38,
                     "steps": [
@@ -3705,6 +3725,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:C2EF"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:C2EF",
                     "bytesConsumed": 18,
                     "steps": [
@@ -3826,6 +3848,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:C301"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:C301",
                     "bytesConsumed": 18,
                     "steps": [
@@ -4743,6 +4767,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:99EB"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 3,
                     "address": "DS:99EB",
                     "bytesConsumed": 18,
                     "steps": [
@@ -5148,6 +5174,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:C523"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 3,
                     "address": "DS:C523",
                     "bytesConsumed": 18,
                     "steps": [
@@ -5602,6 +5630,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:9B67"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 4,
                     "address": "DS:9B67",
                     "bytesConsumed": 20,
                     "steps": [
@@ -5753,6 +5783,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:9B7B"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:9B7B",
                     "bytesConsumed": 24,
                     "steps": [
@@ -5904,6 +5936,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:9B7B"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:9B7B",
                     "bytesConsumed": 24,
                     "steps": [
@@ -6104,6 +6138,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:C69F"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 4,
                     "address": "DS:C69F",
                     "bytesConsumed": 20,
                     "steps": [
@@ -6255,6 +6291,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:C6B3"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:C6B3",
                     "bytesConsumed": 24,
                     "steps": [
@@ -6406,6 +6444,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:C6B3"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:C6B3",
                     "bytesConsumed": 24,
                     "steps": [
@@ -6659,6 +6699,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:9CEB"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 4,
                     "address": "DS:9CEB",
                     "bytesConsumed": 20,
                     "steps": [
@@ -6809,6 +6851,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:9CFF"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:9CFF",
                     "bytesConsumed": 24,
                     "steps": [
@@ -6972,6 +7016,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:9CFF"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:9CFF",
                     "bytesConsumed": 24,
                     "steps": [
@@ -7188,6 +7234,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:C823"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 4,
                     "address": "DS:C823",
                     "bytesConsumed": 20,
                     "steps": [
@@ -7338,6 +7386,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:C837"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:C837",
                     "bytesConsumed": 24,
                     "steps": [
@@ -7501,6 +7551,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:C837"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:C837",
                     "bytesConsumed": 24,
                     "steps": [
@@ -8596,6 +8648,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:9F55"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 5,
                     "address": "DS:9F55",
                     "bytesConsumed": 14,
                     "steps": [
@@ -8716,6 +8770,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:9F63"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:9F63",
                     "bytesConsumed": 24,
                     "steps": [
@@ -8868,6 +8924,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:9F63"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:9F63",
                     "bytesConsumed": 24,
                     "steps": [
@@ -9094,6 +9152,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:CA8D"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 5,
                     "address": "DS:CA8D",
                     "bytesConsumed": 14,
                     "steps": [
@@ -9214,6 +9274,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:CA9B"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:CA9B",
                     "bytesConsumed": 24,
                     "steps": [
@@ -9366,6 +9428,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:CA9B"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:CA9B",
                     "bytesConsumed": 24,
                     "steps": [
@@ -12660,8 +12724,10 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:A597"
                   ],
                   "linkedStream": {
+                    "channelOffset": 8,
+                    "firstStep": 1,
                     "address": "DS:A597",
-                    "bytesConsumed": 118,
+                    "bytesConsumed": 110,
                     "steps": [
                       {
                         "index": 0,
@@ -12834,7 +12900,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                       },
                       {
                         "index": 16,
-                        "rendererSubsteps": 1,
+                        "rendererSubsteps": 9,
                         "commands": [
                           {
                             "opcode": 22586,
@@ -12847,24 +12913,30 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                           "deltaX": 10,
                           "deltaY": 0
                         }
-                      },
-                      {
-                        "index": 17,
-                        "rendererSubsteps": 9,
-                        "commands": [
-                          {
-                            "opcode": 22586,
-                            "token": ":X",
-                            "parameters": []
-                          }
-                        ],
-                        "pose": {
-                          "frame": 14,
-                          "deltaX": 40,
-                          "deltaY": 0
-                        }
                       }
-                    ]
+                    ],
+                    "postHitContinuation": {
+                      "address": "DS:A605",
+                      "bytesConsumed": 8,
+                      "steps": [
+                        {
+                          "index": 0,
+                          "rendererSubsteps": 3,
+                          "commands": [
+                            {
+                              "opcode": 22586,
+                              "token": ":X",
+                              "parameters": []
+                            }
+                          ],
+                          "pose": {
+                            "frame": 14,
+                            "deltaX": 40,
+                            "deltaY": 0
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               ],
@@ -13253,12 +13325,14 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:A605"
                   ],
                   "linkedStream": {
+                    "channelOffset": 8,
+                    "firstStep": 1,
                     "address": "DS:A605",
-                    "bytesConsumed": 20,
+                    "bytesConsumed": 14,
                     "steps": [
                       {
                         "index": 0,
-                        "rendererSubsteps": 3,
+                        "rendererSubsteps": 2,
                         "commands": [
                           {
                             "opcode": 22586,
@@ -13274,16 +13348,6 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                       },
                       {
                         "index": 1,
-                        "rendererSubsteps": 2,
-                        "commands": [],
-                        "pose": {
-                          "frame": 14,
-                          "deltaX": 40,
-                          "deltaY": 0
-                        }
-                      },
-                      {
-                        "index": 2,
                         "rendererSubsteps": 3,
                         "commands": [],
                         "pose": {
@@ -13381,12 +13445,14 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:A605"
                   ],
                   "linkedStream": {
+                    "channelOffset": 8,
+                    "firstStep": 1,
                     "address": "DS:A605",
-                    "bytesConsumed": 20,
+                    "bytesConsumed": 14,
                     "steps": [
                       {
                         "index": 0,
-                        "rendererSubsteps": 3,
+                        "rendererSubsteps": 2,
                         "commands": [
                           {
                             "opcode": 22586,
@@ -13402,16 +13468,6 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                       },
                       {
                         "index": 1,
-                        "rendererSubsteps": 2,
-                        "commands": [],
-                        "pose": {
-                          "frame": 14,
-                          "deltaX": 40,
-                          "deltaY": 0
-                        }
-                      },
-                      {
-                        "index": 2,
                         "rendererSubsteps": 3,
                         "commands": [],
                         "pose": {
@@ -13521,8 +13577,10 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:D0F9"
                   ],
                   "linkedStream": {
+                    "channelOffset": 8,
+                    "firstStep": 1,
                     "address": "DS:D0F9",
-                    "bytesConsumed": 118,
+                    "bytesConsumed": 110,
                     "steps": [
                       {
                         "index": 0,
@@ -13695,7 +13753,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                       },
                       {
                         "index": 16,
-                        "rendererSubsteps": 1,
+                        "rendererSubsteps": 9,
                         "commands": [
                           {
                             "opcode": 22586,
@@ -13708,24 +13766,30 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                           "deltaX": -10,
                           "deltaY": 0
                         }
-                      },
-                      {
-                        "index": 17,
-                        "rendererSubsteps": 9,
-                        "commands": [
-                          {
-                            "opcode": 22586,
-                            "token": ":X",
-                            "parameters": []
-                          }
-                        ],
-                        "pose": {
-                          "frame": 14,
-                          "deltaX": -40,
-                          "deltaY": 0
-                        }
                       }
-                    ]
+                    ],
+                    "postHitContinuation": {
+                      "address": "DS:D167",
+                      "bytesConsumed": 8,
+                      "steps": [
+                        {
+                          "index": 0,
+                          "rendererSubsteps": 3,
+                          "commands": [
+                            {
+                              "opcode": 22586,
+                              "token": ":X",
+                              "parameters": []
+                            }
+                          ],
+                          "pose": {
+                            "frame": 14,
+                            "deltaX": -40,
+                            "deltaY": 0
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               ],
@@ -14114,12 +14178,14 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:D167"
                   ],
                   "linkedStream": {
+                    "channelOffset": 8,
+                    "firstStep": 1,
                     "address": "DS:D167",
-                    "bytesConsumed": 20,
+                    "bytesConsumed": 14,
                     "steps": [
                       {
                         "index": 0,
-                        "rendererSubsteps": 3,
+                        "rendererSubsteps": 2,
                         "commands": [
                           {
                             "opcode": 22586,
@@ -14135,16 +14201,6 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                       },
                       {
                         "index": 1,
-                        "rendererSubsteps": 2,
-                        "commands": [],
-                        "pose": {
-                          "frame": 14,
-                          "deltaX": -40,
-                          "deltaY": 0
-                        }
-                      },
-                      {
-                        "index": 2,
                         "rendererSubsteps": 3,
                         "commands": [],
                         "pose": {
@@ -14242,12 +14298,14 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:D167"
                   ],
                   "linkedStream": {
+                    "channelOffset": 8,
+                    "firstStep": 1,
                     "address": "DS:D167",
-                    "bytesConsumed": 20,
+                    "bytesConsumed": 14,
                     "steps": [
                       {
                         "index": 0,
-                        "rendererSubsteps": 3,
+                        "rendererSubsteps": 2,
                         "commands": [
                           {
                             "opcode": 22586,
@@ -14263,16 +14321,6 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                       },
                       {
                         "index": 1,
-                        "rendererSubsteps": 2,
-                        "commands": [],
-                        "pose": {
-                          "frame": 14,
-                          "deltaX": -40,
-                          "deltaY": 0
-                        }
-                      },
-                      {
-                        "index": 2,
                         "rendererSubsteps": 3,
                         "commands": [],
                         "pose": {
@@ -14997,6 +15045,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:A80B"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:A80B",
                     "bytesConsumed": 30,
                     "steps": [
@@ -15379,6 +15429,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:D365"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:D365",
                     "bytesConsumed": 30,
                     "steps": [
@@ -15808,6 +15860,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:A951"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:A951",
                     "bytesConsumed": 36,
                     "steps": [
@@ -16261,6 +16315,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:D4AB"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:D4AB",
                     "bytesConsumed": 36,
                     "steps": [
@@ -18847,6 +18903,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:AD59"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 3,
                     "address": "DS:AD59",
                     "bytesConsumed": 30,
                     "steps": [
@@ -19032,6 +19090,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:AD77"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:AD77",
                     "bytesConsumed": 20,
                     "steps": [
@@ -19159,6 +19219,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:AD8B"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:AD8B",
                     "bytesConsumed": 20,
                     "steps": [
@@ -19335,6 +19397,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:D8B3"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 3,
                     "address": "DS:D8B3",
                     "bytesConsumed": 30,
                     "steps": [
@@ -19520,6 +19584,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:D8D1"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:D8D1",
                     "bytesConsumed": 20,
                     "steps": [
@@ -19647,6 +19713,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:D8E5"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:D8E5",
                     "bytesConsumed": 20,
                     "steps": [
@@ -19865,6 +19933,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:AE8B"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 2,
                     "address": "DS:AE8B",
                     "bytesConsumed": 30,
                     "steps": [
@@ -20296,6 +20366,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:D9E5"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 2,
                     "address": "DS:D9E5",
                     "bytesConsumed": 30,
                     "steps": [
@@ -20815,6 +20887,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:AFFD"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 5,
                     "address": "DS:AFFD",
                     "bytesConsumed": 24,
                     "steps": [
@@ -21301,6 +21375,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:DB57"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 5,
                     "address": "DS:DB57",
                     "bytesConsumed": 24,
                     "steps": [
@@ -23237,6 +23313,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:B33F"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 3,
                     "address": "DS:B33F",
                     "bytesConsumed": 32,
                     "steps": [
@@ -23433,6 +23511,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:B35F"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:B35F",
                     "bytesConsumed": 20,
                     "steps": [
@@ -23560,6 +23640,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:B373"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:B373",
                     "bytesConsumed": 20,
                     "steps": [
@@ -23736,6 +23818,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:DE95"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 3,
                     "address": "DS:DE95",
                     "bytesConsumed": 32,
                     "steps": [
@@ -23932,6 +24016,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:DEB5"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:DEB5",
                     "bytesConsumed": 20,
                     "steps": [
@@ -24059,6 +24145,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:DEC9"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:DEC9",
                     "bytesConsumed": 20,
                     "steps": [
@@ -27044,6 +27132,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:B8C5"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 5,
                     "address": "DS:B8C5",
                     "bytesConsumed": 26,
                     "steps": [
@@ -27229,6 +27319,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:B8DF"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:B8DF",
                     "bytesConsumed": 20,
                     "steps": [
@@ -27362,6 +27454,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:B8DF"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:B8DF",
                     "bytesConsumed": 20,
                     "steps": [
@@ -27559,6 +27653,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:E419"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 5,
                     "address": "DS:E419",
                     "bytesConsumed": 26,
                     "steps": [
@@ -27744,6 +27840,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:E433"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:E433",
                     "bytesConsumed": 20,
                     "steps": [
@@ -27877,6 +27975,8 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                     "DS:E433"
                   ],
                   "linkedStream": {
+                    "channelOffset": 0,
+                    "firstStep": 0,
                     "address": "DS:E433",
                     "bytesConsumed": 20,
                     "steps": [
@@ -32428,6 +32528,11 @@ export const STAGE0_FULL_COMBAT_GEOMETRY = {
     },
     "initialization": "A2E4/A377 call B061 (left) and B1FD (right), giving every channel of a side the same x, y=135, latched frame 0 and animation mode XN; the animation counter is left untouched",
     "stepParse": "A77F/A7A4 read one pose per active channel through A80F (left) and AA15 (right); :S (A8EF/AAF5) is the only command that writes a channel's x and y",
+    "stepParseOrder": "A7F4 (left) and A9FA (right) walk channel offsets 8,6,4,2,0 once per step and parse only channels whose stream pointer is non-zero",
+    "animationModeStore": ":X/X4/X6/XN only store the token in the channel's mode word (A910/A91C left, AB16/AB22 right); none of them touches the animation counter",
+    "linkedChannels": "G1..G5 (A9A0 left, ABB4 right) only store the target channel's stream pointer and advance the issuing pointer by 4; x, y, mode and counter are untouched. A main-channel G token reaches offsets 0, 2 and 4 later in the same parse pass, so G1 reads its first record in the issuing step; offset 8 was already passed, so G5 reads its first record one step later (firstStep). In the issuing step B0B7/B253 still latch and draw that channel from the pose it last read, which on a fresh start is frame 0 at the B061/B1FD origin, the same image the main channel draws over it",
+    "postHitHandOver": "A24D (hurt) and A28E (guard) re-point only the two main channels and the two extra streams DS:7B5E/7B82 that ABFA/AC5F parse, so a linked channel keeps reading the records after its strike block, with its x, y, mode and counter, until a post-hit G token re-points it (postHitContinuation); the new stream inherits the same x, y, mode and counter",
+    "holdAndDeath": "A7C3 clears offsets 0,2,4,8 before the AD36 hold and B683/B6BD clear every channel before the death streams, so linked channels are never redrawn after the post-hit stream; when AD36 draws nothing the last post-hit image, linked channels included, stays on screen",
     "frameLatch": "ACC4 latches every active channel's pose frame before the step's substeps (B0B7/B253)",
     "draw": "B0FF/B29B pass the latched frame through B1A8/B344 on every draw: :X toggles the counter, X4/X6 advance it modulo 4/6, any other mode clears it, and the drawn frame is the latched frame plus the counter",
     "accumulation": "after each drawn substep ACC4 adds dx/dy to every active channel (B0D7/B273), so a stream ends one increment past its last drawn position",

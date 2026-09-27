@@ -34,6 +34,7 @@ const CODE_SIGNATURES = [
   ["0000:A1E8", "run-one-full-screen-strike", "c606327c4ee88f05a12f7dffd0c606327c59a12d7dffd08b0ed77cbe3d7ce84d4de8c300e819fcc7063cf90b00a11a7c"],
   ["0000:A218", "run-post-hit-stream-then-hold", "a3187ce82000e85e05c606487f4ec606497f4ec706317d3a4ae88f05e8ff0ac7063cf90f00c3"],
   ["0000:A23E", "select-full-screen-hit-reaction", "833ed77c0a7704e84600c3e80100c3"],
+  ["0000:A24D", "repoint-main-channels-for-hit-reaction", "833e007a017408833e007a02741ac3a1527aa3847aa1dc7aa30a7ba1607ba35e7ba1847ba3827bc3a1d87aa30a7ba1567aa3847aa1607ba35e7ba1847ba3827bc3833e007a017408833e007a02741ac3a1547aa3847aa1de7aa30a7ba1627ba35e7ba1867ba3827bc3a1da7aa30a7ba1587aa3847aa1627ba35e7ba1867ba3827bc3"],
   ["0000:A2E4", "prepare-full-screen-primary", "8b3ebf77e81f013c0174053c027448c3bafa00bb8700e8640dba8a02bb8700e8f70ee89401e81914a180f8be41029a0a"],
   ["0000:A377", "prepare-full-screen-counter", "8b3ebf77e88c003c0274053c017448c3bafa00bb8700e8d10cba8a02bb8700e8640ee87700e88613a180f8be41029a0a"],
   ["0000:A413", "setup-counter-left-actor-right-defender", "9ae100471ee8c503e8c805a1697ca37c7aa1717ca3187ca1737ca31a7ca1757ca3847aa1777ca30a7ba1797ca3527aa17d7ca3547aa17b7ca3dc7aa17f7ca3de7aa16b7ca3787aa16d7ca37a7aa19f7ca3fe7aa1a17ca3007b"],
@@ -45,9 +46,15 @@ const CODE_SIGNATURES = [
   ["0000:A7A4", "execute-full-screen-death-stream", "8b1e187c8b073dffff7413a3167c8306187c02e83a00e83d02e80405ebe2c3"],
   ["0000:A7C3", "clear-linked-channels-keep-main", "b90500514903c98bd983fb06740bb8000089877e7a8987047b59e2e7c3"],
   ["0000:A7E0", "clear-left-channels", "b90500514903c98bd9b8000089877e7a59e2f0c3"],
+  ["0000:A7F4", "parse-left-channels-in-offset-order", "b90500514903c9890e767a8bd983bf7e7a007403e8040059e2e9c3"],
   ["0000:A8D1", "read-left-pose-or-apply-s", "8bb77e7a8b048987ba7a8b44028987c47a8b44048987ce7a83877e7a06c38b44028987a67a8b44048987b07a83877e7a06e90aff"],
+  ["0000:A910", "store-left-animation-mode", "8987927a83877e7a02e9f3fe8987927a83877e7a02e9e7fe"],
+  ["0000:A9A0", "repoint-left-linked-channels", "8b4402a37e7a83877e7a04e961fe8b4402a3807a83877e7a04e953fe8b4402a3827a83877e7a04e945fe8b4402a3847a83877e7a04e937fe8b4402a3867a83877e7a04e929fe"],
   ["0000:A9E6", "clear-right-channels", "b90500514903c98bd9b800008987047b59e2f0c3"],
+  ["0000:A9FA", "parse-right-channels-in-offset-order", "b90500514903c9890efc7a8bd983bf047b007403e8040059e2e9c3"],
   ["0000:AAD7", "read-right-pose-or-apply-s", "8bb7047b8b048987407b8b440289874a7b8b44048987547b8387047b06c38b440289872c7b8b44048987367b8387047b06"],
+  ["0000:AB16", "store-right-animation-mode", "8987187b8387047b02e9f3fe8987187b8387047b02e9e7fe"],
+  ["0000:ABB4", "repoint-right-linked-channels", "8b4402a3047b8387047b04e953fe8b4402a3067b8387047b04e945fe8b4402a3087b8387047b04e937fe8b4402a30a7b8387047b04e929fe8b4402a30c7b8387047b04e91bfe"],
   ["0000:ACC4", "run-command-step-substeps", "e8f003e88905a17c7ba3787ba1a07ba39c7b8b0e167c51e89200e8f603e88f05e80f00e82c008336fa7901e8760959e2e5c3"],
   ["0000:AD36", "hold-until-damage-number-settles", "833e1d7d007413833e277d00740c833e337c147305e80300ebe6c3e86f01e8f302e89707e86006b8b902ba0800e86645e88e09b90100e84726c3"],
   ["0000:AD70", "render-one-full-screen-substep", "e85001c706687b3100c7068c7b3100e8c802c706687b3200c7068c7b3200e86007e82906e83700"],
@@ -376,6 +383,31 @@ const FULL_SCREEN_COMMANDS = new Map([
   [0x4555, { token: "UE", argumentKinds: [] }],
 ]);
 
+// `A7F4`/`A9FA` parse a side's channels once per step, walking offsets 8, 6, 4, 2, 0
+// and skipping any channel whose stream pointer is still 0. Command streams run on
+// the main channel at offset 6.
+const MAIN_CHANNEL_OFFSET = 6;
+const CHANNEL_PARSE_ORDER = [8, 6, 4, 2, 0];
+
+function linkedChannelOffset(token) {
+  return (Number(token.slice(1)) - 1) * 2;
+}
+
+/**
+ * `G1..G5` (`A9A0`/`ABB4`) only store the new stream pointer. A channel that the
+ * parse loop visits after the main channel therefore reads its first record in
+ * the step that re-pointed it; `G5`'s offset 8 was already passed, so it waits for
+ * the next step.
+ */
+function linkedChannelParseLag(token) {
+  const target = linkedChannelOffset(token);
+  assert(target !== MAIN_CHANNEL_OFFSET,
+    `${token} would re-point the issuing main channel and skip 4 bytes of its new stream`);
+  return CHANNEL_PARSE_ORDER.indexOf(target) < CHANNEL_PARSE_ORDER.indexOf(MAIN_CHANNEL_OFFSET)
+    ? 1
+    : 0;
+}
+
 function parseFullScreenCommandStream(buffer, dsOffset, stepCounts, followLinkedStreams = true) {
   let cursor = dsOffset;
   const steps = stepCounts.map((rendererSubsteps, index) => {
@@ -408,12 +440,17 @@ function parseFullScreenCommandStream(buffer, dsOffset, stepCounts, followLinked
           ? command.parameters.find((parameter) => typeof parameter === "string")
           : undefined;
         if (pointer) {
-          command.linkedStream = parseFullScreenCommandStream(
-            buffer,
-            Number.parseInt(pointer.slice(3), 16),
-            stepCounts.slice(step.index),
-            false,
-          );
+          const firstStep = step.index + linkedChannelParseLag(command.token);
+          command.linkedStream = {
+            channelOffset: linkedChannelOffset(command.token),
+            firstStep,
+            ...parseFullScreenCommandStream(
+              buffer,
+              Number.parseInt(pointer.slice(3), 16),
+              stepCounts.slice(firstStep),
+              false,
+            ),
+          };
         }
       }
     }
@@ -425,12 +462,20 @@ function parseFullScreenCommandStream(buffer, dsOffset, stepCounts, followLinked
   };
 }
 
+// Only the acting side's streams re-point linked channels: the strike stream and
+// the hurt (`auxiliaryA`) or guard (`auxiliaryC`) stream that `A24D/A28E` hand it.
+const LINKED_CHANNEL_STREAM_KEYS = ["mainLeftOrAttacker", "auxiliaryA", "auxiliaryC"];
+
 /**
  * A `G1`..`G5` weapon channel is a persistent sprite slot, not a one-shot
- * effect: its records sit immediately after the strike block, and the post-hit
- * command stream only re-points the channel when it issues the same token
- * again. Classes whose post-hit streams never re-issue the token keep reading
- * from where the strike block ended, consuming the post-hit step counts.
+ * effect. `A24D/A28E` re-point only the two main channels, so between the
+ * strike and the post-hit stream a linked channel keeps its pointer, x, y,
+ * animation mode and counter, and goes on reading the records that follow its
+ * strike block until a post-hit `G` token re-points it. The continuation below
+ * is exactly the records read before that hand-over takes effect: none for a
+ * `G1` re-pointed on the first post-hit step, the whole post-hit stream when
+ * the token is never re-issued, and one step for `G5`, whose re-point waits for
+ * the next step like its strike link.
  *
  * Record 22 is the stage-0 case: its thrown lance has no post-hit `G1`, so the
  * four records after `DS:AFFD`/`DS:DB57` keep running and carry the lance back
@@ -438,30 +483,38 @@ function parseFullScreenCommandStream(buffer, dsOffset, stepCounts, followLinked
  * upward deflection out of the battle window after contact.
  */
 function attachWeaponChannelContinuations(buffer, commandStreams, postHitStepCounts) {
-  const isMain = (key) => key.startsWith("main");
-  const reissuedTokens = new Set(
-    Object.entries(commandStreams)
-      .filter(([key]) => !isMain(key))
-      .flatMap(([, stream]) => stream.steps)
-      .flatMap((step) => step.commands)
-      .filter((command) => command.linkedStream !== undefined)
-      .map((command) => command.token),
-  );
   for (const [key, stream] of Object.entries(commandStreams)) {
-    if (!isMain(key)) continue;
-    for (const step of stream.steps) {
-      for (const command of step.commands) {
-        if (command.linkedStream === undefined) continue;
-        if (reissuedTokens.has(command.token)) continue;
-        const linkedOffset = parseAddress(`0000:${command.linkedStream.address.slice(3)}`).offset;
-        command.linkedStream.postHitContinuation = parseFullScreenCommandStream(
-          buffer,
-          linkedOffset + command.linkedStream.bytesConsumed,
-          postHitStepCounts,
-          false,
-        );
-      }
+    if (LINKED_CHANNEL_STREAM_KEYS.includes(key)) continue;
+    assert(stream.steps.every((step) => step.commands.every((command) =>
+      command.linkedStream === undefined)),
+    `${stream.address}: a defender stream must not re-point linked channels`);
+  }
+  const linkedCommands = (key) => commandStreams[key].steps
+    .flatMap((step) => step.commands)
+    .filter((command) => command.linkedStream !== undefined);
+  const strikeTokens = new Set(linkedCommands("mainLeftOrAttacker").map(({ token }) => token));
+  for (const key of ["auxiliaryA", "auxiliaryC"]) {
+    for (const { token, linkedStream } of linkedCommands(key)) {
+      assert(strikeTokens.has(token),
+        `${linkedStream.address}: post-hit ${token} has no strike link to take over from`);
     }
+  }
+  const handOverStep = (key, token) => linkedCommands(key)
+    .find((command) => command.token === token)?.linkedStream.firstStep;
+  for (const command of linkedCommands("mainLeftOrAttacker")) {
+    const hurt = handOverStep("auxiliaryA", command.token);
+    const guard = handOverStep("auxiliaryC", command.token);
+    assert(hurt === guard,
+      `${command.linkedStream.address}: hurt and guard hand ${command.token} over at different steps`);
+    const carriedSteps = hurt ?? postHitStepCounts.length;
+    if (carriedSteps === 0) continue;
+    const linkedOffset = parseAddress(`0000:${command.linkedStream.address.slice(3)}`).offset;
+    command.linkedStream.postHitContinuation = parseFullScreenCommandStream(
+      buffer,
+      linkedOffset + command.linkedStream.bytesConsumed,
+      postHitStepCounts.slice(0, carriedSteps),
+      false,
+    );
   }
   return commandStreams;
 }
@@ -1362,6 +1415,11 @@ async function extract(
           },
           initialization: "A2E4/A377 call B061 (left) and B1FD (right), giving every channel of a side the same x, y=135, latched frame 0 and animation mode XN; the animation counter is left untouched",
           stepParse: "A77F/A7A4 read one pose per active channel through A80F (left) and AA15 (right); :S (A8EF/AAF5) is the only command that writes a channel's x and y",
+          stepParseOrder: "A7F4 (left) and A9FA (right) walk channel offsets 8,6,4,2,0 once per step and parse only channels whose stream pointer is non-zero",
+          animationModeStore: ":X/X4/X6/XN only store the token in the channel's mode word (A910/A91C left, AB16/AB22 right); none of them touches the animation counter",
+          linkedChannels: "G1..G5 (A9A0 left, ABB4 right) only store the target channel's stream pointer and advance the issuing pointer by 4; x, y, mode and counter are untouched. A main-channel G token reaches offsets 0, 2 and 4 later in the same parse pass, so G1 reads its first record in the issuing step; offset 8 was already passed, so G5 reads its first record one step later (firstStep). In the issuing step B0B7/B253 still latch and draw that channel from the pose it last read, which on a fresh start is frame 0 at the B061/B1FD origin, the same image the main channel draws over it",
+          postHitHandOver: "A24D (hurt) and A28E (guard) re-point only the two main channels and the two extra streams DS:7B5E/7B82 that ABFA/AC5F parse, so a linked channel keeps reading the records after its strike block, with its x, y, mode and counter, until a post-hit G token re-points it (postHitContinuation); the new stream inherits the same x, y, mode and counter",
+          holdAndDeath: "A7C3 clears offsets 0,2,4,8 before the AD36 hold and B683/B6BD clear every channel before the death streams, so linked channels are never redrawn after the post-hit stream; when AD36 draws nothing the last post-hit image, linked channels included, stays on screen",
           frameLatch: "ACC4 latches every active channel's pose frame before the step's substeps (B0B7/B253)",
           draw: "B0FF/B29B pass the latched frame through B1A8/B344 on every draw: :X toggles the counter, X4/X6 advance it modulo 4/6, any other mode clears it, and the drawn frame is the latched frame plus the counter",
           accumulation: "after each drawn substep ACC4 adds dx/dy to every active channel (B0D7/B273), so a stream ends one increment past its last drawn position",
@@ -1558,7 +1616,7 @@ async function extract(
       ],
     },
     evidenceBoundary: {
-      confirmed: "map hit/death descriptor timelines, native waits, map sound requests, full-screen resource-record selection, five-slot per-class E banks, shared full-screen channel/compositor coordinates and primary/counter initialization, separate actor (+50) and defender (direct) frame placement tables, the y=135 channel ground clip, the main-channel E336 ground shadow, per-substep channel draw order, 210-pixel tiered life-gauge geometry and impact update timing, shared B3BD trail coordinates with no class/frame lookup, <=10 guard versus >10 hurt command/sound selection for stage-0 classes, high-level primary/counter/death ordering, the damage number's origin, per-draw velocity bands, field formatting, drop-shadow glyph passes and ink colours",
+      confirmed: "map hit/death descriptor timelines, native waits, map sound requests, full-screen resource-record selection, five-slot per-class E banks, shared full-screen channel/compositor coordinates and primary/counter initialization, separate actor (+50) and defender (direct) frame placement tables, the y=135 channel ground clip, the main-channel E336 ground shadow, per-substep channel draw order, the 8,6,4,2,0 channel parse order and the linked-channel post-hit hand-over, 210-pixel tiered life-gauge geometry and impact update timing, shared B3BD trail coordinates with no class/frame lookup, <=10 guard versus >10 hurt command/sound selection for stage-0 classes, high-level primary/counter/death ordering, the damage number's origin, per-draw velocity bands, field formatting, drop-shadow glyph passes and ink colours",
       preservedUnknown: "the original design names of many embedded full-screen command fields and the host/VGA duration of one full-screen renderer substep; the released nominal native timer tick is 10.000151 ms",
       implementation: "none; this export is phase-1 evidence only",
     },
