@@ -770,6 +770,23 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-170 reads stage 35's three wall-face enemy cells as the adjacent ledge.
+ * Terrain comes from stage content and is never saved, so a v123 save only moves
+ * to the current identity; a restored battle uses the ledge from its next action.
+ */
+function migrateVersion123Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 123
+    || value.contentVersion !== "stage-11-lilante-identity-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-164 names stage 11's opening pursuer 麗蘭特. The identity repair runs in
  * `restoreStage11PursuerIdentity` before every version step, so a v122 save only
  * moves to the current identity here.
@@ -3473,6 +3490,8 @@ function migratePreviousSaveData(raw: unknown): SaveData | undefined {
   const value = restoreStage11PursuerIdentity(
     rescaleLinearEnemyExperience(restoreOriginalStageTitle(raw)),
   );
+  const migratedVersion123 = migrateVersion123Save(value);
+  if (migratedVersion123) return migratedVersion123;
   const migratedVersion122 = migrateVersion122Save(value);
   if (migratedVersion122) return migratedVersion122;
   const migratedVersion121 = migrateVersion121Save(value);

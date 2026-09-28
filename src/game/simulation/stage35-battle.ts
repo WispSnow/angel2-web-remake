@@ -18,6 +18,25 @@ import {
 import type { ForceDefinition } from "./forces";
 import { DeterministicRng } from "./rng";
 
+// REMAKE-170: B/0071 stands slots 39/35/36 on wall-face tokens at row 8 that
+// resolve to logical slot 0: movement rule 99 and terrain defense 99% for every
+// class. Mode `0`/`2` ranges stop at rule 99, so the original leaves the three
+// out of reach of every technique and shot while nearly doubling their defense
+// against melee. stableRemake reads those cells as the slot-20 broken ledge they
+// line up with at (24..26,8); content keeps the native slot as evidence.
+const STAGE35_WALL_TERRAIN_SLOT = 0;
+const STAGE35_WALL_LEDGE_TERRAIN_SLOT = 20;
+const STAGE35_WALL_LEDGE_CELLS: ReadonlySet<string> = new Set(
+  STAGE35_SEMANTIC_ENEMY_UNITS
+    .filter(({ position }) => stage35TerrainSlotAt(position) === STAGE35_WALL_TERRAIN_SLOT)
+    .map(({ position }) => `${position.x},${position.y}`),
+);
+
+const stage35RemakeTerrainSlotAt = (position: Position): number =>
+  STAGE35_WALL_LEDGE_CELLS.has(`${position.x},${position.y}`)
+    ? STAGE35_WALL_LEDGE_TERRAIN_SLOT
+    : stage35TerrainSlotAt(position);
+
 const STAGE35_UNIT_CONFIG: FixedStageUnitConfig = {
   alliedUnits: STAGE35_SEMANTIC_ALLIED_UNITS,
   enemyUnits: STAGE35_SEMANTIC_ENEMY_UNITS,
@@ -58,7 +77,7 @@ export class Stage35Battle extends Stage0Battle {
     super(campaign.difficulty, rng, createFixedStageScenario({
       ...STAGE35_UNIT_CONFIG,
       stage: STAGE35_DEFINITION,
-      terrainSlotAt: stage35TerrainSlotAt,
+      terrainSlotAt: stage35RemakeTerrainSlotAt,
       dynamicTerrainSlots: {
         "iron-plate": STAGE35_IRON_PLATE_TERRAIN_SLOT,
         obstacle: STAGE35_OBSTACLE_TERRAIN_SLOT,

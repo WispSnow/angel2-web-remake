@@ -1877,7 +1877,7 @@ const stage34BattleSave = (): BattleSaveData => {
   };
 };
 
-const stage35BattleSave = (): BattleSaveData => {
+const stage35BattleSave = (kinsExperience = 0): BattleSaveData => {
   const source = {
     stageId: "stage-35" as const,
     ruleset: "stableRemake" as const,
@@ -1886,7 +1886,7 @@ const stage35BattleSave = (): BattleSaveData => {
     rngCalls: 113,
     roster: completeCampaignRoster([
       { slot: 0, classId: "land-knight", experience: 1_080, life: 320 },
-      { slot: 7, classId: "magic-priest", experience: 0, life: 190 },
+      { slot: 7, classId: "magic-priest", experience: kinsExperience, life: 190 },
       { slot: 18, classId: "archer", experience: 720, life: 145 },
       { slot: 22, classId: "great-axe-warrior", experience: 0, life: 220 },
       { slot: 23, classId: "empress", experience: 0, life: 380 },
@@ -5836,6 +5836,29 @@ describe("Web save validation", () => {
     if (!pursuer) throw new Error("stage 27 pursuer is missing from the save");
     pursuer.classId = "soldier";
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
+  });
+
+  it("migrates version-123 saves by identity when stage 35's wall cells become the ledge (REMAKE-170)", () => {
+    // REMAKE-170 只改第 35 关三名墙面敌军所在格的地形槽；地形来自关卡内容、从不入档，
+    // 所以 v123 战中档（含已受伤的魔鎧）与完成档逐字段保留。
+    // 迁移链整体会把琴斯抬到入队下限 299（REMAKE-151），夹具直接从下限出发。
+    const wounded = stage35BattleSave(299);
+    const armor = wounded.battle.units.find(({ id }) => id === "2:35");
+    if (!armor) throw new Error("stage 35 magic armor warrior is missing from the save");
+    expect(armor).toMatchObject({ classId: "magic-armor-warrior", x: 27, y: 8 });
+    armor.life = 41;
+    for (const current of [stage35BattleSave(299), wounded, battleSave(), completedSave()]) {
+      expect(parseSaveData(JSON.stringify({
+        ...current,
+        version: 123,
+        contentVersion: "stage-11-lilante-identity-1",
+      })), `${current.kind} ${current.stageId}`).toEqual(current);
+    }
+    expect(parseSaveData(JSON.stringify({
+      ...wounded,
+      version: 123,
+      contentVersion: "stage-35-wall-ledge-terrain-1",
+    }))).toBeUndefined();
   });
 
   it("names stage 11's opening pursuer 麗蘭特 while migrating older battle saves (REMAKE-164)", () => {

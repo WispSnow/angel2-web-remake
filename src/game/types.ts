@@ -268,8 +268,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 123;
-  contentVersion: "stage-11-lilante-identity-1";
+  version: 124;
+  contentVersion: "stage-35-wall-ledge-terrain-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

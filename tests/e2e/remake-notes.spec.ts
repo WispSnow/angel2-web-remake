@@ -340,6 +340,24 @@ test("REMAKE-152 與 REMAKE-154 將兩關的敵軍配置漏洞列入 Bug 修復"
   await expect(page.getByTestId("remake-note-REMAKE-154")).toHaveCount(0);
 });
 
+test("REMAKE-170 把「時空異變」牆面上免疫法術的三名敵軍列入 Bug 修復", async ({ page }) => {
+  await page.goto("/");
+  // 使用者要求的、與原版不同的關卡改動一律算原版缺陷修復，不歸「平衡性調整」。
+  await openNotes(page, "fixes");
+  const wallLedge = page.getByTestId("remake-note-REMAKE-170");
+  await expect(wallLedge).toContainText("「時空異變」牆面上的三名敵軍不再免疫法術");
+  await expect(wallLedge).toContainText("炎暴、落雷與射擊都選不中，範圍法術也波及不到");
+  await expect(wallLedge).toContainText("陸戰騎士與魔鎧戰士 10%、半龍戰士 5%");
+  await expect(wallLedge).toContainText("魔鎧戰士各難度的數值與殘血減傷特性均不變");
+  await expect(wallLedge.locator(".rn-note-id")).toHaveText("REMAKE-170");
+  await captureVisualAudit(wallLedge, {
+    path: "artifacts/playwright/remake-notes-stage35-wall-ledge.png",
+  });
+
+  await page.getByTestId("remake-notes-tab-balance").click();
+  await expect(page.getByTestId("remake-note-REMAKE-170")).toHaveCount(0);
+});
+
 test("REMAKE-162 把「騎士城堡前」隔河攻擊娜米的漏洞列入 Bug 修復", async ({ page }) => {
   await page.goto("/");
   // 使用者要求的、與原版不同的關卡改動一律算原版缺陷修復，不歸「平衡性調整」。
