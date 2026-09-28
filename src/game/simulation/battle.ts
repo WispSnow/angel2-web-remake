@@ -48,6 +48,7 @@ import {
   techniqueSelectionPath,
   techniqueSelectionRange,
 } from "./actions/range-map";
+import { iceAiFreezeReach } from "./actions/ice-displacement";
 import { prepareSpecialAction as resolveSpecialAction } from "./actions/resolve";
 import {
   prepareConstruction as resolveConstruction,
@@ -2624,6 +2625,9 @@ export class Stage0Battle {
     const preferredRange = Math.max(1, ...relevantActionIds.map((actionId) => {
       const definition = BATTLE_ACTION_DEFINITIONS[actionId];
       if ("maximumDistance" in definition.range) return definition.range.maximumDistance;
+      // REMAKE-171: the ice effect's value-1 ring sits outside the AI's own
+      // candidate gate, so a wizard parked there could never cast.
+      if (isIceActionId(actionId)) return iceAiFreezeReach(actionId);
       if (definition.target === "self-area" && "effectRadius" in definition.range) {
         return Math.max(1, definition.range.effectRadius - 1);
       }

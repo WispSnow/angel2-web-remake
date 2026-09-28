@@ -532,14 +532,21 @@ export function expertSpecialUtility(
     // REMAKE-094: score the same plan the resolver will commit, so a cast that
     // only shoves its targets out of the effect never reads as control — nor as
     // an effective wizard hit for the REMAKE-036 priority band.
+    // REMAKE-171: the positioning forecast scores a cast from the cell it would
+    // move to, so the plan is centred there and the caster's old cell is free.
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+    const units = position.x === actor.x && position.y === actor.y
+      ? context.units
+      : context.units.map((unit) => unit.id === actor.id
+        ? { ...unit, x: position.x, y: position.y }
+        : unit);
     const { targets } = planIceDisplacement(
       actionId,
       actor,
-      actor,
-      context.units,
+      position,
+      units,
       { width: context.width, height: context.height, terrainSlotAt: context.terrainSlotAt },
-      cachedTechniqueEffectRange(context, actor, definition.range.effectRadius),
+      cachedTechniqueEffectRange(context, position, definition.range.effectRadius),
     );
     for (const { unit: affected, blockReason, freezes } of targets) {
       if (blockReason === "frozen" || blockReason === "classImmune") continue;

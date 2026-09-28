@@ -10,6 +10,9 @@
 `REMAKE-096` 状态：`implemented`；2026-08-16 按用户试玩反馈取消斜向，径向选择收回原版四向，
 等待用户试玩
 
+`REMAKE-171` 状态：`accepted`；2026-09-28 按用户在 `stage-36` 的试玩反馈，修复巫師停在 5 格外
+待命，并由用户试玩通过
+
 负责人：Web 复刻实现
 
 依赖：[`technique-implementation-sequence.md`](technique-implementation-sequence.md)、
@@ -19,6 +22,7 @@
 [`web-remake-rule-decisions.md#remake-036冰雪外圈稳定外推专家-ai-次优先命中巫師`](../../../reverse/gdd/web-remake-rule-decisions.md#remake-036冰雪外圈稳定外推专家-ai-次优先命中巫師)、
 [`web-remake-rule-decisions.md#remake-095冰雪按连线方向八向外推`](../../../reverse/gdd/web-remake-rule-decisions.md#remake-095冰雪按连线方向八向外推)、
 [`web-remake-rule-decisions.md#remake-096径向外推收回原版四向`](../../../reverse/gdd/web-remake-rule-decisions.md#remake-096径向外推收回原版四向)、
+[`web-remake-rule-decisions.md#remake-171冰雪巫師按移动后的落点预演施法接近环停在推完仍冰封的一圈`](../../../reverse/gdd/web-remake-rule-decisions.md#remake-171冰雪巫師按移动后的落点预演施法接近环停在推完仍冰封的一圈)、
 [`web-remake-rule-decisions.md#remake-014敌方技术提示保留原文并对焦效果中心`](../../../reverse/gdd/web-remake-rule-decisions.md#remake-014敌方技术提示保留原文并对焦效果中心)、
 [`shooting-and-technique-system.md`](../../../reverse/notes/shooting-and-technique-system.md)、
 [`technique-presentations.md`](../../../reverse/notes/technique-presentations.md)、
@@ -113,6 +117,10 @@
 的目标计入 `control` 与 `REMAKE-036` 的巫師仇恨带；被吹出范围的巫師不构成有效敌对结果，
 全部目标都会被吹出时记为 `waste`。预测只读公开模拟状态，不读取或推进玩法 PRNG。
 
+依 `REMAKE-171`，法系落点预演按“巫師已站在预演落点”估值：范围以落点为中心，巫師原格空出。候选门
+种子 5 只覆盖 4 格，值 1 的第 5 格又只推不冻，所以没有施法落点时的接近环是 4 格而不是 5 格；巫師
+不会停在 5 格外待命。
+
 `REMAKE-034` 规定只有实际选择 `4C` 时才把巫師排到所有非冰雪行动者之后；改选其他动作
 使用正常专家顺序。存活 side 2 全部具备冰雪技术时禁用 `4C`，但不对近期冰封目标减分；该门禁按职业能力
 判断且对残军规模没有下限，只剩一名巫師时同样禁用。
@@ -176,3 +184,6 @@
 - `REMAKE-096`：方向集合收回原版四向（整数点积角度序，45° 平局按原版下上左右破平），
   斜向与拐角规则移除；本档的竞技场与单元断言不受影响（相关目标均在正交轴上），
   `tests/unit/save.test.ts` 覆盖 v79→v80 迁移。
+- `REMAKE-171`：`tests/unit/expert-ai.test.ts` 的 5 格巫師用例修复前第一步即待命，修复后先移入 4 格
+  预演 `4C`、下一次规划原地施放并冻住目标；另一用例锁定 `2C/3C/4C` 接近环 2/3/4 格。
+  `tests/unit/save.test.ts` 覆盖 v124→v125 迁移。

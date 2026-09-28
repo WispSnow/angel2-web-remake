@@ -5838,6 +5838,23 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
   });
 
+  it("migrates version-124 saves by identity when ice casters plan inside their freeze reach (REMAKE-171)", () => {
+    // REMAKE-171 只改自动冰雪施法者的落点规划；规划每次行动都从公开棋盘重算、从不入档，
+    // 所以 v124 战中档与完成档逐字段保留。
+    for (const current of [stage36BattleSave(), battleSave(), completedSave()]) {
+      expect(parseSaveData(JSON.stringify({
+        ...current,
+        version: 124,
+        contentVersion: "stage-35-wall-ledge-terrain-1",
+      })), `${current.kind} ${current.stageId}`).toEqual(current);
+    }
+    expect(parseSaveData(JSON.stringify({
+      ...battleSave(),
+      version: 124,
+      contentVersion: "wizard-ice-freeze-reach-1",
+    }))).toBeUndefined();
+  });
+
   it("migrates version-123 saves by identity when stage 35's wall cells become the ledge (REMAKE-170)", () => {
     // REMAKE-170 只改第 35 关三名墙面敌军所在格的地形槽；地形来自关卡内容、从不入档，
     // 所以 v123 战中档（含已受伤的魔鎧）与完成档逐字段保留。

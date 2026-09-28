@@ -62,6 +62,21 @@ export interface IceDisplacementPlan {
 const positionKey = ({ x, y }: Position): string => `${x},${y}`;
 
 /**
+ * REMAKE-171: the farthest distance from which an AI cast can still freeze a
+ * target. The AI candidate gate is a native range seed, so it reaches `seed − 1`
+ * cells; and every push gains one range value, so a target on the value-1 ring
+ * is shoved out of the effect (REMAKE-094). For 2C/3C/4C both limits fall on
+ * the same ring — 4C's is four cells, not the five its effect reaches.
+ */
+export function iceAiFreezeReach(actionId: IceActionId): number {
+  const { range } = BATTLE_ACTION_DEFINITIONS[actionId];
+  const candidateSeed = "aiCandidateSelectionRadius" in range
+    ? range.aiCandidateSelectionRadius
+    : range.selectionRadius;
+  return Math.max(1, Math.min(candidateSeed - 1, range.effectRadius - 2));
+}
+
+/**
  * Shared by the authoritative resolver and the expert AI scorer so a wizard can
  * never value a cast that its own resolution would turn into a pure shove.
  * Pure: it reads public simulation state only and never touches the gameplay RNG.

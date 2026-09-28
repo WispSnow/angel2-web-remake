@@ -770,6 +770,23 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-171 only changes where automatic ice casters plan to stand. Plans are
+ * rebuilt from the public board every action, so a v124 save only moves to the
+ * current identity.
+ */
+function migrateVersion124Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 124
+    || value.contentVersion !== "stage-35-wall-ledge-terrain-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-170 reads stage 35's three wall-face enemy cells as the adjacent ledge.
  * Terrain comes from stage content and is never saved, so a v123 save only moves
  * to the current identity; a restored battle uses the ledge from its next action.
@@ -3490,6 +3507,8 @@ function migratePreviousSaveData(raw: unknown): SaveData | undefined {
   const value = restoreStage11PursuerIdentity(
     rescaleLinearEnemyExperience(restoreOriginalStageTitle(raw)),
   );
+  const migratedVersion124 = migrateVersion124Save(value);
+  if (migratedVersion124) return migratedVersion124;
   const migratedVersion123 = migrateVersion123Save(value);
   if (migratedVersion123) return migratedVersion123;
   const migratedVersion122 = migrateVersion122Save(value);

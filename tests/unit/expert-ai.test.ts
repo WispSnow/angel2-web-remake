@@ -19,6 +19,7 @@ import { NAMED_LEADER_ESCORT_RADIUS } from "../../src/game/simulation/battle";
 import { loadStageRuntime } from "../../src/game/stage-runtime";
 import { manhattan } from "../../src/game/simulation/grid";
 import { expertSpecialUtility } from "../../src/game/simulation/expert-ai";
+import { iceAiFreezeReach } from "../../src/game/simulation/actions/ice-displacement";
 import { DeterministicRng } from "../../src/game/simulation/rng";
 import { Stage14Battle } from "../../src/game/simulation/stage14-battle";
 import { Stage19Battle } from "../../src/game/simulation/stage19-battle";
@@ -1583,6 +1584,48 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     expect(held.control).toBeGreaterThan(0);
     expect(held.wizardHits).toBe(1);
     expect(held.waste).toBe(0);
+  });
+
+  it("walks a tier-three wizard inside its 4C freeze reach instead of idling five cells out (REMAKE-171)", () => {
+    // Stage 36 report: from five cells away 4C only shoves a pushable target off
+    // the value-1 ring (REMAKE-094). The positioning forecast scored every cell
+    // it could move to as if the wizard cast from where it already stood, so all
+    // of them read as waste and the wizard waited for the rest of the battle.
+    const battle = new ArenaBattle([
+      { id: "ally", side: 1 as const, slot: 0, classId: "soldier" as const, level: 3 as const, x: 25, y: 36 },
+      { id: "enemy-wizard", side: 2 as const, slot: 0, classId: "wizard" as const, level: 3 as const, x: 20, y: 36 },
+      // A non-ice squadmate keeps REMAKE-034's pure-ice ban out of the way.
+      { id: "enemy-soldier", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 15, y: 30 },
+    ], 0, new DeterministicRng(0x3318));
+    const ally = battle.unit("ally")!;
+    expect(manhattan(battle.unit("enemy-wizard")!, ally)).toBe(5);
+
+    const approach = battle.planEnemyAiAction("enemy-wizard");
+    expect(approach).toMatchObject({ kind: "move", setupActionId: "ice-4", setupTargetId: "ally" });
+    const destination = approach!.path.at(-1)!;
+    expect(manhattan(destination, ally)).toBeLessThanOrEqual(iceAiFreezeReach("ice-4"));
+
+    expect(battle.moveUnit("enemy-wizard", destination)).toBe(true);
+    expect(battle.planEnemyAiAction("enemy-wizard")).toMatchObject({
+      kind: "special",
+      actionId: "ice-4",
+      path: [destination],
+    });
+    battle.commitPreparedAction(battle.prepareSpecialAction({
+      actionId: "ice-4",
+      actorId: "enemy-wizard",
+    }));
+    expect(ally.actionDisabled).toBe(true);
+  });
+
+  it("approaches ice casters to the last ring that still freezes after the push (REMAKE-171)", () => {
+    // The AI candidate gate is a native seed (seed − 1 cells) and REMAKE-094
+    // turns the value-1 ring into a pure shove; both put 4C's ring at four.
+    expect((["ice-2", "ice-3", "ice-4"] as const).map(iceAiFreezeReach)).toEqual([2, 3, 4]);
+    for (const actionId of ["ice-2", "ice-3", "ice-4"] as const) {
+      const { range } = BATTLE_ACTION_DEFINITIONS[actionId];
+      expect(range.aiCandidateSelectionRadius - 1).toBe(range.effectRadius - 2);
+    }
   });
 
   it("keeps a wizard out of melee and defers its ice action behind ordinary attackers", () => {

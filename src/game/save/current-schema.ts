@@ -30,8 +30,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 124 as const;
-export const SAVE_CONTENT_VERSION = "stage-35-wall-ledge-terrain-1" as const;
+export const SAVE_VERSION = 125 as const;
+export const SAVE_CONTENT_VERSION = "wizard-ice-freeze-reach-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;
