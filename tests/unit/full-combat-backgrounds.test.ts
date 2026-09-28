@@ -3,10 +3,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  FULL_COMBAT_BACKDROP_LAYERS,
+  FULL_COMBAT_BACKDROP_WRAP,
   FULL_COMBAT_BACKGROUND_EVIDENCE,
   FULL_COMBAT_BACKGROUND_FALLBACK_RECORD,
   FULL_COMBAT_BACKGROUND_RECORDS,
   FULL_COMBAT_BACKGROUND_STAGE_TABLE,
+  FULL_COMBAT_BATTLE_BUFFER,
+  FULL_COMBAT_PRESENT_WINDOW,
+  FULL_COMBAT_WINDOW_BOX,
+  FULL_COMBAT_WINDOW_FRAME,
 } from "../../src/game/content/full-combat-backgrounds.generated";
 import {
   fullCombatBackgroundAsset,
@@ -45,7 +51,14 @@ describe("native full-screen battle backdrop selection", () => {
   it("keeps the decoded native tables pinned to module 29", () => {
     expect(FULL_COMBAT_BACKGROUND_EVIDENCE.stageTable).toBe("DS:78DC");
     expect(FULL_COMBAT_BACKGROUND_EVIDENCE.defenderCell).toBe("DS:77C1");
-    expect(FULL_COMBAT_BACKGROUND_EVIDENCE.backdropSize).toEqual([448, 148]);
+    expect(FULL_COMBAT_BACKGROUND_EVIDENCE.backdropWidth).toBe(448);
+    // C/17 and C/27 declare a 149th row; the published pack keeps 148 and the
+    // compositor paints that row palette 0 (only YD can expose it).
+    const rows = new Map(FULL_COMBAT_BACKGROUND_EVIDENCE.renderedRecords
+      .map(({ record, sourceRows, publishedRows }) => [record, [sourceRows, publishedRows]]));
+    expect(rows.get(17)).toEqual([149, 148]);
+    expect(rows.get(27)).toEqual([149, 148]);
+    expect(rows.get(5)).toEqual([148, 148]);
     // 95F8 restarts the cursor at the table head rather than clearing it, so an
     // unlisted stage inherits the first entry instead of falling back to C/0.
     expect(FULL_COMBAT_BACKGROUND_FALLBACK_RECORD)
@@ -132,6 +145,65 @@ describe("native full-screen battle backdrop selection", () => {
 
   it("rejects records the catalog does not ship", () => {
     expect(() => fullCombatBackgroundAsset(13)).toThrow(/C\/13/);
+  });
+
+  it("decodes module 29's five backdrop layers and their truncating wraps (REMAKE-169)", () => {
+    expect(FULL_COMBAT_BACKDROP_LAYERS.map(({ firstRow, rows, copy, rightStep, leftStep }) =>
+      [firstRow, rows, copy, rightStep, leftStep])).toEqual([
+      [0, 112, "row-cyclic", 1, -1],
+      [112, 8, "linear", 2, -2],
+      [120, 8, "linear", 3, -3],
+      [128, 8, "linear", 4, -4],
+      [136, 14, "linear", 5, -5],
+    ]);
+    // `mov si,3Ah` against a 38h-byte row: the far layer starts 2 bytes in.
+    expect(FULL_COMBAT_BACKDROP_LAYERS[0].seedBytes % FULL_COMBAT_BACKDROP_WRAP.rowBytes).toBe(2);
+    expect(FULL_COMBAT_BACKDROP_LAYERS.map(({ phaseWord }) => phaseWord))
+      .toEqual(["CS:AFD9", "CS:AFDB", "CS:AFDD", "CS:AFDF", "CS:AFE1"]);
+    expect(FULL_COMBAT_BACKDROP_WRAP).toEqual({
+      rowBytes: 56,
+      right: { resetWhen: "atOrAbove", limit: 56, reset: 0 },
+      left: { resetWhen: "atOrBelow", limit: 0, reset: 56 },
+    });
+    const { compositor } = FULL_COMBAT_BACKGROUND_EVIDENCE;
+    // Only the composer and the two wrap routines touch the phase words, and
+    // both stop sites write :J, so nothing clears the phases between battles.
+    expect(compositor.phaseWordReferences.every((address) =>
+      address >= "0000:AF60" && address <= "0000:AFD8")).toBe(true);
+    expect(compositor.directionStops).toEqual([
+      { address: "0000:9859", token: ":J" },
+      { address: "0000:A22B", token: ":J" },
+    ]);
+    expect(FULL_COMBAT_BACKGROUND_EVIDENCE.inBattleLoad).toBe("0000:B9A4 -> 1000:0DD0");
+  });
+
+  it("presents only 432x147 of the buffer inside the window frame (REMAKE-169)", () => {
+    expect(FULL_COMBAT_BATTLE_BUFFER).toEqual({
+      width: 448, rows: 192, composedRows: 150, screenX: 96, screenY: 158,
+    });
+    expect(FULL_COMBAT_PRESENT_WINDOW).toEqual({
+      bufferX: 8, bufferY: 0, width: 432, height: 147, displacedBufferY: 4,
+    });
+    expect(FULL_COMBAT_BACKGROUND_EVIDENCE.present).toMatchObject({
+      pixelOffset: 8, ydMode: "DY", ydToggleWord: "CS:AE0C", ydToggle: 0x20, ydPixelOffset: 0x708,
+    });
+    expect(FULL_COMBAT_WINDOW_FRAME).toHaveLength(14);
+    expect(FULL_COMBAT_WINDOW_BOX).toEqual({ x: 96, y: 151, width: 448, height: 167 });
+    // Paint the rectangles in order and read the columns the present skips.
+    const colourAt = (x: number, y: number) => FULL_COMBAT_WINDOW_FRAME.reduce<number | undefined>(
+      (colour, rect) => x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height
+        ? rect.color
+        : colour,
+      undefined,
+    );
+    const sceneRow = FULL_COMBAT_BATTLE_BUFFER.screenY + 50;
+    const column = (from: number) => Array.from({ length: 8 }, (_, index) => colourAt(from + index, sceneRow));
+    expect(column(FULL_COMBAT_BATTLE_BUFFER.screenX)).toEqual([0, 14, 2, 0, 14, 14, 14, 0]);
+    expect(column(FULL_COMBAT_BATTLE_BUFFER.screenX + 440)).toEqual([0, 14, 14, 14, 0, 2, 14, 0]);
+    // The row under the presented window is not framed: the dimmed map stays.
+    const belowWindow = FULL_COMBAT_BATTLE_BUFFER.screenY + FULL_COMBAT_PRESENT_WINDOW.height;
+    expect(colourAt(FULL_COMBAT_BATTLE_BUFFER.screenX + 8, belowWindow)).toBeUndefined();
+    expect(colourAt(FULL_COMBAT_BATTLE_BUFFER.screenX + 439, belowWindow)).toBeUndefined();
   });
 
   it("carries one backdrop through the whole script, counter-attack included", () => {

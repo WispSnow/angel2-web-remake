@@ -3,8 +3,9 @@
 // (ref/战斗场景视频.mp4). All positions are battle-window scene coordinates:
 // a 448×148 viewport at game position (96,158) whose character-channel ground
 // line is y=135 (A2E4/A377 initialize both physical sides with BX=0087h).
-// The scene background is a 448-cycle with two parallax layers: rows 0..109
-// scroll with the camera at 1×, rows 110..147 (near floor) at 2×.
+// The backdrop is module 29's five-layer composition; its per-layer phases
+// (`backdropPhases`) follow the same substeps as the camera and carry over
+// from the previous full-screen battle (REMAKE-169, full-combat-backdrop.ts).
 //
 // Measured structure of one strike (times at 75 fps, converted to ms):
 //   windup   ~450 ms  four poses in place, sword-draw sound
@@ -44,6 +45,11 @@ import {
 } from "./content/stage0-actions.generated";
 import { FULL_COMBAT_BACKGROUND_FALLBACK_RECORD } from "./content/full-combat-backgrounds.generated";
 import { classDefinition } from "./content/classes";
+import {
+  FULL_COMBAT_BACKDROP_INITIAL_PHASES,
+  advanceFullCombatBackdropPhases,
+  type FullCombatBackdropPhases,
+} from "./full-combat-backdrop";
 import type { AttackResult, BattleUnit, UnitClassId } from "./types";
 
 export type FullCombatClass = number;
@@ -110,8 +116,14 @@ export interface FullCombatSceneState {
   showLeftPanel: boolean;
   showWindow: boolean;
   showScene: boolean;
-  /** Camera world offset; far layer scrolls 1×, near floor 2×. */
+  /**
+   * Native pixels the camera has travelled in this presentation: 8 per
+   * composed substep under `:R`, −8 under `:L`. The backdrop itself is drawn
+   * from `backdropPhases`.
+   */
   camera: number;
+  /** `CS:AFD9..AFE1` as the current substep composes them, in source bytes. */
+  backdropPhases: FullCombatBackdropPhases;
   /** Native YD/ND viewport-source alternation: 0 or -4 pixels. */
   viewportYOffset: number;
   /** Native 210-pixel tiered life gauges; panel numbers remain pre-strike. */
@@ -210,6 +222,8 @@ export interface FullCombatScript {
   cues: FullCombatCue[];
   marks: FullCombatMark[];
   sample: (t: number) => FullCombatSceneState;
+  /** The phases the next full-screen battle starts from. */
+  finalBackdropPhases: FullCombatBackdropPhases;
 }
 
 const OPEN = {
@@ -248,6 +262,7 @@ interface StrikeSpec {
   /** Shared main-channel x consumed by native movement and common effects. */
   victimX: number;
   cameraFrom: number;
+  backdropFrom: FullCombatBackdropPhases;
   damage: number;
   victimDies: boolean;
   final: boolean;
@@ -785,16 +800,17 @@ function nativeScrollDirection(
 
 /**
  * Replays AEEF's background state exactly: commands change direction at step
- * entry, while the 8-pixel phase update happens after the currently presented
+ * entry, while each phase update happens after the currently presented
  * substep and is therefore visible from the following substep onward.
+ * `onUpdates` receives each step's run of completed updates in order.
  */
-function sampleNativeScroll(
+function replayNativeScroll(
   steps: readonly NativeCommandStep[],
   age: number,
   substepDuration: number,
-  initialDirection: NativeScrollDirection = 0,
-): NativeScrollSample {
-  let distance = 0;
+  initialDirection: NativeScrollDirection,
+  onUpdates: (direction: NativeScrollDirection, count: number) => void,
+): NativeScrollDirection {
   let direction = initialDirection;
   let elapsed = 0;
   for (const step of steps) {
@@ -806,11 +822,40 @@ function sampleNativeScroll(
       0,
       Math.min(step.rendererSubsteps, Math.floor((age - elapsed) / substepDuration)),
     );
-    distance += direction * 8 * completed;
-    if (age < elapsed + duration) return { distance, direction };
+    onUpdates(direction, completed);
+    if (age < elapsed + duration) return direction;
     elapsed += duration;
   }
+  return direction;
+}
+
+function sampleNativeScroll(
+  steps: readonly NativeCommandStep[],
+  age: number,
+  substepDuration: number,
+  initialDirection: NativeScrollDirection = 0,
+): NativeScrollSample {
+  let distance = 0;
+  const direction = replayNativeScroll(steps, age, substepDuration, initialDirection,
+    (stepDirection, count) => {
+      distance += stepDirection * 8 * count;
+    });
   return { distance, direction };
+}
+
+function sampleNativeBackdrop(
+  steps: readonly NativeCommandStep[],
+  age: number,
+  substepDuration: number,
+  from: FullCombatBackdropPhases,
+  initialDirection: NativeScrollDirection = 0,
+): { phases: FullCombatBackdropPhases; direction: NativeScrollDirection } {
+  let phases = from;
+  const direction = replayNativeScroll(steps, age, substepDuration, initialDirection,
+    (stepDirection, count) => {
+      phases = advanceFullCombatBackdropPhases(phases, stepDirection, count);
+    });
+  return { phases, direction };
 }
 
 function strikeTimes(spec: StrikeSpec): StrikeTimes {
@@ -906,6 +951,52 @@ function cameraAt(spec: StrikeSpec, times: StrikeTimes, t: number): number {
     distance += deathScroll.distance;
   }
   return spec.cameraFrom + distance;
+}
+
+/**
+ * The backdrop phases over the same substeps as `cameraAt`. The direction is
+ * `:J` whenever no stream runs (`9859` at entry, `A22B` after the post-hit
+ * stream), so the opening draw, the hold redraws and the counter's opening
+ * draw leave the phases where the last stream put them.
+ */
+function backdropPhasesAt(
+  spec: StrikeSpec,
+  times: StrikeTimes,
+  t: number,
+): FullCombatBackdropPhases {
+  const main = nativeMainStream(
+    spec.actorClass,
+    spec.actorSide,
+    "mainLeftOrAttacker",
+  );
+  const mainAge = Math.max(0, Math.min(t - spec.start, times.impact - spec.start));
+  const mainScroll = sampleNativeBackdrop(main, mainAge, NATIVE_STRIKE_SUBSTEP, spec.backdropFrom);
+  if (t < times.impact) return mainScroll.phases;
+
+  const reaction = spec.damage <= 10 ? "guard" : "hurt";
+  const post = nativeReactionStream(
+    spec.actorClass,
+    spec.actorSide,
+    reaction,
+    "actor",
+  );
+  const postAge = Math.max(0, Math.min(t - times.impact, times.holdStart - times.impact));
+  const postScroll = sampleNativeBackdrop(
+    post,
+    postAge,
+    NATIVE_POST_HIT_SUBSTEP,
+    mainScroll.phases,
+    mainScroll.direction,
+  );
+  if (!spec.victimDies || t < times.holdStart) return postScroll.phases;
+  const victimSide = spec.actorSide === "left" ? "right" : "left";
+  return sampleNativeBackdrop(
+    STAGE0_FULL_COMBAT_DEATH[victimSide].steps,
+    Math.min(t - times.holdStart, times.end - times.holdStart),
+    NATIVE_POST_HIT_SUBSTEP,
+    postScroll.phases,
+    0,
+  ).phases;
 }
 
 /**
@@ -1588,7 +1679,15 @@ function strikeMarks(spec: StrikeSpec, times: StrikeTimes): FullCombatMark[] {
 
 function sampleStrike(spec: StrikeSpec, times: StrikeTimes, t: number): Pick<
   FullCombatSceneState,
-  "camera" | "viewportYOffset" | "sprites" | "shadows" | "lance" | "projectile" | "particles" | "damage"
+  | "camera"
+  | "backdropPhases"
+  | "viewportYOffset"
+  | "sprites"
+  | "shadows"
+  | "lance"
+  | "projectile"
+  | "particles"
+  | "damage"
 > {
   const sprites: FullCombatSpriteState[] = [];
   const actorChannel = nativeClassActorSprite(spec, times, t);
@@ -1608,6 +1707,7 @@ function sampleStrike(spec: StrikeSpec, times: StrikeTimes, t: number): Pick<
   });
   return {
     camera: cameraAt(spec, times, t),
+    backdropPhases: backdropPhasesAt(spec, times, t),
     viewportYOffset: nativePresentation.viewportYOffset,
     sprites,
     shadows,
@@ -1639,6 +1739,7 @@ export function buildFullCombatScript(
   defender: BattleUnit,
   result: AttackResult,
   backgroundRecord: number = FULL_COMBAT_BACKGROUND_FALLBACK_RECORD,
+  backdropFrom: FullCombatBackdropPhases = FULL_COMBAT_BACKDROP_INITIAL_PHASES,
 ): FullCombatScript {
   const battleKey = ++battleKeyCounter;
   const attackerLeft = attacker.side === 1;
@@ -1659,6 +1760,7 @@ export function buildFullCombatScript(
     victimClass: primaryVictimClass,
     ...primaryCoordinates,
     cameraFrom: 0,
+    backdropFrom,
     damage: result.damage,
     victimDies: result.defenderDied,
     final: result.defenderDied || !result.counterOccurred,
@@ -1682,6 +1784,7 @@ export function buildFullCombatScript(
       victimClass: counterVictimClass,
       ...counterCoordinates,
       cameraFrom: primaryCameraEnd,
+      backdropFrom: backdropPhasesAt(primary, primaryTimes, primaryTimes.end),
       damage: result.counterDamage,
       victimDies: result.attackerDied,
       final: true,
@@ -1730,6 +1833,7 @@ export function buildFullCombatScript(
         t,
         ...stage,
         camera: 0,
+        backdropPhases: backdropFrom,
         viewportYOffset: 0,
         lifeGauges: lifeGaugesAt(t),
         sprites: [],
@@ -1751,7 +1855,13 @@ export function buildFullCombatScript(
     };
   };
 
-  return { duration, cues, marks, sample };
+  return {
+    duration,
+    cues,
+    marks,
+    sample,
+    finalBackdropPhases: backdropPhasesAt(finalSpec, finalTimes, finalTimes.end),
+  };
 }
 
 /** Per-frame sprite metadata: image width and the ground-anchor x within it. */

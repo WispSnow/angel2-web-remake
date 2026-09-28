@@ -606,17 +606,18 @@
   position: absolute;
   left: 50%;
   top: 0;
-  width: 454px;
-  height: 163px;
+  width: var(--rn-class-combat-width);
+  height: var(--rn-class-combat-height);
   transform: translateX(-50%) scale(var(--rn-class-combat-scale, 1));
   transform-origin: top center;
 }
-/* 正式渲染器仍以 640×350 邏輯螢幕定位；這裡只裁出原版 454×163 全景窗。 */
+/* 正式渲染器仍以 640×350 邏輯螢幕定位；這裡只裁出原版全景窗框，尺寸與位置由
+   class-preview.ts 依生成的 `FULL_COMBAT_WINDOW_BOX` 設定。 */
 .rn-class-combat-native > .full-combat {
   right: auto;
   bottom: auto;
-  left: -93px;
-  top: -155px;
+  left: calc(-1 * var(--rn-class-combat-x));
+  top: calc(-1 * var(--rn-class-combat-y));
 }
 .rn-class-combat-stage.is-unavailable {
   display: grid;

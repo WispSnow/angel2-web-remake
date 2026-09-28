@@ -1,4 +1,16 @@
+import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import {
+  FULL_COMBAT_BATTLE_BUFFER,
+  FULL_COMBAT_PRESENT_WINDOW,
+  FULL_COMBAT_WINDOW_FRAME,
+} from "../../src/game/content/full-combat-backgrounds.generated";
+import { NATIVE_GAMEPLAY_PALETTE } from "../../src/game/content/native-font.generated";
+import {
+  fullCombatBackdropSourcePixel,
+  type FullCombatBackdropPhases,
+} from "../../src/game/full-combat-backdrop";
+import { decodeScreenshot } from "./screenshot-pixels";
 import { captureVisualAudit } from "./visual-audit";
 
 test("the laboratory schedules prepared full-combat sounds without media requests", async ({ page }) => {
@@ -99,6 +111,162 @@ test("a soldier panorama requests bounded atlases instead of individual frame PN
     "/assets/original/full-combat-atlases/right-soldier.png",
     "/assets/original/full-combat/backgrounds/05.png",
   ]);
+});
+
+/**
+ * Renders the lab screen at 1:1 in page pixels: the lab otherwise scales the
+ * logical screen fractionally and centres it on a half pixel.
+ */
+const pinLogicalScreen = (page: Page, extraCss = "") => page.addStyleTag({
+  content: `.logical-screen { transform: none !important; position: fixed !important;
+    left: 0 !important; top: 0 !important; margin: 0 !important; }${extraCss}`,
+});
+
+const hexColour = (hex: string): [number, number, number] =>
+  [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16)) as [number, number, number];
+
+test("REMAKE-169: the backdrop is module 29's five-layer composition inside the native window", async ({ page }) => {
+  await page.goto(
+    "/combat-lab.html?attacker=soldier&defender=soldier&reaction=hurt&side=left&speed=4",
+  );
+  // Only the backdrop is under test: hide everything the channels draw over it.
+  await pinLogicalScreen(page, `.full-combat-channels, .full-combat-shadow,
+    .full-combat-particles, .full-damage-number { visibility: hidden !important; }`);
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+  const { marks } = await labState(page);
+  const markTime = (phase: string) => {
+    const mark = marks.find((entry) => entry.phase === phase);
+    if (!mark) throw new Error(`missing ${phase}`);
+    return mark.t;
+  };
+  const record = decodeScreenshot(
+    readFileSync("public/assets/original/full-combat/backgrounds/05.png"),
+  );
+  const present = {
+    x: FULL_COMBAT_BATTLE_BUFFER.screenX + FULL_COMBAT_PRESENT_WINDOW.bufferX,
+    y: FULL_COMBAT_BATTLE_BUFFER.screenY + FULL_COMBAT_PRESENT_WINDOW.bufferY,
+    width: FULL_COMBAT_PRESENT_WINDOW.width,
+    height: FULL_COMBAT_PRESENT_WINDOW.height,
+  };
+
+  const expectComposition = async (phases: FullCombatBackdropPhases) => {
+    await expect(page.getByTestId("full-combat-backdrop")).toHaveAttribute("data-phases", phases.join(","));
+    await page.waitForFunction(() => Array.from(
+      document.querySelectorAll<HTMLImageElement>(".full-combat-backdrop img"),
+    ).every((image) => image.complete && image.naturalWidth === 448));
+    const shot = decodeScreenshot(await page.screenshot({ clip: present }));
+    expect([shot.width, shot.height]).toEqual([present.width, present.height]);
+    let mismatches = 0;
+    for (let y = 0; y < present.height; y += 1) {
+      for (let x = 0; x < present.width; x += 1) {
+        const source = fullCombatBackdropSourcePixel(x + FULL_COMBAT_PRESENT_WINDOW.bufferX, y, phases);
+        const expected = source && source.y < record.height
+          ? [...record.pixels.subarray((source.y * record.width + source.x) * record.channels)
+            .subarray(0, 3)]
+          : [0, 0, 0];
+        const actual = [...shot.pixels.subarray((y * shot.width + x) * shot.channels).subarray(0, 3)];
+        if (actual.some((value, channel) => value !== expected[channel])) mismatches += 1;
+      }
+    }
+    expect(mismatches, `pixels off the native composition at phases ${phases.join(",")}`).toBe(0);
+  };
+
+  // Scene start: the far layer is already 16 px into C/5, the floor is not.
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), markTime("fullWindup"));
+  await expectComposition([0, 0, 0, 0, 0]);
+  await captureVisualAudit(page.getByTestId("full-combat-window"), {
+    path: "artifacts/playwright/combat-lab-remake-169-scene-start.png",
+  });
+  // The primary hold of capture frame 139: layers 1 and 3 spill a row.
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), markTime("fullHold"));
+  await expectComposition([26, 52, 21, 48, 10]);
+  await captureVisualAudit(page.getByTestId("full-combat-window"), {
+    path: "artifacts/playwright/combat-lab-remake-169-primary-hold.png",
+  });
+
+  // The frame's outer 8 columns are the buffer columns F2CC never presents.
+  const frameBox = FULL_COMBAT_WINDOW_FRAME.reduce((box, rect) => ({
+    x: Math.min(box.x, rect.x),
+    y: Math.min(box.y, rect.y),
+    right: Math.max(box.right, rect.x + rect.width),
+    bottom: Math.max(box.bottom, rect.y + rect.height),
+  }), { x: Infinity, y: Infinity, right: 0, bottom: 0 });
+  const frame = decodeScreenshot(await page.screenshot({
+    clip: {
+      x: frameBox.x,
+      y: frameBox.y,
+      width: frameBox.right - frameBox.x,
+      height: frameBox.bottom - frameBox.y,
+    },
+  }));
+  const frameColour = (screenX: number, screenY: number) => {
+    const offset = ((screenY - frameBox.y) * frame.width + screenX - frameBox.x) * frame.channels;
+    return [...frame.pixels.subarray(offset, offset + 3)];
+  };
+  const row = FULL_COMBAT_BATTLE_BUFFER.screenY + 50;
+  const margin = (from: number) => Array.from({ length: 8 }, (_, index) => frameColour(from + index, row));
+  expect(margin(FULL_COMBAT_BATTLE_BUFFER.screenX))
+    .toEqual([0, 14, 2, 0, 14, 14, 14, 0].map((colour) => hexColour(NATIVE_GAMEPLAY_PALETTE[colour])));
+  expect(margin(FULL_COMBAT_BATTLE_BUFFER.screenX + 440))
+    .toEqual([0, 14, 14, 14, 0, 2, 14, 0].map((colour) => hexColour(NATIVE_GAMEPLAY_PALETTE[colour])));
+
+  // A right-side strike: its first :L update leaves every layer at a full
+  // row, so the four near layers read the record one row further down.
+  await page.goto(
+    "/combat-lab.html?attacker=soldier&defender=soldier&reaction=hurt&side=right&speed=4",
+  );
+  await pinLogicalScreen(page, `.full-combat-channels, .full-combat-shadow,
+    .full-combat-particles, .full-damage-number { visibility: hidden !important; }`);
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+  const rightMarks = (await labState(page)).marks;
+  const rightMark = (phase: string) => {
+    const mark = rightMarks.find((entry) => entry.phase === phase);
+    if (!mark) throw new Error(`missing ${phase}`);
+    return mark.t;
+  };
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), rightMark("fullCharge") + 40);
+  await expectComposition([56, 56, 56, 56, 56]);
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), rightMark("fullHold"));
+  await expectComposition([31, 6, 38, 12, 51]);
+  await captureVisualAudit(page.getByTestId("full-combat-window"), {
+    path: "artifacts/playwright/combat-lab-remake-169-right-hold.png",
+  });
+});
+
+test("REMAKE-169: YD shifts only the presented buffer, never the frame or the gauges", async ({ page }) => {
+  await page.goto(
+    "/combat-lab.html?attacker=jungle-warrior&defender=soldier&reaction=hurt&speed=4",
+  );
+  await pinLogicalScreen(page);
+  const windup = (await labState(page)).marks.find(({ phase }) => phase === "fullWindup")?.t;
+  if (windup === undefined) throw new Error("missing fullWindup");
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), windup);
+  await expect(page.getByTestId("full-combat-viewport-content")).toHaveAttribute("data-y-offset", "0");
+  const boxes = () => page.evaluate(() => Object.fromEntries(
+    ["full-combat-present", "full-combat-viewport-content", "full-left-life-gauge", "full-right-life-gauge"]
+      .map((testId) => {
+        const rect = document.querySelector(`[data-testid="${testId}"]`)!.getBoundingClientRect();
+        return [testId, [rect.x, rect.y, rect.width, rect.height]];
+      }),
+  ));
+  const still = await boxes();
+  expect(still["full-combat-present"]).toEqual([
+    FULL_COMBAT_BATTLE_BUFFER.screenX + FULL_COMBAT_PRESENT_WINDOW.bufferX,
+    FULL_COMBAT_BATTLE_BUFFER.screenY,
+    FULL_COMBAT_PRESENT_WINDOW.width,
+    FULL_COMBAT_PRESENT_WINDOW.height,
+  ]);
+  // 9E28 draws both gauge frames at screen y=308.
+  expect(still["full-left-life-gauge"]).toEqual([103, 308, 212, 7]);
+  expect(still["full-right-life-gauge"]).toEqual([324, 308, 212, 7]);
+
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_361));
+  await expect(page.getByTestId("full-combat-viewport-content")).toHaveAttribute("data-y-offset", "-4");
+  const shifted = await boxes();
+  expect(shifted["full-combat-viewport-content"][1]).toBe(still["full-combat-viewport-content"][1] - 4);
+  expect(shifted["full-combat-present"]).toEqual(still["full-combat-present"]);
+  expect(shifted["full-left-life-gauge"]).toEqual(still["full-left-life-gauge"]);
+  expect(shifted["full-right-life-gauge"]).toEqual(still["full-right-life-gauge"]);
 });
 
 test("record 35 empress exposes only the original right-side soldier fallback", async ({ page }) => {

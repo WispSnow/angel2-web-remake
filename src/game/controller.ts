@@ -69,6 +69,10 @@ import {
   promotionDialogueFor,
 } from "./content/promotion-dialogue";
 import { buildFullCombatScript, type FullCombatPhaseName, type FullCombatSceneState } from "./full-combat";
+import {
+  FULL_COMBAT_BACKDROP_INITIAL_PHASES,
+  type FullCombatBackdropPhases,
+} from "./full-combat-backdrop";
 import { inspectTerrain, type TerrainInspection } from "./terrain-inspection";
 import {
   TURN_TRANSITION_HOLD_NATIVE_TICKS,
@@ -545,6 +549,12 @@ export class GameController {
   lastRoutePulse?: PreparedRoutePulse;
   combatPresentation?: CombatPresentation;
   combatPresentationTrace: CombatPresentationTraceEntry[] = [];
+  /**
+   * Presentation-only: module 29 keeps its backdrop phase words across
+   * full-screen battles until it is decompressed again on the next stage
+   * entry, so the next full-screen battle starts from here (REMAKE-169).
+   */
+  private fullCombatBackdropPhases: FullCombatBackdropPhases = FULL_COMBAT_BACKDROP_INITIAL_PHASES;
   specialActionPresentation?: SpecialActionPresentation;
   routePulsePresentation?: RoutePulsePresentation;
   routePulsePresentationTrace: Array<
@@ -902,6 +912,8 @@ export class GameController {
     this.completedProgressMetadata = undefined;
     this.stage49Ending = undefined;
     this.credits = undefined;
+    // Entering a stage battle is where GO.EXE decompresses module 29 afresh.
+    this.fullCombatBackdropPhases = FULL_COMBAT_BACKDROP_INITIAL_PHASES;
     this.stageEntrySnapshot = cloneCampaignState({ ...campaign, stageId });
     this.preparationCampaign = runtime.preparation
       ? cloneCampaignState(this.stageEntrySnapshot)
@@ -4289,7 +4301,10 @@ export class GameController {
     const script = buildFullCombatScript(attacker, defender, result, fullCombatBackgroundRecord(
       this.battle.stage.nativeStage,
       this.battle.terrainSlotAt(defender),
-    ));
+    ), this.fullCombatBackdropPhases);
+    // The phases are fixed by the script, so a presentation that is cut short
+    // still hands the next battle the phases the whole one would have left.
+    this.fullCombatBackdropPhases = script.finalBackdropPhases;
     const fastTest = this.testMode && !this.fullCombatRealTime;
     const timeScale = fastTest ? 24 : this.presentationFast ? 3.2 : 1;
     const frameInterval = fastTest ? 2 : 15;
@@ -4819,6 +4834,8 @@ export class GameController {
       return;
     }
     this.battle = this.stageRuntime.createBattle(this.stageEntrySnapshot);
+    // A native retry leaves module 29 for module 27 and comes back fresh.
+    this.fullCombatBackdropPhases = FULL_COMBAT_BACKDROP_INITIAL_PHASES;
     this.difficulty = this.stageEntrySnapshot.difficulty;
     this.campaignRoute = undefined;
     this.movementPresentation = undefined;
@@ -6278,6 +6295,7 @@ export class GameController {
         fullScene: this.combatPresentation.fullScene ? { ...this.combatPresentation.fullScene } : undefined,
       } : undefined,
       combatPresentationTrace: this.combatPresentationTrace.map((entry) => ({ ...entry })),
+      fullCombatBackdropPhases: [...this.fullCombatBackdropPhases],
       specialActionPresentation: this.specialActionPresentation ? {
         ...this.specialActionPresentation,
         actor: {

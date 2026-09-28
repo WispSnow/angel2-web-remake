@@ -1,4 +1,5 @@
 import { className, classStatsFor } from "../content/classes";
+import { FULL_COMBAT_WINDOW_BOX } from "../content/full-combat-backgrounds.generated";
 import type {
   CombatPresentation,
   CombatPresentationPhase,
@@ -18,8 +19,8 @@ export interface ClassPreviewController {
   destroy(): void;
 }
 
-const PREVIEW_NATIVE_WIDTH = 454;
-const PREVIEW_NATIVE_HEIGHT = 163;
+const PREVIEW_NATIVE_WIDTH = FULL_COMBAT_WINDOW_BOX.width;
+const PREVIEW_NATIVE_HEIGHT = FULL_COMBAT_WINDOW_BOX.height;
 const PREVIEW_REPLAY_HOLD = 700;
 
 const previewExperience = (classId: UnitClassId): number => classId === "soldier" ? 299 : 300;
@@ -103,7 +104,7 @@ function scenarioFor(
 /**
  * Mounts the same deterministic full-combat script and DOM renderer used by
  * campaign battles and the combat lab. The compendium only crops the native
- * 454×163 battle window; it does not maintain a second animation table.
+ * framed battle window; it does not maintain a second animation table.
  */
 export function mountClassPreview(
   detail: HTMLElement,
@@ -132,6 +133,10 @@ export function mountClassPreview(
   let animationFrame = 0;
   let destroyed = false;
 
+  nativeFrame.style.setProperty("--rn-class-combat-width", `${PREVIEW_NATIVE_WIDTH}px`);
+  nativeFrame.style.setProperty("--rn-class-combat-height", `${PREVIEW_NATIVE_HEIGHT}px`);
+  nativeFrame.style.setProperty("--rn-class-combat-x", `${FULL_COMBAT_WINDOW_BOX.x}px`);
+  nativeFrame.style.setProperty("--rn-class-combat-y", `${FULL_COMBAT_WINDOW_BOX.y}px`);
   const resize = (): void => {
     const scale = Math.min(1, stage.clientWidth / PREVIEW_NATIVE_WIDTH);
     stage.style.height = `${Math.round(PREVIEW_NATIVE_HEIGHT * scale)}px`;

@@ -1405,8 +1405,9 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .map-combat .slash-mark { display: block; color: #fff3a4; font: 800 48px/36px system-ui, sans-serif; transform: rotate(16deg); filter: drop-shadow(0 0 5px #ff2d2d); }
 .map-combat b { position: absolute; left: 5px; top: 26px; color: #fff; font: 800 15px system-ui, sans-serif; -webkit-text-stroke: 1px #8d0707; }
 /* Native full-screen battle: the live map stays visible under a checkerboard
-   dim, twin status panels pop in at the top, and the yellow-framed 448×148
-   battle window opens at (96,158) with a two-layer parallax backdrop. */
+   dim, twin status panels pop in at the top, and module 29's framed battle
+   window opens; the renderer places it from the generated frame, buffer and
+   present-window tables (REMAKE-169). */
 .full-combat {
   inset: 0;
   width: 640px;
@@ -1422,21 +1423,22 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   background-image: conic-gradient(#000c 25%, #0006 0 50%, #000c 0 75%, #0006 0);
   background-size: 2px 2px;
 }
+/* `9B73` draws the frame once as filled rectangles; nothing else paints the
+   window, so its interior shows the dimmed map until the scene is presented. */
 .full-combat-window {
   position: absolute;
   z-index: 2;
-  left: 93px;
-  top: 155px;
-  width: 454px;
-  height: 163px;
-  overflow: hidden;
-  border: 3px solid #f5d64a;
-  background: rgba(6, 3, 2, .82);
-  box-shadow: 0 0 0 1px #7a3c0e, 4px 4px 0 rgba(0, 0, 0, .65);
 }
+.full-combat-window-rect { position: absolute; display: block; }
+/* `F2CC` copies only this part of the battle buffer to the screen. The frame
+   covers the buffer columns it skips, and the row under it keeps the map. */
+.full-combat-present {
+  position: absolute;
+  overflow: hidden;
+}
+/* The battle buffer; `YD` moves it within the presented window. */
 .full-combat-viewport-content {
   position: absolute;
-  inset: 0;
   width: 448px;
   height: 157px;
 }
@@ -1445,32 +1447,45 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   left: 0;
   top: 0;
   width: 448px;
-  height: 148px;
   overflow: hidden;
-  background: #130a07;
+  /* Buffer rows the compositor never fills, or fills from past the record's
+     last row, show palette 0 (REMAKE-169). */
+  background: #000000;
   /* Keeps the native channel layering below the damage number and gauges. */
   isolation: isolate;
 }
-.full-combat-backdrop { position: absolute; inset: 0; --far-scroll: 0px; --near-scroll: 0px; }
-.full-combat-backdrop img {
+.full-combat-backdrop { position: absolute; inset: 0; }
+/* One band per `AF8A` layer: the head image starts `--offset` into the band's
+   own rows and the tail fills the columns past the row end, from the same rows
+   (row-cyclic far layer) or the next source rows (linear layers). */
+.full-combat-backdrop-layer {
   position: absolute;
-  top: 0;
+  left: 0;
+  width: 448px;
+  overflow: hidden;
+  --offset: 0px;
+}
+.full-combat-backdrop-layer img {
+  position: absolute;
+  left: 0;
   display: block;
   width: 448px;
-  height: 148px;
+  height: auto;
   max-width: none;
   image-rendering: var(--image-rendering, pixelated);
 }
-/* Far layer (wall + walkway) pans at 1×, near floor rows at 2×; each is the
-   same cyclic 448 px image shown twice for seamless wrap. */
-.full-combat-backdrop img.far { left: 0; transform: translateX(var(--far-scroll)); }
-.full-combat-backdrop img.far.copy { transform: translateX(calc(var(--far-scroll) + 448px)); }
-.full-combat-backdrop img.near { left: 0; transform: translateX(var(--near-scroll)); clip-path: inset(110px 0 0 0); }
-.full-combat-backdrop img.near.copy { transform: translateX(calc(var(--near-scroll) + 448px)); clip-path: inset(110px 0 0 0); }
+.full-combat-backdrop-layer img.head {
+  top: calc(-1 * var(--row));
+  transform: translateX(calc(-1 * var(--offset)));
+}
+.full-combat-backdrop-layer img.tail {
+  top: calc(-1 * var(--next-row));
+  transform: translateX(calc(448px - var(--offset)));
+}
 /* Module 29 skips every channel byte past buffer offset 1D88h (135 rows of
    56 bytes), so no character, weapon or spell bitmap is drawn at or below the
-   y=135 ground line; the 13 rows beneath it only show the backdrop, the
-   ground shadows and the damage number. */
+   y=135 ground line; the rows beneath it only show the backdrop, the ground
+   shadows and the damage number. */
 .full-combat-channels {
   position: absolute;
   left: 0;
@@ -1543,18 +1558,18 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   left: 0;
   top: 0;
 }
+/* `9E28` draws both gauge frames at screen y=308 over the frame's yellow band;
+   they belong to the VGA page, so `YD` never moves them. */
 .full-combat-strip {
   position: absolute;
   left: 0;
-  top: 148px;
+  top: 157px;
   width: 448px;
-  height: 9px;
-  border-top: 2px solid #ffdf10;
-  background: #ffdf10;
+  height: 7px;
 }
 .full-life-gauge {
   position: absolute;
-  top: 1px;
+  top: 0;
   width: 212px;
   height: 7px;
   background: #000;

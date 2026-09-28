@@ -23,6 +23,14 @@ import { mapUnitVisualOffset } from "./content/map-unit-presentation";
 import { TECHNIQUE_LAB_UNIT_ASSETS } from "./content/technique-lab.generated";
 import { classTraitsFor } from "./content/class-traits";
 import { fullCombatBackgroundAsset } from "./content/full-combat-backgrounds";
+import {
+  FULL_COMBAT_BACKDROP_LAYERS,
+  FULL_COMBAT_BATTLE_BUFFER,
+  FULL_COMBAT_PRESENT_WINDOW,
+  FULL_COMBAT_WINDOW_BOX,
+  FULL_COMBAT_WINDOW_FRAME,
+} from "./content/full-combat-backgrounds.generated";
+import { fullCombatBackdropLayerOffsets } from "./full-combat-backdrop";
 import { activeUnitStatusPresentations } from "./content/status-presentations";
 import {
   BATTLE_CHROME_COMPOSITE,
@@ -1789,6 +1797,43 @@ function fullSpriteAsset(sprite: FullCombatSpriteState): {
   return { frameName: frames[sprite.frame], meta };
 }
 
+/**
+ * `9B73` fills the window frame once at entry; its outer 8-pixel columns sit
+ * on the buffer columns `F2CC` never presents.
+ */
+function fullCombatWindowFrameMarkup(): string {
+  return FULL_COMBAT_WINDOW_FRAME.map(({ descriptor, x, y, width, height, color }) =>
+    `<i class="full-combat-window-rect" data-descriptor="${descriptor}" style="left:${
+      x - FULL_COMBAT_WINDOW_BOX.x}px;top:${y - FULL_COMBAT_WINDOW_BOX.y}px;width:${
+      width}px;height:${height}px;background:${NATIVE_GAMEPLAY_PALETTE[color]}"></i>`).join("");
+}
+
+/**
+ * One clipped band per `AF8A` layer. The head image carries the layer's own
+ * rows from its offset; the tail fills the columns past the row end, from the
+ * same rows for the row-cyclic far layer and from the next source rows for a
+ * linear layer. Source rows the record does not have stay transparent over
+ * the scene's palette-0 ground.
+ */
+function fullCombatBackdropMarkup(
+  imageSource: string,
+  asset: string,
+  record: number,
+): string {
+  return FULL_COMBAT_BACKDROP_LAYERS.map(({ layer, firstRow, rows, copy }) => {
+    const nextRow = copy === "row-cyclic" ? firstRow : firstRow + 1;
+    const image = (part: "head" | "tail") => {
+      const identity = layer === 0 && part === "head"
+        ? ` data-testid="full-combat-background" data-record="${record}" data-image-ready="${imageSource !== asset}"`
+        : "";
+      return `<img class="${part}" src="${imageSource}" data-source-url="${asset}" alt=""${identity} />`;
+    };
+    return `<div class="full-combat-backdrop-layer" data-layer="${layer}" data-copy="${copy}"
+      style="top:${firstRow}px;height:${rows}px;--row:${firstRow}px;--next-row:${nextRow}px">${
+      image("head")}${image("tail")}</div>`;
+  }).join("");
+}
+
 function buildFullCombatSkeleton(
   layer: HTMLElement,
   presentation: CombatPresentation,
@@ -1818,14 +1863,29 @@ function buildFullCombatSkeleton(
   layer.innerHTML = `
     ${statusPanel("left", leftUnit)}
     ${statusPanel("right", rightUnit)}
-    <div class="full-combat-window" data-testid="full-combat-window" hidden>
-      <div class="full-combat-viewport-content" data-testid="full-combat-viewport-content">
-        <div class="full-combat-scene" data-testid="full-combat-scene" hidden>
-          <div class="full-combat-backdrop">
-            <img class="far" src="${background}" data-source-url="${backgroundAsset}" alt="" data-testid="full-combat-background" data-record="${backgroundRecord}" data-image-ready="${background !== backgroundAsset}" />
-            <img class="far copy" src="${background}" data-source-url="${backgroundAsset}" alt="" />
-            <img class="near" src="${background}" data-source-url="${backgroundAsset}" alt="" />
-            <img class="near copy" src="${background}" data-source-url="${backgroundAsset}" alt="" />
+    <div class="full-combat-window" data-testid="full-combat-window" hidden
+      style="left:${FULL_COMBAT_WINDOW_BOX.x}px;top:${FULL_COMBAT_WINDOW_BOX.y}px;width:${
+      FULL_COMBAT_WINDOW_BOX.width}px;height:${FULL_COMBAT_WINDOW_BOX.height}px">
+      ${fullCombatWindowFrameMarkup()}
+      <div class="full-combat-strip" aria-hidden="true">
+        <div class="full-life-gauge left" data-testid="full-left-life-gauge">
+          <i class="base"></i><i class="fill"></i><i class="shine"></i>
+        </div>
+        <div class="full-life-gauge right" data-testid="full-right-life-gauge">
+          <i class="base"></i><i class="fill"></i><i class="shine"></i>
+        </div>
+      </div>
+      <div class="full-combat-present" data-testid="full-combat-present"
+        style="left:${FULL_COMBAT_BATTLE_BUFFER.screenX + FULL_COMBAT_PRESENT_WINDOW.bufferX
+          - FULL_COMBAT_WINDOW_BOX.x}px;top:${FULL_COMBAT_BATTLE_BUFFER.screenY
+          + FULL_COMBAT_PRESENT_WINDOW.bufferY - FULL_COMBAT_WINDOW_BOX.y}px;width:${
+          FULL_COMBAT_PRESENT_WINDOW.width}px;height:${FULL_COMBAT_PRESENT_WINDOW.height}px">
+      <div class="full-combat-viewport-content" data-testid="full-combat-viewport-content"
+        style="left:${-FULL_COMBAT_PRESENT_WINDOW.bufferX}px;top:${-FULL_COMBAT_PRESENT_WINDOW.bufferY}px">
+        <div class="full-combat-scene" data-testid="full-combat-scene" hidden
+          style="height:${FULL_COMBAT_PRESENT_WINDOW.displacedBufferY + FULL_COMBAT_PRESENT_WINDOW.height}px">
+          <div class="full-combat-backdrop" data-testid="full-combat-backdrop">
+            ${fullCombatBackdropMarkup(background, backgroundAsset, backgroundRecord)}
           </div>
           <div class="full-combat-particles" aria-hidden="true"></div>
           <div class="full-combat-shadow" data-channel="victim" data-testid="full-victim-shadow" aria-hidden="true" hidden></div>
@@ -1842,15 +1902,8 @@ function buildFullCombatSkeleton(
             <div class="full-combat-sprite slot-effect-G5" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G5-sprite"></i></div>
           </div>
         </div>
-        <div class="full-combat-strip" aria-hidden="true">
-          <div class="full-life-gauge left" data-testid="full-left-life-gauge">
-            <i class="base"></i><i class="fill"></i><i class="shine"></i>
-          </div>
-          <div class="full-life-gauge right" data-testid="full-right-life-gauge">
-            <i class="base"></i><i class="fill"></i><i class="shine"></i>
-          </div>
-        </div>
         <b class="full-damage-number" data-testid="full-damage-number" hidden></b>
+      </div>
       </div>
     </div>`;
   paintNativeDomTextIn(layer);
@@ -1930,11 +1983,15 @@ export function renderCombat(
   viewportContent.style.transform = `translateY(${scene.viewportYOffset}px)`;
   viewportContent.dataset.yOffset = String(scene.viewportYOffset);
 
-  const farOffset = ((scene.camera % 448) + 448) % 448;
-  const nearOffset = ((scene.camera * 2 % 448) + 448) % 448;
   const backdrop = query<HTMLElement>(".full-combat-backdrop");
-  backdrop.style.setProperty("--far-scroll", `${-farOffset}px`);
-  backdrop.style.setProperty("--near-scroll", `${-nearOffset}px`);
+  const phases = scene.backdropPhases.join(",");
+  if (backdrop.dataset.phases !== phases) {
+    backdrop.dataset.phases = phases;
+    const offsets = fullCombatBackdropLayerOffsets(scene.backdropPhases);
+    backdrop.querySelectorAll<HTMLElement>(".full-combat-backdrop-layer").forEach((band, index) => {
+      band.style.setProperty("--offset", `${offsets[index]}px`);
+    });
+  }
 
   const slots: Array<{ selector: string; sprite?: FullCombatSpriteState }> = [
     {
