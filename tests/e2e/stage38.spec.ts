@@ -1,6 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { CREDITS_NAME_FRAMES, CREDITS_ROLE_FRAMES } from "../../src/game/content/credits";
+import { PORTRAIT_CATALOG } from "../../src/game/content/portrait-catalog.generated";
+import { STAGE38_STORY_PAGES } from "../../src/game/content/stage38-runtime.generated";
+import type { DialoguePage } from "../../src/game/types";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { skipStoryDialogue } from "./dialogue-controls";
@@ -172,6 +175,85 @@ test("S38-C: the opening focuses Nia after all 44 static enemies already exist",
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage38-opening-story.png`,
   });
+});
+
+test("S38-I: every ghost in the SAY/0164 chant takes the portrait for its own phrase", async ({ page }) => {
+  // One glyph is 12 ms of program time under `?test=1`. A paused clock steps the
+  // chant one glyph at a time, so every swap is read at its exact glyph.
+  await page.clock.install();
+  await page.goto("/?debugScenario=stage-38-opening&difficulty=0&test=1");
+  await waitForPhase(page, "openingStory");
+  const layer = page.getByTestId("dialogue-layer");
+  const lowerPortrait = page.locator("#dialogue-portrait-lower");
+  const sourceWait = () => layer.getAttribute("data-source-wait");
+  const typedText = () => page.locator("#dialogue-text").evaluate((element) => element.textContent ?? "");
+  const shownFace = () => page.evaluate(() => ({
+    typed: document.querySelector("#dialogue-text")?.textContent?.length ?? 0,
+    portrait: Number(document.querySelector<HTMLElement>("#dialogue-portrait-lower")?.dataset.portraitRecord),
+    name: document.querySelector("#dialogue-portrait-name-lower .visually-hidden")?.textContent ?? "",
+    // A face swapped in mid-glyph has no time to fetch: it must come from the stage gate.
+    staged: document.querySelector<HTMLImageElement>("#dialogue-portrait-lower .portrait-base")
+      ?.src.startsWith("blob:") ?? false,
+  }));
+  // The first press on a typing page only completes it, so press until the page turns.
+  const turnPage = async () => {
+    const before = await sourceWait();
+    await expect.poll(async () => {
+      if (await sourceWait() === before) await layer.click();
+      return sourceWait();
+    }, { intervals: [100] }).not.toBe(before);
+  };
+  const opening: readonly DialoguePage[] = STAGE38_STORY_PAGES["stage-38-opening-story"];
+  const expectedFace = (wait: number, typed: number) => {
+    const cues = opening[wait - 1].lower?.portraitCues ?? [];
+    // The tick that draws glyph `at` runs that phrase's `HD` first.
+    const cue = cues.filter(({ at }) => at < typed).at(-1) ?? cues[0];
+    return { portrait: cue.portrait, name: PORTRAIT_CATALOG[cue.portrait].displayName?.trim() ?? "" };
+  };
+  const stepChantPage = async (wait: number, stopAfter = Number.POSITIVE_INFINITY) => {
+    const text = opening[wait - 1].lower?.text ?? "";
+    const faces: number[] = [];
+    // The first glyph is drawn as soon as the portrait has decoded, off the paused clock.
+    await expect.poll(async () => (await typedText()).length).toBe((opening[wait - 1].revealStart ?? 0) + 1);
+    for (let steps = 0; ; steps += 1) {
+      const shown = await shownFace();
+      expect(shown, `SAY/0164 wait ${wait} after ${shown.typed} characters`)
+        .toEqual({ typed: shown.typed, ...expectedFace(wait, shown.typed), staged: true });
+      if (faces.at(-1) !== shown.portrait) faces.push(shown.portrait);
+      if (shown.typed >= text.length || steps >= stopAfter) return faces;
+      await page.clock.runFor(12);
+    }
+  };
+  const cuePortraits = (wait: number) =>
+    (opening[wait - 1].lower?.portraitCues ?? []).map(({ portrait }) => portrait);
+
+  while (await sourceWait() !== "19") await turnPage();
+  await expect.poll(typedText).toBe(opening[18].lower?.text);
+  await expect(lowerPortrait).toBeHidden();
+  await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 500);
+
+  await turnPage();
+  expect(await stepChantPage(20)).toEqual([25, 24, 12, 0, 6, 11]);
+  await expect(page.locator("#dialogue-portrait-name-lower")).toHaveText("芙瑪羅妮");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage38-chant-fumaroni.png`,
+  });
+  await turnPage();
+  expect(await stepChantPage(21)).toEqual(cuePortraits(21));
+
+  // Completing a page mid-chant lands on the face its last phrase ends with.
+  await turnPage();
+  expect(await stepChantPage(22, 12)).toEqual([30, 31]);
+  await layer.click();
+  await expect.poll(typedText).toBe(opening[21].lower?.text);
+  expect(await sourceWait()).toBe("22");
+  await expect(lowerPortrait).toHaveAttribute("data-portrait-record", "60");
+  await expect(lowerPortrait).toHaveAttribute("data-speaking", "false");
+  expect((await shownFace()).name).toBe(PORTRAIT_CATALOG[60].displayName?.trim());
+
+  await turnPage();
+  expect(await stepChantPage(23)).toEqual([62, 51]);
+  await page.clock.resume();
 });
 
 test("S38-E: Nia defeat retries the hidden-stage deployment", async ({ page }) => {

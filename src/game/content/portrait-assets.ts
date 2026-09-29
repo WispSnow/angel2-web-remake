@@ -27,9 +27,10 @@ export function portraitAssetUrlsForRecords(
 
 export function dialoguePortraitRecords(pages: readonly DialoguePage[]): readonly PortraitRecord[] {
   const records = new Set<PortraitRecord>();
-  for (const page of pages) {
-    if (page.upper?.portrait !== undefined) records.add(page.upper.portrait);
-    if (page.lower?.portrait !== undefined) records.add(page.lower.portrait);
+  for (const window of pages.flatMap(({ upper, lower }) => [upper, lower])) {
+    if (window?.portrait !== undefined) records.add(window.portrait);
+    // A mid-page swap has no time to wait for decoding, so it crosses the gate too.
+    for (const cue of window?.portraitCues ?? []) records.add(cue.portrait);
   }
   return [...records].sort((left, right) => left - right);
 }

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { EVIDENCE_AVAILABLE } from "./evidence";
 import { className } from "../../src/game/content/classes";
 import { musicProgramFor } from "../../src/game/content/music";
+import { stageDialoguePortraitRecords } from "../../src/game/content/portrait-assets";
 import { stageSimulationEffectFor } from "../../src/game/content/stage-effects";
 import {
   activateStage38Content,
@@ -20,6 +21,7 @@ import {
   STAGE38_STORY_PAGES,
   STAGE38_TERRAIN_TOKENS,
 } from "../../src/game/content/stage38";
+import type { DialoguePage } from "../../src/game/types";
 
 const workspace = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const sha256 = (value: Uint8Array): string => createHash("sha256").update(value).digest("hex");
@@ -125,6 +127,48 @@ describe("stage 38 generated content", () => {
       .toMatchObject({ entryTrack: "MUSIC/5", loopTrack: "MUSIC/4" });
     expect(musicProgramFor("stage-38-player-phase-music"))
       .toBe(STAGE38_MUSIC_PROGRAMS["stage-38-player-phase-music"]);
+  });
+
+  it("lets every ghost in the SAY/0164 chant speak its own phrase", () => {
+    activateStage38Content();
+    const opening: readonly DialoguePage[] = STAGE38_STORY_PAGES["stage-38-opening-story"];
+    const chant = opening
+      .filter((page) => page.lower?.portraitCues)
+      .map((page) => ({
+        wait: page.source.wait,
+        final: page.lower?.portrait,
+        cues: (page.lower?.portraitCues ?? []).map(({ at, portrait }) => [at, portrait]),
+      }));
+    expect(chant).toEqual([
+      { wait: 20, final: 11, cues: [[22, 25], [30, 24], [37, 12], [47, 0], [54, 6], [61, 11]] },
+      { wait: 21, final: 29, cues: [[0, 19], [9, 16], [16, 28], [24, 20], [31, 5], [40, 4], [48, 15], [55, 29]] },
+      { wait: 22, final: 60, cues: [[0, 30], [7, 31], [17, 48], [25, 50], [34, 53], [41, 55], [49, 58], [58, 60]] },
+      { wait: 23, final: 51, cues: [[0, 62], [7, 51]] },
+    ]);
+    // Each phrase swaps in before its first glyph: `妳 們 ～～`, `曾 經 ～～`, ...
+    const first = opening[19].lower;
+    expect((first?.portraitCues ?? []).map(({ at }) =>
+      (first?.text ?? "").slice(at).replace(/^\n/u, "").slice(0, 4)))
+      .toEqual([" 妳 們", " 曾 經", " 打 敗", " 我 們", " 但 是", " 我 們"]);
+    // No mid-page face may have to decode after the loading page has gone.
+    expect(stageDialoguePortraitRecords(STAGE38_DEFINITION)).toEqual(expect.arrayContaining(
+      chant.flatMap(({ cues }) => cues.map(([, portrait]) => portrait)),
+    ));
+  });
+
+  it.skipIf(!EVIDENCE_AVAILABLE)("replays SAY/0164's HD order in the chant cues", async () => {
+    activateStage38Content();
+    const document = JSON.parse(await readFile(
+      path.join(workspace, "reverse/parsed/dialogue/0164.json"),
+      "utf8",
+    )) as { actions: Array<{ line: number; op: string; slot?: string; portraitId?: number }> };
+    const chantDraws = document.actions
+      .filter(({ op, slot, line }) => op === "show_portrait" && slot === "lower" && line > 66 && line < 154)
+      .map(({ portraitId }) => portraitId);
+    expect(chantDraws).toHaveLength(24);
+    const opening: readonly DialoguePage[] = STAGE38_STORY_PAGES["stage-38-opening-story"];
+    expect(opening.flatMap((page) => (page.lower?.portraitCues ?? []).map(({ portrait }) => portrait)))
+      .toEqual(chantDraws);
   });
 
   it.skipIf(!EVIDENCE_AVAILABLE)("keeps evidence and shipping assets byte-identical", async () => {

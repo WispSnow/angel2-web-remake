@@ -46,10 +46,19 @@ import {
 } from "./full-combat";
 import { applyFullCombatAtlasFrame } from "./full-combat-atlas";
 import { fullCombatImageSource } from "./full-combat-image-cache";
-import type { BattleUnit, DialoguePage, PortraitRecord, Position, UnitClassId, UnitStats } from "./types";
+import type {
+  BattleUnit,
+  DialoguePage,
+  DialogueWindowState,
+  PortraitRecord,
+  Position,
+  UnitClassId,
+  UnitStats,
+} from "./types";
 import type { TerrainInspection } from "./terrain-inspection";
 import type { AudioManager } from "./audio";
 import { renderNativeDialogueText } from "./dialogue-text";
+import { dialoguePortraitAfterTyping } from "./dialogue-portrait-cues";
 import {
   dialogueWindowOpenAnimation,
   finishDialogueWindowClose,
@@ -499,6 +508,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let revealedCharacters = 0;
   let activeDialogueText: HTMLElement | undefined;
   let activeDialoguePortrait: HTMLElement | undefined;
+  /** 逐字中途換肖像的那扇窗（SAY/0164 每念一段就 `HD` 一次）；沒有換肖像的頁面為空。 */
+  let activeDialogueCueWindow: { slot: "upper" | "lower"; state: DialogueWindowState } | undefined;
+  /** 上一次 `HD` 執行時窗內已畫出的字數；`render` 據此重畫同一張臉，不回到頁尾那張。 */
+  let dialoguePortraitTyped = 0;
   /** 當前逐字所在的 `A/18` 面板；主操作要補完逐字時得先把它的展開跳到最後一格。 */
   let activeDialoguePanel: HTMLElement | undefined;
   /** 展開途中按下、待逐字開始才兌現的主操作；等同原版留在 DOS 鍵盤緩衝裡的那一下。 */
@@ -538,6 +551,61 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     portrait.dataset.mouthFrame = nativeMouthFrameAfterGlyph(portrait.dataset.mouthFrame, character);
     portrait.dataset.talkCount = String(Number(portrait.dataset.talkCount ?? "0") + 1);
   };
+  /** 貼上一扇對話窗的肖像與姓名牌；回傳這次是否換了一張臉。 */
+  const showDialoguePortrait = (
+    slot: "upper" | "lower",
+    shown: Pick<DialogueWindowState, "portrait" | "speaker">,
+    active: boolean,
+  ): boolean => {
+    const elements = dialogueWindows[slot];
+    if (shown.portrait === undefined) {
+      stopSpeaking(elements.portrait);
+      elements.portrait.hidden = true;
+      elements.portraitName.hidden = true;
+      elements.portraitName.textContent = "";
+      return false;
+    }
+    const previous = elements.portrait.dataset.portraitRecord;
+    configureAnimatedPortrait(
+      elements.portrait,
+      shown.portrait,
+      `${shown.speaker ?? "角色"}肖像`,
+      `dialogue-${slot}`,
+      `dialogue-portrait-${slot}`,
+      battlePortraitShowsRedEyes(controller, shown.portrait),
+    );
+    void prepareAnimatedPortrait(elements.portrait).catch(() => undefined);
+    elements.portrait.hidden = false;
+    elements.portrait.dataset.testid = active
+      ? "dialogue-portrait-composite"
+      : `dialogue-portrait-composite-${slot}`;
+    paintNativeDomText(elements.portraitName, (
+      controller.promotionDialogueActive
+        ? shown.speaker
+        : PORTRAIT_CATALOG[shown.portrait].displayName ?? shown.speaker
+    )?.trim() ?? "");
+    elements.portraitName.hidden = false;
+    elements.portraitName.dataset.testid = active
+      ? "dialogue-portrait-name"
+      : `dialogue-portrait-name-${slot}`;
+    if (!active) stopSpeaking(elements.portrait);
+    return previous !== String(shown.portrait);
+  };
+  /**
+   * 執行逐字途中輪到的 `HD`：換成已畫出 `typed` 個字時該在場的那張臉。換臉會把口型
+   * 與發言狀態重設，所以還有字要畫時要重新開口。
+   */
+  const syncDialoguePortraitCue = (typed: number) => {
+    dialoguePortraitTyped = typed;
+    const cueWindow = activeDialogueCueWindow;
+    if (!cueWindow) return;
+    const swapped = showDialoguePortrait(
+      cueWindow.slot,
+      dialoguePortraitAfterTyping(cueWindow.state, typed),
+      true,
+    );
+    if (swapped && typed < dialogueFullText.length) startSpeaking(activeDialoguePortrait, true);
+  };
   const stopDialogueTimer = () => {
     if (dialogueTimer !== undefined) clearProgramTimeout(dialogueTimer);
     if (dialogueAdvanceTimer !== undefined) clearProgramTimeout(dialogueAdvanceTimer);
@@ -572,6 +640,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     revealStart = 0,
     portrait?: HTMLElement,
     panel?: HTMLElement,
+    cueWindow?: { slot: "upper" | "lower"; state: DialogueWindowState },
   ) => {
     stopDialogueTimer();
     stopSpeaking(activeDialoguePortrait);
@@ -582,7 +651,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     activeDialogueText = target;
     activeDialoguePortrait = portrait;
     activeDialoguePanel = panel;
+    activeDialogueCueWindow = cueWindow?.state.portraitCues ? cueWindow : undefined;
     revealedCharacters = Math.max(0, Math.min(fullText.length, revealStart));
+    dialoguePortraitTyped = revealedCharacters;
     renderNativeDialogueText(target, fullText.slice(0, revealedCharacters), fullText);
     const tick = () => {
       if (activeDialogueKey !== key || activeDialogueText !== target || revealedCharacters >= dialogueFullText.length) {
@@ -592,6 +663,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         return;
       }
       const character = dialogueFullText[revealedCharacters];
+      syncDialoguePortraitCue(revealedCharacters);
       revealedCharacters += 1;
       renderNativeDialogueText(target, dialogueFullText.slice(0, revealedCharacters), dialogueFullText);
       if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
@@ -635,6 +707,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       if (activeDialogueKey !== key || activeDialogueText !== target) return;
       activeDialoguePortraitReady = true;
       revealedCharacters = dialogueFullText.length;
+      syncDialoguePortraitCue(revealedCharacters);
       renderNativeDialogueText(target, dialogueFullText);
       stopSpeaking(activeDialoguePortrait);
       scheduleAutomaticDialogueAdvance(key);
@@ -656,6 +729,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     stopDialogueTimer();
     revealedCharacters = dialogueFullText.length;
+    syncDialoguePortraitCue(revealedCharacters);
     renderNativeDialogueText(activeDialogueText, dialogueFullText);
     stopSpeaking(activeDialoguePortrait);
     if (controller.groupCommandDialogueActive) scheduleAutomaticDialogueAdvance(activeDialogueKey);
@@ -1570,7 +1644,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           }
           continue;
         }
-        elements.speaker.textContent = state.speaker ?? "";
+        // The typing window of a page with mid-reveal `HD`s shows the face of
+        // the phrase being typed; a new page starts from its opening face.
+        const shown = active && state.portraitCues
+          ? dialoguePortraitAfterTyping(state, pageChanged ? page.revealStart ?? 0 : dialoguePortraitTyped)
+          : state;
+        elements.speaker.textContent = shown.speaker ?? "";
         // A slot with no text is a portrait the script left on screen after
         // closing its window; only .dialogue-copy carries the A/18 text panel,
         // so collapsing it leaves the framed portrait and nameplate alone.
@@ -1578,8 +1657,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         elements.box.setAttribute(
           "aria-label",
           state.text === undefined
-            ? `${state.speaker ?? "角色"}在場`
-            : state.speaker ? `${state.speaker}對話` : "旁白",
+            ? `${shown.speaker ?? "角色"}在場`
+            : shown.speaker ? `${shown.speaker}對話` : "旁白",
         );
         if (state.text !== undefined && (!active || pageChanged)) {
           renderNativeDialogueText(elements.text, state.text);
@@ -1591,36 +1670,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           elements.copy.style.removeProperty("--dialogue-text-inset-x");
           elements.copy.style.removeProperty("--dialogue-text-inset-y");
         }
-        if (state.portrait !== undefined) {
-          configureAnimatedPortrait(
-            elements.portrait,
-            state.portrait,
-            `${state.speaker ?? "角色"}肖像`,
-            `dialogue-${slot}`,
-            `dialogue-portrait-${slot}`,
-            battlePortraitShowsRedEyes(controller, state.portrait),
-          );
-          void prepareAnimatedPortrait(elements.portrait).catch(() => undefined);
-          elements.portrait.hidden = false;
-          elements.portrait.dataset.testid = active
-            ? "dialogue-portrait-composite"
-            : `dialogue-portrait-composite-${slot}`;
-          paintNativeDomText(elements.portraitName, (
-            controller.promotionDialogueActive
-              ? state.speaker
-              : PORTRAIT_CATALOG[state.portrait].displayName ?? state.speaker
-          )?.trim() ?? "");
-          elements.portraitName.hidden = false;
-          elements.portraitName.dataset.testid = active
-            ? "dialogue-portrait-name"
-            : `dialogue-portrait-name-${slot}`;
-          if (!active) stopSpeaking(elements.portrait);
-        } else {
-          stopSpeaking(elements.portrait);
-          elements.portrait.hidden = true;
-          elements.portraitName.hidden = true;
-          elements.portraitName.textContent = "";
-        }
+        showDialoguePortrait(slot, shown, active);
       }
       const activeState = page.activeSlot ? page[page.activeSlot] : undefined;
       if (page.activeSlot && activeState?.text !== undefined) {
@@ -1637,6 +1687,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             page.revealStart,
             portrait,
             dialogueWindows[page.activeSlot].copy,
+            { slot: page.activeSlot, state: activeState },
           );
         }
       } else if (pageChanged) {
@@ -1645,6 +1696,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         activeDialogueKey = pageKey;
         activeDialogueText = undefined;
         activeDialoguePortrait = undefined;
+        activeDialogueCueWindow = undefined;
         activeDialoguePanel = undefined;
         activeDialoguePortraitReady = true;
         pendingDialogueFastForward = false;
@@ -1667,6 +1719,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       activeDialogueKey = "";
       activeDialogueText = undefined;
       activeDialoguePortrait = undefined;
+      activeDialogueCueWindow = undefined;
       activeDialoguePanel = undefined;
       activeDialoguePortraitReady = true;
       pendingDialogueFastForward = false;

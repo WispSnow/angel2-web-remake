@@ -185,9 +185,25 @@ export interface AttackResult {
   splitCount?: number;
 }
 
+/** An `HD`/`HU` the script runs between two runs of this window's text. */
+export interface DialoguePortraitCue {
+  /** Characters of the window text already typed when the portrait is drawn. */
+  at: number;
+  portrait: PortraitRecord;
+  speaker?: string;
+}
+
 export interface DialogueWindowState {
+  /** The portrait on screen at the page's `KY`; with cues, the last cue's. */
   portrait?: PortraitRecord;
   speaker?: string;
+  /**
+   * Portraits drawn while this page is still typing, in reveal order; the first
+   * cue is the one on screen when typing starts. SAY/0164 runs `ME`/`HD` before
+   * every chanted phrase so each ghost speaks its own words; the page still
+   * waits only once, at the end.
+   */
+  portraitCues?: readonly DialoguePortraitCue[];
   /**
    * Native window text. Absent when the script keeps a portrait on screen with
    * its text window closed — `HD`/`HU` without `WD`/`WU`, as in SAY/0043 where
