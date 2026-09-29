@@ -86,6 +86,12 @@ const STAGE3_FORCE_DEFINITIONS = [
       preserveNativeFormation: true,
       // REMAKE-111：被救援的第四军团只求活下来，近战交出主动权，全队向黛西收拢。
       rally: { unitId: STAGE3_RALLY_UNIT_ID, meleeHoldsFire: true },
+      // REMAKE-172：拦截救援队的莎第二军团全灭后，救援队已能会合，第四军团不再死守，
+      // 改走与其他自动友军相同的专家作战，免得只剩第一军团时战斗无限拖长。
+      release: {
+        whenForcesEliminated: ["sha-second-corps"],
+        tacticLabel: "轉守為攻",
+      },
     },
   },
   {

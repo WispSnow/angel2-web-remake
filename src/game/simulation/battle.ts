@@ -1050,7 +1050,7 @@ export class Stage0Battle {
   }
 
   forceForUnit(id: string): ForceDefinition | undefined {
-    return this.forces.definitionForUnit(id);
+    return this.forces.activeDefinitionForUnit(id, this.units);
   }
 
   playerManualPhaseComplete(): boolean {
@@ -2108,7 +2108,7 @@ export class Stage0Battle {
       return { unitId: id, kind: path.length > 1 ? "move" : "wait", path };
     }
 
-    const doctrine = this.forces.definitionForUnit(id)?.doctrine;
+    const doctrine = this.forceForUnit(id)?.doctrine;
     if (doctrine?.strategy === "terrain-hold") {
       return this.planTerrainHoldAiAction(unit, doctrine);
     }
@@ -2225,7 +2225,7 @@ export class Stage0Battle {
 
   private planEnemyAiActionUncached(unit: BattleUnit, behavior: number): AlliedAiAction {
     const id = unit.id;
-    const doctrine = this.forces.definitionForUnit(id)?.doctrine;
+    const doctrine = this.forceForUnit(id)?.doctrine;
     if (doctrine?.strategy === "terrain-hold") {
       const action = this.planTerrainHoldAiAction(unit, doctrine);
       this.recordExpertDecision(unit, [action], action);
@@ -3191,7 +3191,7 @@ export class Stage0Battle {
     actor: BattleUnit,
     destination: Position,
   ): { release: number; progress: number } {
-    const force = this.forces.definitionForUnit(actor.id);
+    const force = this.forceForUnit(actor.id);
     if (force?.doctrine.strategy !== "expert"
       || positionKey(destination) === positionKey(actor)) {
       return { release: 0, progress: 0 };
@@ -3960,7 +3960,7 @@ export class Stage0Battle {
       const hasExplicitStrategy = leaderId !== undefined || stableOrder.some((id) =>
         this.routePulseByActorId.has(id)
         || this.escortRouteByActorId.has(id)
-        || this.forces.definitionForUnit(id)?.doctrine.strategy === "terrain-hold");
+        || this.forceForUnit(id)?.doctrine.strategy === "terrain-hold");
       if (hasExplicitStrategy) {
         const unitId = stableOrder[0];
         const unit = this.unit(unitId);

@@ -24,6 +24,19 @@ export interface ForceRallyDoctrine {
   meleeHoldsFire: boolean;
 }
 
+/**
+ * REMAKE-172. A hold exists to outlast one specific threat; once every listed
+ * opposing force is gone the holding force fights under the ordinary expert
+ * doctrine instead of stalling the battle. Membership is read from the live
+ * board, so the release needs no saved state.
+ */
+export interface TerrainHoldReleaseDoctrine {
+  /** Opposing forces whose full elimination ends the hold. */
+  whenForcesEliminated: readonly string[];
+  /** Player-facing tactic once the hold has ended. */
+  tacticLabel: string;
+}
+
 export interface TerrainHoldForceAiDoctrine {
   strategy: "terrain-hold";
   allowedTerrainSlots: readonly number[];
@@ -35,6 +48,7 @@ export interface TerrainHoldForceAiDoctrine {
   >;
   preserveNativeFormation: boolean;
   rally?: ForceRallyDoctrine;
+  release?: TerrainHoldReleaseDoctrine;
 }
 
 export type ForceAiDoctrine = ExpertForceAiDoctrine | TerrainHoldForceAiDoctrine;
@@ -72,6 +86,7 @@ function assertPercent(label: string, value: number): void {
 export class ForceRegistry {
   private readonly definitionsById = new Map<string, ForceDefinition>();
   private readonly forceIdByUnitId = new Map<string, string>();
+  private readonly releasedDefinitionsById = new Map<string, ForceDefinition>();
   private readonly playerCommanderId: string | undefined;
 
   constructor(
@@ -164,6 +179,28 @@ export class ForceRegistry {
           throw new Error(`Force ${definition.id} cannot target friendly force ${preferredForceId}`);
         }
       }
+      if (definition.doctrine.strategy !== "terrain-hold" || !definition.doctrine.release) continue;
+      const release = definition.doctrine.release;
+      if (release.whenForcesEliminated.length === 0) {
+        throw new Error(`Force ${definition.id} release needs at least one force`);
+      }
+      if (release.tacticLabel.trim().length === 0) {
+        throw new Error(`Force ${definition.id} has an empty released tactic`);
+      }
+      for (const releaseForceId of release.whenForcesEliminated) {
+        const releaseForce = this.definitionsById.get(releaseForceId);
+        if (!releaseForce) {
+          throw new Error(`Force ${definition.id} is released by missing force ${releaseForceId}`);
+        }
+        if (releaseForce.side === definition.side) {
+          throw new Error(`Force ${definition.id} cannot be released by friendly force ${releaseForceId}`);
+        }
+      }
+      this.releasedDefinitionsById.set(definition.id, {
+        ...definition,
+        tacticLabel: release.tacticLabel,
+        doctrine: { strategy: "expert" },
+      });
     }
     this.playerCommanderId = playerCommanderId;
   }
@@ -175,6 +212,28 @@ export class ForceRegistry {
   definitionForUnit(unitId: string): ForceDefinition | undefined {
     const forceId = this.forceIdByUnitId.get(unitId);
     return forceId ? this.definition(forceId) : undefined;
+  }
+
+  /**
+   * The definition that governs the unit on the current board: a terrain hold
+   * whose release forces have all left the battlefield answers as its released
+   * expert form (REMAKE-172).
+   */
+  activeDefinitionForUnit(
+    unitId: string,
+    units: readonly BattleUnit[],
+  ): ForceDefinition | undefined {
+    const definition = this.definitionForUnit(unitId);
+    if (!definition || definition.doctrine.strategy !== "terrain-hold") return definition;
+    const released = this.releasedDefinitionsById.get(definition.id);
+    const release = definition.doctrine.release;
+    if (!released || !release) return definition;
+    const releaseForceIds = new Set(release.whenForcesEliminated);
+    const threatRemains = units.some((unit) => {
+      const forceId = this.forceIdByUnitId.get(unit.id);
+      return forceId !== undefined && releaseForceIds.has(forceId);
+    });
+    return threatRemains ? definition : released;
   }
 
   controlForUnit(unitId: string): ForceControl | undefined {

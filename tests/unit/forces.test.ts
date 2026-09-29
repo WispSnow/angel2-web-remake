@@ -203,6 +203,71 @@ describe("force registry", () => {
       },
     }], [units[0]])).toThrow(/Rally unit 1:2 is not a member/);
   });
+
+  describe("terrain-hold release (REMAKE-172)", () => {
+    const holdDoctrine = (whenForcesEliminated: readonly string[]) => ({
+      strategy: "terrain-hold" as const,
+      allowedTerrainSlots: [3],
+      entryTerrainSlots: [3],
+      restThresholdPercent: 50,
+      criticalHealThresholdPercent: 50,
+      preserveNativeFormation: false,
+      release: { whenForcesEliminated, tacticLabel: "轉守為攻" },
+    });
+    const units = [unit("1:1", 1), unit("2:1", 2), unit("2:2", 2), unit("2:3", 2)];
+    const definitions: ForceDefinition[] = [
+      {
+        ...expertForce("holders", 1, ["1:1"]),
+        control: "independent-ai",
+        tacticLabel: "固守防區",
+        doctrine: holdDoctrine(["interceptors"]),
+      },
+      expertForce("besiegers", 2, ["2:1"]),
+      expertForce("interceptors", 2, ["2:2", "2:3"]),
+    ];
+
+    it("holds while any listed force member survives and fights as expert once all are gone", () => {
+      const registry = new ForceRegistry(definitions, units);
+      expect(registry.activeDefinitionForUnit("1:1", units)).toBe(definitions[0]);
+
+      const oneInterceptorLeft = units.filter(({ id }) => id !== "2:2");
+      expect(registry.activeDefinitionForUnit("1:1", oneInterceptorLeft)?.doctrine.strategy)
+        .toBe("terrain-hold");
+
+      const interceptorsGone = units.filter(({ id }) => id !== "2:2" && id !== "2:3");
+      const released = registry.activeDefinitionForUnit("1:1", interceptorsGone);
+      expect(released).toMatchObject({
+        id: "holders",
+        side: 1,
+        control: "independent-ai",
+        unitIds: ["1:1"],
+        tacticLabel: "轉守為攻",
+        doctrine: { strategy: "expert" },
+      });
+      // 解除不写回登记表：原定义不变，同一棋盘再次查询得到同一对象。
+      expect(registry.definitionForUnit("1:1")).toBe(definitions[0]);
+      expect(registry.activeDefinitionForUnit("1:1", interceptorsGone)).toBe(released);
+      // 其他军团不受影响。
+      expect(registry.activeDefinitionForUnit("2:1", interceptorsGone)).toBe(definitions[1]);
+    });
+
+    it("rejects releases tied to missing or friendly forces", () => {
+      expect(() => new ForceRegistry([
+        { ...definitions[0], doctrine: holdDoctrine(["nobody"]) },
+        ...definitions.slice(1),
+      ], units)).toThrow(/released by missing force nobody/);
+      expect(() => new ForceRegistry([
+        { ...definitions[0], doctrine: holdDoctrine([]) },
+        ...definitions.slice(1),
+      ], units)).toThrow(/release needs at least one force/);
+      expect(() => new ForceRegistry([
+        definitions[0],
+        expertForce("friends", 1, ["1:2"]),
+        { ...definitions[0], id: "other-holders", unitIds: ["1:3"], doctrine: holdDoctrine(["friends"]) },
+        ...definitions.slice(1),
+      ], [...units, unit("1:2", 1), unit("1:3", 1)])).toThrow(/released by friendly force friends/);
+    });
+  });
 });
 
 describe("npc ally map badge identity", () => {

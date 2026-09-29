@@ -39,6 +39,16 @@ const archerFollowerCampaign: CampaignState = {
   ]),
 };
 
+/**
+ * Clears the board down to side 1 plus the second corps' rear soldier at its
+ * opening cell (31,30), far outside any fourth-corps shot. That one survivor
+ * keeps the `REMAKE-172` release from firing, so the hold doctrine stays under
+ * test while nothing is in reach.
+ */
+const keepAlliesAndDistantInterceptor = (battle: Stage3Battle): void => {
+  battle.units = battle.units.filter((unit) => unit.side === 1 || unit.id === "2:49");
+};
+
 describe("stage 3 battle construction and stable-remake automation", () => {
   it("builds the fixed 13-vs-12 roster with inherited classes and named leaders", () => {
     const battle = new Stage3Battle(campaign);
@@ -235,7 +245,7 @@ describe("stage 3 battle construction and stable-remake automation", () => {
   it("still follows its leader once no shot is left on the board", () => {
     const battle = new Stage3Battle(archerFollowerCampaign);
     const leader = battle.unit("1:3")!;
-    battle.units = battle.units.filter((unit) => unit.side === 1);
+    keepAlliesAndDistantInterceptor(battle);
     const follower = battle.unit("1:21")!;
     const distanceBefore = Math.abs(follower.x - leader.x) + Math.abs(follower.y - leader.y);
 
@@ -320,6 +330,65 @@ describe("stage 3 battle construction and stable-remake automation", () => {
       .toBe(true);
   });
 
+  describe("fourth corps release after the second corps falls (REMAKE-172)", () => {
+    const SECOND_CORPS_IDS = ["2:44", "2:45", "2:47", "2:46", "2:50", "2:48", "2:49"];
+    const meleeBesideFirstCorps = (survivingSecondCorpsIds: readonly string[]) => {
+      const battle = new Stage3Battle(campaign);
+      battle.units = battle.units.filter((unit) => !SECOND_CORPS_IDS.includes(unit.id)
+        || survivingSecondCorpsIds.includes(unit.id));
+      const unit = battle.unit("1:45")!;
+      const enemy = battle.unit("2:42")!;
+      enemy.x = unit.x;
+      enemy.y = unit.y - 1;
+      expect(unit.life).toBe(battle.statsFor(unit).maxLife);
+      return { battle, unit, enemy };
+    };
+
+    it("keeps holding while a single second-corps member survives", () => {
+      const { battle, unit } = meleeBesideFirstCorps(["2:49"]);
+      expect(battle.forceForUnit(unit.id)).toMatchObject({
+        id: "fourth-corps",
+        tacticLabel: "固守防區",
+        doctrine: { strategy: "terrain-hold" },
+      });
+      expect(battle.planAlliedAiAction(unit.id)).toMatchObject({ kind: "move" });
+    });
+
+    it("switches the whole corps to ordinary expert combat once the second corps is gone", () => {
+      const { battle, unit, enemy } = meleeBesideFirstCorps([]);
+      for (const member of battle.units.filter((candidate) =>
+        candidate.side === 1 && !battle.isPlayerControllableAlly(candidate.id))) {
+        expect(battle.forceForUnit(member.id), member.id).toMatchObject({
+          id: "fourth-corps",
+          control: "independent-ai",
+          tacticLabel: "轉守為攻",
+          doctrine: { strategy: "expert" },
+        });
+        // 解除只换教义，玩家仍不能指挥第四军团。
+        expect(battle.isPlayerControllableAlly(member.id)).toBe(false);
+      }
+      // 同一格、同样满血：固守时向黛西收拢，解除后就地进攻第一军团。
+      expect(battle.planAlliedAiAction(unit.id)).toMatchObject({
+        unitId: unit.id,
+        kind: "attack",
+        targetId: enemy.id,
+      });
+    });
+
+    it("lets a released member leave the forest to chase the first corps", () => {
+      const battle = new Stage3Battle(campaign);
+      battle.units = battle.units.filter((unit) => !SECOND_CORPS_IDS.includes(unit.id));
+      const pursuers = battle.units.filter((unit) => unit.side === 1
+        && !battle.isPlayerControllableAlly(unit.id)
+        && unit.id !== "1:3");
+      const leavesDefenseArea = pursuers.some((unit) => {
+        const action = battle.planAlliedAiAction(unit.id);
+        return action?.path.some((position) => ![3, 5].includes(stage3TerrainSlotAt(position)));
+      });
+      expect(leavesDefenseArea).toBe(true);
+    });
+  });
+
   it("keeps Daisy herself in place rather than rallying on her own cell", () => {
     const battle = new Stage3Battle(campaign);
     const daisy = battle.unit("1:3")!;
@@ -333,7 +402,7 @@ describe("stage 3 battle construction and stable-remake automation", () => {
   it("rests a wounded ranged member that has neither a shot nor rally progress left", () => {
     // REMAKE-143: the fourth corps' hold position is a rest while wounded.
     const battle = new Stage3Battle(campaign);
-    battle.units = battle.units.filter((unit) => unit.side === 1);
+    keepAlliesAndDistantInterceptor(battle);
     const daisy = battle.unit("1:3")!;
     const archer = battle.unit("1:45")!;
     archer.classId = "archer";
@@ -362,7 +431,7 @@ describe("stage 3 battle construction and stable-remake automation", () => {
 
   it("rallies a leaderless ranged automatic ally on Daisy once no shot is left", () => {
     const battle = new Stage3Battle(campaign);
-    battle.units = battle.units.filter((unit) => unit.side === 1);
+    keepAlliesAndDistantInterceptor(battle);
     const archer = battle.unit("1:45")!;
     archer.classId = "archer";
     archer.className = "弓兵";
@@ -384,7 +453,7 @@ describe("stage 3 battle construction and stable-remake automation", () => {
    */
   it("walks the right flank around the hole in the forest instead of stalling", () => {
     const battle = new Stage3Battle(campaign);
-    battle.units = battle.units.filter((unit) => unit.side === 1);
+    keepAlliesAndDistantInterceptor(battle);
     const daisy = battle.unit("1:3")!;
     const flank = battle.unit("1:50")!;
     expect(stage3TerrainSlotAt({ x: 31, y: 18 })).toBe(2);
