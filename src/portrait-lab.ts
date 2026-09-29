@@ -17,7 +17,12 @@ if (!root) throw new Error("#app not found");
 
 const CURRENT_STAGE_RECORDS = new Set<PortraitRecord>([0, 15, 42, 43, 44, 45, 46, 47, 48]);
 const displayName = (record: PortraitRecord): string =>
-  PORTRAIT_CATALOG[record].displayName?.replaceAll(" ", "") || `未命名記錄 ${record}`;
+  PORTRAIT_CATALOG[record].battleDisplayName?.replaceAll(" ", "") || `未命名記錄 ${record}`;
+/** Module 25's prebattle table still names D/51 with the leftover 「史萊姆」. */
+const prebattleNameNote = (record: PortraitRecord): string => {
+  const prebattle = PORTRAIT_CATALOG[record].displayName?.replaceAll(" ", "");
+  return prebattle && prebattle !== displayName(record) ? ` · 關前名牌「${prebattle}」` : "";
+};
 
 root.innerHTML = `
   <main class="portrait-lab-shell">
@@ -65,7 +70,7 @@ root.innerHTML = `
           })}
           <div class="portrait-card-copy">
             <h2>${displayName(record)}</h2>
-            <p>D/${String(record).padStart(4, "0")}</p>
+            <p>D/${String(record).padStart(4, "0")}${prebattleNameNote(record)}</p>
             ${animation
               ? `<small>眼 ${animation.eyeOrigin.x},${animation.eyeOrigin.y} · 口 ${animation.mouthOrigin.x},${animation.mouthOrigin.y}${animation.metadataSourceRecord === record ? "" : ` · 布局沿用 D/${animation.metadataSourceRecord}`}${animation.originCorrection ? ` · ${animation.originCorrection.ruleId} 修正原版眼位 ${animation.originCorrection.nativeOrigin.x},${animation.originCorrection.nativeOrigin.y}` : ""}</small>`
               : "<small class=\"is-static\">原版無動畫元資料／覆蓋幀</small>"}

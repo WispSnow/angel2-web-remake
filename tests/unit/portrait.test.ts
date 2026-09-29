@@ -44,6 +44,17 @@ describe("generated campaign portrait catalog", () => {
     expect(PORTRAIT_CATALOG[67].animation?.metadataSourceRecord).toBe(56);
   });
 
+  it("keeps module 29's battle nameplates apart from module 25's prebattle table", () => {
+    // SAY/0164 is the only script that draws D/51, and module 29 runs it: the
+    // leftover 「史萊姆」 in module 25's table C never reaches a player.
+    expect(PORTRAIT_CATALOG[51]).toMatchObject({ displayName: " 史萊姆", battleDisplayName: " 水戰士" });
+    const differing = PORTRAIT_RECORDS.filter((record) =>
+      PORTRAIT_CATALOG[record].battleDisplayName !== PORTRAIT_CATALOG[record].displayName);
+    expect(differing).toEqual([51]);
+    expect(PORTRAIT_CATALOG[63].battleDisplayName).toBeNull();
+    expect(PORTRAIT_CATALOG[67].battleDisplayName).toBe(PORTRAIT_CATALOG[56].battleDisplayName);
+  });
+
   it("provides complete eye and mouth layers for every stage-zero and stage-one portrait", () => {
     for (const record of [0, 15, 34, 42, 43, 44, 45, 46, 47, 48, 49] as const) {
       const animation = PORTRAIT_CATALOG[record].animation;

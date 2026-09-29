@@ -208,7 +208,8 @@ test("S38-I: every ghost in the SAY/0164 chant takes the portrait for its own ph
     const cues = opening[wait - 1].lower?.portraitCues ?? [];
     // The tick that draws glyph `at` runs that phrase's `HD` first.
     const cue = cues.filter(({ at }) => at < typed).at(-1) ?? cues[0];
-    return { portrait: cue.portrait, name: PORTRAIT_CATALOG[cue.portrait].displayName?.trim() ?? "" };
+    // A battle story reads module 29's nameplate table, not module 25's.
+    return { portrait: cue.portrait, name: PORTRAIT_CATALOG[cue.portrait].battleDisplayName?.trim() ?? "" };
   };
   const stepChantPage = async (wait: number, stopAfter = Number.POSITIVE_INFINITY) => {
     const text = opening[wait - 1].lower?.text ?? "";
@@ -249,10 +250,14 @@ test("S38-I: every ghost in the SAY/0164 chant takes the portrait for its own ph
   expect(await sourceWait()).toBe("22");
   await expect(lowerPortrait).toHaveAttribute("data-portrait-record", "60");
   await expect(lowerPortrait).toHaveAttribute("data-speaking", "false");
-  expect((await shownFace()).name).toBe(PORTRAIT_CATALOG[60].displayName?.trim());
+  expect((await shownFace()).name).toBe(PORTRAIT_CATALOG[60].battleDisplayName?.trim());
 
   await turnPage();
   expect(await stepChantPage(23)).toEqual([62, 51]);
+  await expect(page.locator("#dialogue-portrait-name-lower")).toHaveText("水戰士");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage38-chant-water-warrior.png`,
+  });
   await page.clock.resume();
 });
 

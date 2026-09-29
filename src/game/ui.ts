@@ -160,7 +160,8 @@ const nativePresentationAssetEntries = (): ReadonlyArray<readonly [string, strin
 ];
 const nativePresentationAssetStyle = () => nativePresentationAssetEntries()
   .map(([property, value]) => `${property}:${value}`).join(";");
-const niaPortraitDisplayName = (PORTRAIT_CATALOG[46].displayName ?? "妮雅").trim();
+// The outcome and quit feedback windows are module 29 surfaces.
+const niaPortraitDisplayName = (PORTRAIT_CATALOG[46].battleDisplayName ?? "妮雅").trim();
 
 export interface CombatPresentationRenderSource {
   battlePresentation: "map" | "full";
@@ -584,10 +585,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     elements.portrait.dataset.testid = active
       ? "dialogue-portrait-composite"
       : `dialogue-portrait-composite-${slot}`;
+    // Module 25 stories and module 29 battle dialogue each read their own
+    // metadata table, and the two disagree on D/51's name.
+    const entry = PORTRAIT_CATALOG[shown.portrait];
+    const nativeName = controller.phase === "prebattleStory" ? entry.displayName : entry.battleDisplayName;
     paintNativeDomText(elements.portraitName, (
-      controller.promotionDialogueActive
-        ? shown.speaker
-        : PORTRAIT_CATALOG[shown.portrait].displayName ?? shown.speaker
+      controller.promotionDialogueActive ? shown.speaker : nativeName ?? shown.speaker
     )?.trim() ?? "");
     elements.portraitName.hidden = false;
     elements.portraitName.dataset.testid = active
