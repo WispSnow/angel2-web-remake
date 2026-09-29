@@ -31,6 +31,8 @@ export function stageEventTriggerMatches(
       return received.type === expected.type && received.effectId === expected.effectId;
     case "round-started":
       return received.type === expected.type && received.round === expected.round;
+    case "force-released":
+      return received.type === expected.type && received.forceId === expected.forceId;
   }
 }
 
@@ -48,6 +50,8 @@ export function consumedEventIdsForBattleResume(
           return true;
         case "round-started":
           return trigger.round <= round;
+        // A release depends on the board, not the round; the save keeps it.
+        case "force-released":
         case "objective-satisfied":
         case "victory-flow-completed":
           return false;

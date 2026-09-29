@@ -539,3 +539,80 @@ test("S03-S: rescue allies retain the magician map figure after a deeper promoti
     path: `${ARTIFACT_DIR}/stage3-rescue-ally-magician-map-figure.png`,
   });
 });
+
+/**
+ * REMAKE-172. Once 莎第二軍團 is gone the fourth corps drops its hold. Before its
+ * first released phase 黛西 orders the counterattack and 希蜜 answers, both in the
+ * native two-window battle dialogue; the line is a consumed stage event, so the
+ * next round's automatic phase runs without it.
+ */
+test("S03-V: the fourth corps counterattacks once the second corps falls, announced once", async ({ page }) => {
+  await openStage3(page, "stage-03-second-corps-cleared&difficulty=0&test=1");
+  let current = await state(page);
+  expect(current.units.filter(({ side, slot }) => side === 2 && slot >= 44)).toHaveLength(0);
+
+  // 右栏战术在台词之前就反映棋盘：解除由棋盘判定，不等演出。
+  const daisy = current.units.find(({ id }) => id === "1:3")!;
+  await moveCursorTo(page, daisy.x, daisy.y);
+  await page.keyboard.press("Space");
+  await expect(page.getByTestId("unit-tactic")).toHaveText("友軍・戰術轉守為攻");
+  await page.keyboard.press("Escape");
+
+  await page.evaluate(() => {
+    const addresses: string[] = [];
+    (window as unknown as { __remake172Addresses: string[] }).__remake172Addresses = addresses;
+    const layer = document.querySelector("[data-testid=dialogue-layer]")!;
+    new MutationObserver(() => {
+      const address = (layer as HTMLElement).dataset.sourceAddress;
+      if (address?.startsWith("REMAKE-172") && addresses.at(-1) !== address) addresses.push(address);
+    }).observe(layer, { attributes: true, attributeFilter: ["data-source-address"] });
+  });
+
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-allRest").click();
+  await page.getByTestId("dialogue-layer").click();
+
+  const layer = page.getByTestId("dialogue-layer");
+  await expect(layer).toHaveAttribute("data-source-address", "REMAKE-172:1");
+  await expect(layer).toHaveAttribute("data-source-record", "remake-authored");
+  await expect(layer).toHaveAttribute("data-active-slot", "upper");
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText("第四軍團聽令，轉守為攻！");
+  await expect(page.getByTestId("dialogue-window-lower")).toBeHidden();
+  await expect(page.getByTestId("dialogue-portrait-composite"))
+    .toHaveAttribute("data-portrait-record", "43");
+  expect((await state(page)).phase).toBe("allyAuto");
+  // 台词挂起自动阶段：第四军团此时一个都还没行动。
+  current = await state(page);
+  expect(current.units.filter(({ id }) => ["1:21", "1:46", "1:45", "1:47", "1:3", "1:20", "1:50"]
+    .includes(id) && id !== "1:3").every(({ acted }) => !acted)).toBe(true);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage3-remake172-daisy-order.png`,
+  });
+
+  await layer.click();
+  await expect(layer).toHaveAttribute("data-source-address", "REMAKE-172:2");
+  await expect(layer).toHaveAttribute("data-active-slot", "lower");
+  await expect(page.getByTestId("dialogue-window-lower")).toContainText("好！我們一起拿下梅蒂！");
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText("轉守為攻");
+  await expect(page.getByTestId("dialogue-portrait-composite"))
+    .toHaveAttribute("data-portrait-record", "45");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage3-remake172-himi-reply.png`,
+  });
+  await layer.click();
+
+  await waitForPhaseThroughPromotions(page, "player");
+  const consumed = await page.evaluate(
+    () => (window.__ANGEL2__?.getState() as { consumedEventIds: string[] }).consumedEventIds,
+  );
+  expect(consumed.filter((id) => id === "stage-03-fourth-corps-counterattack")).toHaveLength(1);
+
+  // 第 2 回合的自动阶段不再重播。
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-allRest").click();
+  await page.getByTestId("dialogue-layer").click();
+  await waitForPhaseThroughPromotions(page, "enemy");
+  expect(await page.evaluate(
+    () => (window as unknown as { __remake172Addresses: string[] }).__remake172Addresses,
+  )).toEqual(["REMAKE-172:1", "REMAKE-172:2"]);
+});

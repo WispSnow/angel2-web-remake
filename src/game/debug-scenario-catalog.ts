@@ -200,6 +200,14 @@ export const DEBUG_SCENARIOS = [
     fixture: true,
   },
   {
+    id: "stage-03-second-corps-cleared",
+    stageId: "stage-03",
+    title: "第二軍團全滅",
+    phase: "REMAKE-172",
+    description: "移除莎第二軍團七人；結束我方回合後黛西下令轉守為攻、希蜜回應，第四軍團改為正常作戰。",
+    fixture: true,
+  },
+  {
     id: "stage-03-near-victory",
     stageId: "stage-03",
     title: "一擊擊敗梅蒂",

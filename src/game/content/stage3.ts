@@ -1,9 +1,13 @@
 import type { MusicProgram } from "../music-transport";
-import type { PortraitRecord, Position, UnitClassId } from "../types";
+import type { DialoguePage, PortraitRecord, Position, UnitClassId } from "../types";
 import * as actionContent from "./stage1-actions.generated";
 import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord } from "./classes";
-import { registerStageStoryPages } from "./dialogue";
+import {
+  registerStageBattleDialogues,
+  registerStageStoryPages,
+  type StageBattleDialogue,
+} from "./dialogue";
 import {
   STAGE3_GENERIC_ALLY_SLOT_SWAP,
   withSwappedGenericAllySlots,
@@ -115,6 +119,14 @@ export const STAGE3_DEFINITION = {
       simulationEffect: "stage-03-fourth-corps-joined",
       presentation: "none",
     },
+    // REMAKE-172：莎第二军团全灭后，第四军团第一次以解除后的教义行动之前，黛西下令
+    // 转守为攻、希蜜回应。台词由复刻撰写，不是原版 SAY 记录。
+    {
+      id: "stage-03-fourth-corps-counterattack",
+      trigger: { type: "force-released", forceId: "fourth-corps" },
+      simulationEffect: "none",
+      presentation: "stage-03-fourth-corps-counterattack",
+    },
     {
       id: "stage-03-boss-defeated",
       trigger: { type: "objective-satisfied" },
@@ -175,6 +187,48 @@ export const STAGE3_FOURTH_CORPS_NAMED_ACTORS = STAGE3_SEMANTIC_ALLIED_UNITS
     (left.position.y * STAGE3.width + left.position.x)
     - (right.position.y * STAGE3.width + right.position.x))
   .map(({ slot }) => ({ side: 1 as const, slot }));
+
+/** Force ids shared by the battle, its REMAKE-172 event and the save schema. */
+export const STAGE3_FOURTH_CORPS_FORCE_ID = "fourth-corps";
+export const STAGE3_SECOND_CORPS_FORCE_ID = "sha-second-corps";
+/** 莎第二军团（阻击救援队）的七个敌方槽，按原版行动顺序。 */
+export const STAGE3_SECOND_CORPS_UNIT_IDS = [
+  "2:44", "2:45", "2:47", "2:46", "2:50", "2:48", "2:49",
+] as const;
+
+const stage3Speaker = (slot: number): { portrait: PortraitRecord; speaker: string } => {
+  const actor = STAGE3_ALLIED_ACTORS.find((candidate) => candidate.slot === slot);
+  if (!actor || actor.portraitRecord === 255) throw new Error(`Stage 3 slot ${slot} is not a named speaker`);
+  return { portrait: actor.portraitRecord as PortraitRecord, speaker: actor.normalizedName };
+};
+
+const DAISY_COUNTERATTACK_LINE = {
+  ...stage3Speaker(3),
+  text: "「希蜜她們已經擊退了攔路的敵軍！\n  第四軍團聽令，轉守為攻！」",
+};
+
+/**
+ * `REMAKE-172` 的复刻撰写对白（`[DD]`，用户 2026-09-29 选定）。沿用原版 SAY 场景的
+ * 双窗写法：黛西在上窗，希蜜在下窗接话时黛西的窗口保持打开。标点、换行缩进与点阵
+ * 字库覆盖都按原版对白的约定，`stage3-battle.test.ts` 检查每个字都有原版字形。
+ */
+export const STAGE3_FOURTH_CORPS_COUNTERATTACK_DIALOGUE = {
+  focusUnitId: "1:3",
+  statusText: "莎第二軍團已全滅：第四軍團轉守為攻。",
+  pages: [
+    {
+      activeSlot: "upper",
+      upper: DAISY_COUNTERATTACK_LINE,
+      source: { record: "remake-authored", wait: 1, address: "REMAKE-172:1" },
+    },
+    {
+      activeSlot: "lower",
+      upper: DAISY_COUNTERATTACK_LINE,
+      lower: { ...stage3Speaker(1), text: "「好！我們一起拿下梅蒂！」" },
+      source: { record: "remake-authored", wait: 2, address: "REMAKE-172:2" },
+    },
+  ] satisfies DialoguePage[],
+} as const satisfies StageBattleDialogue;
 
 function enemyIdentity(
   slot: number,
@@ -252,6 +306,9 @@ export function activateStage3Content(): void {
     "stage-03-route-to-stage-04": { type: "campaign-route", destination: "stage-04" },
   });
   registerStageStoryPages(STAGE3_STORY_PAGES);
+  registerStageBattleDialogues({
+    "stage-03-fourth-corps-counterattack": STAGE3_FOURTH_CORPS_COUNTERATTACK_DIALOGUE,
+  });
   registerStageMusicPrograms(STAGE3_MUSIC_PROGRAMS);
 }
 

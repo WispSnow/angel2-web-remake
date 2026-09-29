@@ -43,6 +43,8 @@ import {
 } from "./content/classes";
 import {
   storyPagesForId,
+  isStageBattleDialogueId,
+  stageBattleDialogueFor,
   storyPhaseForStageStory,
   type StageStoryPhase,
 } from "./content/dialogue";
@@ -53,6 +55,7 @@ import {
   type CampaignRouteId,
 } from "./content/stage-effects";
 import type {
+  StageBattleDialogueId,
   StageEventDefinition,
   StageEventTrigger,
   StageObjectiveCondition,
@@ -576,6 +579,8 @@ export class GameController {
   aiTechniqueDialogue?: AiTechniqueDialoguePresentation;
   contextualLineDialogue?: ContextualLineDialoguePresentation;
   private battleContextDialogue?: { page: DialoguePage; resume: () => void };
+  /** Set by 跳過 so a multi-page battle dialogue drops its remaining pages. */
+  private battleContextDialogueSkipped = false;
   movementPresentation?: MovementPresentation;
   statusMessage = "";
   pendingSaveSlot?: number;
@@ -1312,8 +1317,10 @@ export class GameController {
   skipDialogue(): void {
     this.dialogueSkipConfirmOpen = false;
     this.dialogueSkipConfirmIndex = 1;
-    if (this.battleContextDialogue) this.advanceDialogue();
-    else if (this.groupCommandDialogueActive) this.advanceDialogue();
+    if (this.battleContextDialogue) {
+      this.battleContextDialogueSkipped = true;
+      this.advanceDialogue();
+    } else if (this.groupCommandDialogueActive) this.advanceDialogue();
     else if (isStoryPhase(this.phase)) this.completeDialogue();
   }
 
@@ -1435,10 +1442,15 @@ export class GameController {
       if (event.simulationEffect !== "none") {
         await this.executeStageSimulationEffect(event.simulationEffect);
       }
-      this.applyStagePresentation(event.presentation);
+      if (isStageBattleDialogueId(event.presentation)) {
+        await this.presentStageBattleDialogue(event.presentation);
+      } else {
+        this.applyStagePresentation(event.presentation);
+      }
       if (
         this.skippingScriptedSequence
         && event.presentation !== "none"
+        && !isStageBattleDialogueId(event.presentation)
         && event.presentation !== "stage-00-opening-move"
         && event.presentation !== "stage-01-messenger-arrival"
         && storyPhaseForStageStory(this.battle.stage, event.presentation) === "scriptedStory"
@@ -1565,7 +1577,40 @@ export class GameController {
     this.phase = "nextStage";
   }
 
-  private applyStagePresentation(presentation: StagePresentationId): void {
+  /**
+   * Plays a stage's in-battle dialogue on the battle map and resolves once the
+   * player closes the last page; the phase that dispatched it then continues.
+   */
+  private async presentStageBattleDialogue(dialogueId: StageBattleDialogueId): Promise<void> {
+    const dialogue = stageBattleDialogueFor(dialogueId);
+    if (!dialogue) throw new Error(`Missing battle dialogue: ${dialogueId}`);
+    const focus = this.battle.unit(dialogue.focusUnitId);
+    if (focus) {
+      this.battle.focusId = focus.id;
+      this.cursor = { x: focus.x, y: focus.y };
+      this.centerCamera(focus);
+    }
+    this.statusMessage = dialogue.statusText;
+    this.emit();
+    if (this.skippingScriptedSequence) return;
+    this.battleContextDialogueSkipped = false;
+    for (const page of dialogue.pages) {
+      if (this.battleContextDialogueSkipped) break;
+      await this.awaitBattleContextPage(page);
+    }
+    this.battleContextDialogueSkipped = false;
+  }
+
+  private async awaitBattleContextPage(page: DialoguePage): Promise<void> {
+    await new Promise<void>((resolve) => {
+      this.battleContextDialogue = { page, resume: resolve };
+      this.emit();
+    });
+  }
+
+  private applyStagePresentation(
+    presentation: Exclude<StagePresentationId, StageBattleDialogueId>,
+  ): void {
     if (presentation === "none" || presentation === "stage-00-opening-move"
       || presentation === "stage-01-messenger-arrival") return;
     const phase = storyPhaseForStageStory(this.battle.stage, presentation);
@@ -3528,6 +3573,11 @@ export class GameController {
     if (automaticIds.length > 0 && mode !== "autonomous") {
       this.statusMessage = "友軍 NPC 軍團獨立行動；不受玩家集團命令控制。";
       this.emit();
+    }
+    // REMAKE-172: a force whose hold was lifted announces it before its first
+    // released phase. The event is consumed once, so it survives save and load.
+    for (const forceId of this.battle.releasedForceIds(automaticIds)) {
+      await this.processStageEvents(this.consumeStageTrigger({ type: "force-released", forceId }));
     }
     if (await runQueue(automaticIds)) {
       this.busy = false;

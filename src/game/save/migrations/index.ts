@@ -770,6 +770,53 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-172 lifts stage 3's fourth-corps hold once 莎第二軍團 is gone and
+ * announces it with a one-off event. The release is read from the saved board
+ * and the event only fires on a later automatic phase, so a v125 save only moves
+ * to the current identity; `addStage3CounterattackCompletion` has already
+ * added the new event to stage-3 completions.
+ */
+function migrateVersion125Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 125
+    || value.contentVersion !== "wizard-ice-freeze-reach-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
+ * REMAKE-172 adds `stage-03-fourth-corps-counterattack` to stage 3, and a
+ * completion save lists every event of the stage it finished. An older stage-4
+ * completion predates the id, so it is added next to the opening events it
+ * follows. A battle save needs nothing: the event is optional there, and one
+ * that has not fired yet simply fires on the next automatic phase that earns it.
+ */
+function addStage3CounterattackCompletion(value: unknown): unknown {
+  if (!isRecord(value)
+    || value.kind !== "completed"
+    || value.stageId !== "stage-04"
+    || !Array.isArray(value.consumedEventIds)
+    || !value.consumedEventIds.every((id) => typeof id === "string")) return value;
+  const consumedEventIds = value.consumedEventIds as string[];
+  const joinedIndex = consumedEventIds.indexOf("stage-03-fourth-corps-joined");
+  if (joinedIndex < 0 || consumedEventIds.includes("stage-03-fourth-corps-counterattack")) {
+    return value;
+  }
+  return {
+    ...value,
+    consumedEventIds: [
+      ...consumedEventIds.slice(0, joinedIndex + 1),
+      "stage-03-fourth-corps-counterattack",
+      ...consumedEventIds.slice(joinedIndex + 1),
+    ],
+  };
+}
+
+/**
  * REMAKE-171 only changes where automatic ice casters plan to stand. Plans are
  * rebuilt from the public board every action, so a v124 save only moves to the
  * current identity.
@@ -3505,8 +3552,10 @@ function migratePreviousSaveData(raw: unknown): SaveData | undefined {
   // Every version step below validates against the current names, the current
   // difficulty 1/2 enemy ladder and stage 11's named pursuer.
   const value = restoreStage11PursuerIdentity(
-    rescaleLinearEnemyExperience(restoreOriginalStageTitle(raw)),
+    rescaleLinearEnemyExperience(restoreOriginalStageTitle(addStage3CounterattackCompletion(raw))),
   );
+  const migratedVersion125 = migrateVersion125Save(value);
+  if (migratedVersion125) return migratedVersion125;
   const migratedVersion124 = migrateVersion124Save(value);
   if (migratedVersion124) return migratedVersion124;
   const migratedVersion123 = migrateVersion123Save(value);
@@ -3573,7 +3622,11 @@ function migratePreviousSaveData(raw: unknown): SaveData | undefined {
 }
 
 function migrateLegacySaveData(raw: unknown): SaveData | undefined {
-  const value = addStage27EliolaDisplayIdentity(normalizeStage3OpeningEvents(raw));
+  // Pre-REMAKE-109 completions only gain the opening events here, so the
+  // REMAKE-172 completion event is added again after them.
+  const value = addStage27EliolaDisplayIdentity(
+    addStage3CounterattackCompletion(normalizeStage3OpeningEvents(raw)),
+  );
   const migratedVersion95 = migrateVersion95Save(value);
   if (migratedVersion95) return migratedVersion95;
   const migratedVersion94 = migrateVersion94Save(value);

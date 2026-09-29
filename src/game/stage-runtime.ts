@@ -113,6 +113,16 @@ export interface StageSaveSchema {
   validEventIds: readonly string[];
   requiredResumeEventIds?: readonly string[];
   /**
+   * Events a battle save may carry on top of `requiredResumeEventIds`, each only
+   * once every listed unit is gone from the saved board (REMAKE-172: an announced
+   * force release cannot coexist with the force that holds it back). Mirrored so
+   * validation never loads the stage chunk.
+   */
+  optionalResumeEvents?: readonly {
+    eventId: string;
+    requiresRemovedUnitIds: readonly string[];
+  }[];
+  /**
    * The stage objective's defeat condition. A battle save is only written while the
    * fight is undecided, so a saved board that already meets it cannot be genuine.
    * Mirrored here so validation never loads the stage chunk; `stage-runtime.test.ts`
@@ -2242,6 +2252,7 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-03-opening-story",
         "stage-03-player-ready",
         "stage-03-fourth-corps-joined",
+        "stage-03-fourth-corps-counterattack",
         "stage-03-boss-defeated",
         "stage-03-victory-story",
         "stage-03-completed-route",
@@ -2253,6 +2264,11 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-03-player-ready",
         "stage-03-fourth-corps-joined",
       ],
+      // REMAKE-172 announces the fourth corps' release once 莎第二軍團 is gone.
+      optionalResumeEvents: [{
+        eventId: "stage-03-fourth-corps-counterattack",
+        requiresRemovedUnitIds: ["2:44", "2:45", "2:47", "2:46", "2:50", "2:48", "2:49"],
+      }],
       defeat: { type: "any-unit-removed", side: 1, slots: [1, 3] },
       alliedUnits: {
         // REMAKE-108 hands Himi the four campaign slots the player grew in stages 0–1.

@@ -858,6 +858,7 @@ test("debug hub imports a formal save roster read-only", async ({ page }) => {
       "stage-03-opening-story",
       "stage-03-player-ready",
       "stage-03-fourth-corps-joined",
+      "stage-03-fourth-corps-counterattack",
       "stage-03-boss-defeated",
       "stage-03-victory-story",
       "stage-03-completed-route",

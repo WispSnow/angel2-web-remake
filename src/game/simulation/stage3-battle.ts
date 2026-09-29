@@ -2,7 +2,10 @@ import {
   activateStage3Content,
   STAGE3_DEFINITION,
   STAGE3_IRON_PLATE_TERRAIN_SLOT,
+  STAGE3_FOURTH_CORPS_FORCE_ID,
   STAGE3_OBSTACLE_TERRAIN_SLOT,
+  STAGE3_SECOND_CORPS_FORCE_ID,
+  STAGE3_SECOND_CORPS_UNIT_IDS,
   STAGE3_SEMANTIC_ALLIED_UNITS,
   STAGE3_SEMANTIC_ENEMY_UNITS,
   stage3TerrainSlotAt,
@@ -70,7 +73,7 @@ const STAGE3_FORCE_DEFINITIONS = [
     doctrine: { strategy: "expert" },
   },
   {
-    id: "fourth-corps",
+    id: STAGE3_FOURTH_CORPS_FORCE_ID,
     label: "第四軍團",
     tacticLabel: "固守防區",
     side: 1,
@@ -89,7 +92,7 @@ const STAGE3_FORCE_DEFINITIONS = [
       // REMAKE-172：拦截救援队的莎第二军团全灭后，救援队已能会合，第四军团不再死守，
       // 改走与其他自动友军相同的专家作战，免得只剩第一军团时战斗无限拖长。
       release: {
-        whenForcesEliminated: ["sha-second-corps"],
+        whenForcesEliminated: [STAGE3_SECOND_CORPS_FORCE_ID],
         tacticLabel: "轉守為攻",
       },
     },
@@ -103,17 +106,17 @@ const STAGE3_FORCE_DEFINITIONS = [
     unitIds: sideUnitIds(2, [42, 41, 40, 43, 17]),
     doctrine: { strategy: "expert" },
     targeting: {
-      preferredForceIds: ["fourth-corps"],
+      preferredForceIds: [STAGE3_FOURTH_CORPS_FORCE_ID],
       fallback: "all-opponents",
     },
   },
   {
-    id: "sha-second-corps",
+    id: STAGE3_SECOND_CORPS_FORCE_ID,
     label: "莎第二軍團",
     tacticLabel: "阻擊救援隊",
     side: 2,
     control: "independent-ai",
-    unitIds: sideUnitIds(2, [44, 45, 47, 46, 50, 48, 49]),
+    unitIds: STAGE3_SECOND_CORPS_UNIT_IDS,
     doctrine: { strategy: "expert" },
     targeting: {
       preferredForceIds: ["himi-rescue-force"],

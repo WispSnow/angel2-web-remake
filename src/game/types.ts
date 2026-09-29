@@ -243,6 +243,8 @@ export interface DialoguePage {
       | "battle-command"
       | "ai-technique"
       | "battle-context"
+      // `[DD]` lines the remake writes itself; `address` names the REMAKE decision.
+      | "remake-authored"
       // DS:84BB contextual battle lines outside the AI technique groups.
       | "resting-low-life"
       | "breaking-contact"
@@ -299,8 +301,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 125;
-  contentVersion: "wizard-ice-freeze-reach-1";
+  version: 126;
+  contentVersion: "fourth-corps-release-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

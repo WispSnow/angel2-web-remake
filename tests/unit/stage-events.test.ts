@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { STAGE1_DEFINITION } from "../../src/game/content/stage1";
 import { STAGE22_DEFINITION } from "../../src/game/content/stage22";
+import { STAGE3_DEFINITION } from "../../src/game/content/stage3";
 import { STAGE0_DEFINITION } from "../../src/game/content/stages";
 import {
   consumedEventIdsForBattleResume,
@@ -23,6 +24,29 @@ describe("stage event simulation", () => {
       { type: "story-completed", storyId: "stage-00-prebattle-story" },
       { type: "story-completed", storyId: "stage-00-opening-story" },
     )).toBe(false);
+  });
+
+  it("fires the stage 3 counterattack once per released force and never from the round (REMAKE-172)", () => {
+    expect(stageEventTriggerMatches(
+      { type: "force-released", forceId: "fourth-corps" },
+      { type: "force-released", forceId: "sha-first-corps" },
+    )).toBe(false);
+    const resumed = createStageEventState(
+      STAGE3_DEFINITION,
+      consumedEventIdsForBattleResume(STAGE3_DEFINITION, 40),
+    );
+    expect(resumed.consumedEventIds).not.toContain("stage-03-fourth-corps-counterattack");
+    const released = dispatchStageEvents(
+      STAGE3_DEFINITION,
+      resumed,
+      { type: "force-released", forceId: "fourth-corps" },
+    );
+    expect(released.events.map(({ id }) => id)).toEqual(["stage-03-fourth-corps-counterattack"]);
+    expect(dispatchStageEvents(
+      STAGE3_DEFINITION,
+      released.state,
+      { type: "force-released", forceId: "fourth-corps" },
+    ).events).toEqual([]);
   });
 
   it("consumes each stage event once and preserves definition order", () => {

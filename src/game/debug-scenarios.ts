@@ -63,6 +63,7 @@ const STAGE3_COMPLETED_EVENT_IDS = [
   "stage-03-opening-story",
   "stage-03-player-ready",
   "stage-03-fourth-corps-joined",
+  "stage-03-fourth-corps-counterattack",
   "stage-03-boss-defeated",
   "stage-03-victory-story",
   "stage-03-completed-route",
@@ -3635,6 +3636,12 @@ const DEBUG_SCENARIO_FACTORIES = {
   }),
   "stage-03-daisy-defeat": withSetup(createStage3Player, (controller) => {
     controller.forceDefeatForTest(1);
+  }),
+  "stage-03-second-corps-cleared": withSetup(createStage3Player, (controller) => {
+    const battle = controller.battle;
+    battle.removeStoryUnits(battle.units
+      .filter(({ id }) => battle.forceForUnit(id)?.id === "sha-second-corps"));
+    controller.statusMessage = "調試場景：莎第二軍團已全滅；結束我方回合後第四軍團轉守為攻。";
   }),
   "stage-03-near-victory": withSetup(createStage3Player, (controller) => {
     controller.forceVictorySetupForTest();

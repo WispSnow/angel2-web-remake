@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { isPromotionEligible } from "../../src/game/content/classes";
 import {
+  STAGE3_DEFINITION,
+  STAGE3_FOURTH_CORPS_COUNTERATTACK_DIALOGUE,
   STAGE3_FOURTH_CORPS_NAMED_ACTORS,
+  STAGE3_SECOND_CORPS_UNIT_IDS,
   stage3TerrainSlotAt,
 } from "../../src/game/content/stage3";
+import { NATIVE_FONT_CHARACTERS } from "../../src/game/content/native-font.generated";
+import { STAGE_RUNTIME_MANIFEST } from "../../src/game/stage-runtime";
 import { completeCampaignRoster, initialEnemyExperience } from "../../src/game/content/stage0";
 import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
 import type { CampaignState, UnitClassId } from "../../src/game/types";
@@ -373,6 +378,72 @@ describe("stage 3 battle construction and stable-remake automation", () => {
         kind: "attack",
         targetId: enemy.id,
       });
+    });
+
+    it("reports the released fourth corps only once the whole second corps is gone", () => {
+      const battle = new Stage3Battle(campaign);
+      const automaticIds = battle.alliedActionOrder(false);
+      expect(battle.releasedForceIds(automaticIds)).toEqual([]);
+      battle.units = battle.units.filter((unit) => !SECOND_CORPS_IDS.includes(unit.id)
+        || unit.id === "2:49");
+      expect(battle.releasedForceIds(automaticIds)).toEqual([]);
+      battle.units = battle.units.filter((unit) => unit.id !== "2:49");
+      expect(battle.releasedForceIds(automaticIds)).toEqual(["fourth-corps"]);
+      // 手动救援队从来没有固守教义，不会被报告。
+      expect(battle.releasedForceIds(["1:1", "1:40"])).toEqual([]);
+    });
+
+    it("announces the release once, with Daisy's order and Himi's reply", () => {
+      const events = STAGE3_DEFINITION.events
+        .filter(({ trigger }) => trigger.type === "force-released");
+      expect(events).toEqual([{
+        id: "stage-03-fourth-corps-counterattack",
+        trigger: { type: "force-released", forceId: "fourth-corps" },
+        simulationEffect: "none",
+        presentation: "stage-03-fourth-corps-counterattack",
+      }]);
+      const { focusUnitId, pages } = STAGE3_FOURTH_CORPS_COUNTERATTACK_DIALOGUE;
+      expect(focusUnitId).toBe("1:3");
+      expect(pages.map((page) => ({
+        activeSlot: page.activeSlot,
+        upper: page.upper && [page.upper.portrait, page.upper.speaker],
+        lower: page.lower && [page.lower.portrait, page.lower.speaker],
+        source: page.source,
+      }))).toEqual([
+        {
+          activeSlot: "upper",
+          upper: [43, "黛西"],
+          lower: undefined,
+          source: { record: "remake-authored", wait: 1, address: "REMAKE-172:1" },
+        },
+        {
+          activeSlot: "lower",
+          upper: [43, "黛西"],
+          lower: [45, "希蜜"],
+          source: { record: "remake-authored", wait: 2, address: "REMAKE-172:2" },
+        },
+      ]);
+      expect(pages[0].upper?.text)
+        .toBe("「希蜜她們已經擊退了攔路的敵軍！\n  第四軍團聽令，轉守為攻！」");
+      expect(pages[1].lower?.text).toBe("「好！我們一起拿下梅蒂！」");
+      // 对白正文由原版点阵字绘制，复刻撰写的句子也只能用字库里有的字。
+      const glyphs = new Set(NATIVE_FONT_CHARACTERS);
+      const missing = pages.flatMap((page) => [page.upper?.text, page.lower?.text])
+        .flatMap((text) => [...(text ?? "")])
+        .filter((character) => character !== " " && character !== "\n" && !glyphs.has(character));
+      expect(missing).toEqual([]);
+    });
+
+    it("mirrors the second corps into the save schema's optional counterattack event", () => {
+      const battle = new Stage3Battle(campaign);
+      expect(STAGE3_SECOND_CORPS_UNIT_IDS.filter((id) =>
+        battle.forceForUnit(id)?.id === "sha-second-corps")).toEqual([...STAGE3_SECOND_CORPS_UNIT_IDS]);
+      expect(battle.units.filter(({ id }) => battle.forceForUnit(id)?.id === "sha-second-corps"))
+        .toHaveLength(STAGE3_SECOND_CORPS_UNIT_IDS.length);
+      expect(STAGE_RUNTIME_MANIFEST["stage-03"].save.optionalResumeEvents).toEqual([{
+        eventId: "stage-03-fourth-corps-counterattack",
+        requiresRemovedUnitIds: [...STAGE3_SECOND_CORPS_UNIT_IDS],
+      }]);
     });
 
     it("lets a released member leave the forest to chase the first corps", () => {

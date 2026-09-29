@@ -205,6 +205,7 @@ export type StageEventId =
   | "stage-03-opening-story"
   | "stage-03-player-ready"
   | "stage-03-fourth-corps-joined"
+  | "stage-03-fourth-corps-counterattack"
   | "stage-03-boss-defeated"
   | "stage-03-victory-story"
   | "stage-03-completed-route"
@@ -550,9 +551,16 @@ export type StageSimulationEffectId =
   | "stage-38-set-victory-999"
   | "stage-38-route-to-credits";
 
+/**
+ * In-battle dialogue that plays on the battle map without leaving the current
+ * phase: the phase that triggered it resumes once the player closes the last page.
+ */
+export type StageBattleDialogueId = "stage-03-fourth-corps-counterattack";
+
 export type StagePresentationId =
   | "none"
   | StageStoryId
+  | StageBattleDialogueId
   | "stage-00-opening-move"
   | "stage-01-messenger-arrival";
 
@@ -562,6 +570,12 @@ export type StageEventTrigger =
   | { type: "story-completed"; storyId: StageStoryId }
   | { type: "effect-completed"; effectId: StageSimulationEffectId }
   | { type: "round-started"; round: number }
+  /**
+   * REMAKE-172: an automatic force's phase is about to run under its released
+   * doctrine. Dispatched at the start of the automatic allied queue, so a
+   * release that happens mid-phase is announced when the force next acts.
+   */
+  | { type: "force-released"; forceId: string }
   | { type: "objective-satisfied" }
   | { type: "victory-flow-completed" };
 

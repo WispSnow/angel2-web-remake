@@ -1053,6 +1053,18 @@ export class Stage0Battle {
     return this.forces.activeDefinitionForUnit(id, this.units);
   }
 
+  /** REMAKE-172: forces among `unitIds` that currently act under a released doctrine. */
+  releasedForceIds(unitIds: readonly string[]): string[] {
+    const forceIds = new Set<string>();
+    for (const id of unitIds) {
+      const definition = this.forces.definitionForUnit(id);
+      if (definition && this.unit(id) && this.forceForUnit(id) !== definition) {
+        forceIds.add(definition.id);
+      }
+    }
+    return [...forceIds];
+  }
+
   playerManualPhaseComplete(): boolean {
     return this.units
       .filter(({ id }) => this.isPlayerControllableAlly(id))

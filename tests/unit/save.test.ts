@@ -4858,6 +4858,7 @@ describe("Web save validation", () => {
         "stage-03-opening-story",
         "stage-03-player-ready",
         "stage-03-fourth-corps-joined",
+        "stage-03-fourth-corps-counterattack",
         "stage-03-boss-defeated",
         "stage-03-victory-story",
         "stage-03-completed-route",
@@ -4868,6 +4869,9 @@ describe("Web save validation", () => {
       version: 14,
       contentVersion: "stage-03-recovery-1",
       stageLabel: "下一關",
+      // REMAKE-172's event is newer than this save and is backfilled.
+      consumedEventIds: current.consumedEventIds
+        .filter((id) => id !== "stage-03-fourth-corps-counterattack"),
     };
     expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
   });
@@ -5838,6 +5842,78 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
   });
 
+  it("migrates version-125 saves and adds the fourth-corps counterattack to stage-3 completions (REMAKE-172)", () => {
+    // REMAKE-172 的解除从棋盘读出、从不入档；新事件只在之后的自动阶段触发，所以 v125
+    // 战中档与完成档逐字段保留，只有第 3 关完成档要补上这条事件。
+    for (const current of [stage3BattleSave(), battleSave(), completedSave()]) {
+      expect(parseSaveData(JSON.stringify({
+        ...current,
+        version: 125,
+        contentVersion: "wizard-ice-freeze-reach-1",
+      })), `${current.kind} ${current.stageId}`).toEqual(current);
+    }
+    const stage3Completion: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-04",
+      stageLabel: "通過力場",
+      stageProgress: 1000,
+      consumedEventIds: [
+        "stage-03-opening-story",
+        "stage-03-player-ready",
+        "stage-03-fourth-corps-joined",
+        "stage-03-fourth-corps-counterattack",
+        "stage-03-boss-defeated",
+        "stage-03-victory-story",
+        "stage-03-completed-route",
+      ],
+    };
+    expect(parseSaveData(JSON.stringify({
+      ...stage3Completion,
+      version: 125,
+      contentVersion: "wizard-ice-freeze-reach-1",
+      consumedEventIds: stage3Completion.consumedEventIds
+        .filter((id) => id !== "stage-03-fourth-corps-counterattack"),
+    }))).toEqual(stage3Completion);
+    expect(parseSaveData(JSON.stringify({
+      ...battleSave(),
+      version: 125,
+      contentVersion: "fourth-corps-release-1",
+    }))).toBeUndefined();
+  });
+
+  it("accepts the stage-3 counterattack event only once the second corps has left the board (REMAKE-172)", () => {
+    const secondCorpsIds = new Set(["2:44", "2:45", "2:47", "2:46", "2:50", "2:48", "2:49"]);
+    const withoutSecondCorps = (save: BattleSaveData, keptId?: string): BattleSaveData => ({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.filter(({ id }) => !secondCorpsIds.has(id) || id === keptId),
+      },
+    });
+    const announced = (save: BattleSaveData): BattleSaveData => ({
+      ...save,
+      consumedEventIds: [...save.consumedEventIds, "stage-03-fourth-corps-counterattack"],
+    });
+
+    // 解除后、第四军团还没行动：事件尚未触发，照常可读。
+    const released = withoutSecondCorps(stage3BattleSave());
+    expect(parseSaveData(JSON.stringify(released))).toEqual(released);
+    // 台词播过之后存档。
+    const afterLine = announced(released);
+    expect(parseSaveData(JSON.stringify(afterLine))).toEqual(afterLine);
+    // 第二军团还有人在场，就不可能已经宣告解除。
+    expect(parseSaveData(JSON.stringify(announced(stage3BattleSave())))).toBeUndefined();
+    expect(parseSaveData(JSON.stringify(
+      announced(withoutSecondCorps(stage3BattleSave(), "2:49")),
+    ))).toBeUndefined();
+    // 必需事件仍须齐全。
+    expect(parseSaveData(JSON.stringify({
+      ...afterLine,
+      consumedEventIds: afterLine.consumedEventIds
+        .filter((id) => id !== "stage-03-fourth-corps-joined"),
+    }))).toBeUndefined();
+  });
+
   it("migrates version-124 saves by identity when ice casters plan inside their freeze reach (REMAKE-171)", () => {
     // REMAKE-171 只改自动冰雪施法者的落点规划；规划每次行动都从公开棋盘重算、从不入档，
     // 所以 v124 战中档与完成档逐字段保留。
@@ -6520,6 +6596,7 @@ describe("Web save validation", () => {
         "stage-03-opening-story",
         "stage-03-player-ready",
         "stage-03-fourth-corps-joined",
+        "stage-03-fourth-corps-counterattack",
         "stage-03-boss-defeated",
         "stage-03-victory-story",
         "stage-03-completed-route",

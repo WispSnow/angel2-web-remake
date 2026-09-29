@@ -30,8 +30,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 125 as const;
-export const SAVE_CONTENT_VERSION = "wizard-ice-freeze-reach-1" as const;
+export const SAVE_VERSION = 126 as const;
+export const SAVE_CONTENT_VERSION = "fourth-corps-release-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;
@@ -474,8 +474,6 @@ export function isBattleSave(
   return value.kind === "battle"
     && value.stageLabel === manifest.label
     && consumedEventIds.every((id) => validEventIds.has(id))
-    && (saveSchema.requiredResumeEventIds === undefined
-      || hasExactlyTheseValues(consumedEventIds, saveSchema.requiredResumeEventIds))
     && (!requireStageEntrySnapshot
       || isStageEntrySnapshot(value.stageEntrySnapshot, stageId, difficulty))
     && isSavedBattleState(
@@ -486,7 +484,28 @@ export function isBattleSave(
       true,
       true,
       requireTerrainOverrides,
-    );
+    )
+    && hasResumeEvents(consumedEventIds, saveSchema, value.battle as SavedBattleState);
+}
+
+/**
+ * The required resume events exactly, plus any optional event whose board
+ * condition the saved battle already meets (REMAKE-172).
+ */
+function hasResumeEvents(
+  consumedEventIds: readonly string[],
+  saveSchema: StageSaveSchema,
+  battle: SavedBattleState,
+): boolean {
+  if (saveSchema.requiredResumeEventIds === undefined) return true;
+  const unitIds = new Set(battle.units.map(({ id }) => id));
+  const optionalEventIds = new Set((saveSchema.optionalResumeEvents ?? [])
+    .filter(({ requiresRemovedUnitIds }) => requiresRemovedUnitIds.every((id) => !unitIds.has(id)))
+    .map(({ eventId }) => eventId));
+  return hasExactlyTheseValues(
+    consumedEventIds.filter((id) => !optionalEventIds.has(id)),
+    saveSchema.requiredResumeEventIds,
+  );
 }
 
 export function isSaveData(value: unknown): value is SaveData {

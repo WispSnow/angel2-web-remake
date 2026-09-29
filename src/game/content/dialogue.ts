@@ -1,5 +1,5 @@
 import type { DialoguePage, DialogueWindowState } from "../types";
-import type { StageDefinition, StageStoryId } from "./stages";
+import type { StageBattleDialogueId, StageDefinition, StageStoryId } from "./stages";
 
 const windowState = (
   text: string,
@@ -107,6 +107,44 @@ export function registerStageStoryPages(
     if (pages.length === 0) throw new Error(`Cannot register an empty story: ${storyId}`);
     STORY_PAGE_REGISTRY[storyId] = pages;
   }
+}
+
+export interface StageBattleDialogue {
+  /** The unit the camera and cursor move to before the first page. */
+  focusUnitId: string;
+  statusText: string;
+  pages: readonly DialoguePage[];
+}
+
+const STAGE_BATTLE_DIALOGUE_IDS: ReadonlySet<string> = new Set<StageBattleDialogueId>([
+  "stage-03-fourth-corps-counterattack",
+]);
+
+export function isStageBattleDialogueId(id: string): id is StageBattleDialogueId {
+  return STAGE_BATTLE_DIALOGUE_IDS.has(id);
+}
+
+const BATTLE_DIALOGUE_REGISTRY: Partial<Record<StageBattleDialogueId, StageBattleDialogue>> = {};
+
+export function registerStageBattleDialogues(
+  dialogues: Partial<Record<StageBattleDialogueId, StageBattleDialogue>>,
+): void {
+  for (const [dialogueId, dialogue] of Object.entries(dialogues) as Array<
+    [StageBattleDialogueId, StageBattleDialogue]
+  >) {
+    const existing = BATTLE_DIALOGUE_REGISTRY[dialogueId];
+    if (existing && existing !== dialogue) {
+      throw new Error(`Battle dialogue already registered with different content: ${dialogueId}`);
+    }
+    if (dialogue.pages.length === 0) throw new Error(`Cannot register an empty battle dialogue: ${dialogueId}`);
+    BATTLE_DIALOGUE_REGISTRY[dialogueId] = dialogue;
+  }
+}
+
+export function stageBattleDialogueFor(
+  dialogueId: StageBattleDialogueId,
+): StageBattleDialogue | undefined {
+  return BATTLE_DIALOGUE_REGISTRY[dialogueId];
 }
 
 export function storyIdForStagePhase(
