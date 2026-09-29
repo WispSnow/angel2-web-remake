@@ -829,6 +829,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     stopSpeaking(activeFeedbackPortrait);
     return true;
   };
+  /**
+   * 鍵盤確認鍵與手把 `A` 共用的主操作。逐字中的對白／結果文字先補完本頁，肖像解碼、
+   * 窗體展開與 `DL` 變色期間的那一下也由這兩個函式吃掉或收下；都沒有可補完的內容才
+   * 交給控制器。跳過確認框開著時直接交給控制器選取「是／否」。
+   */
+  const confirmAtCursor = () => {
+    if (controller.dialogueSkipConfirmOpen
+      || (!finishDialogueTyping() && !finishFeedbackTyping())) controller.primaryAtCursor();
+  };
 
   const hideSidePanelHint = () => {
     if (sidePanelHintTimer !== undefined) clearProgramTimeout(sidePanelHintTimer);
@@ -1177,10 +1186,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (delta) controller.moveCursor(delta);
     else if (event.repeat) return;
     else if (routeCycle) controller.cycleMagicArcherRoute(lower === "q" ? -1 : 1);
-    else if (isKeyboardConfirm(key)) {
-      if (controller.dialogueSkipConfirmOpen
-        || (!finishDialogueTyping() && !finishFeedbackTyping())) controller.primaryAtCursor();
-    }
+    else if (isKeyboardConfirm(key)) confirmAtCursor();
     else if (isKeyboardCancel(key)) {
       const cancelled = controller.secondaryAction();
       if (!cancelled && key === "Escape") controller.systemAction();
@@ -1838,9 +1844,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const unsubscribe = controller.onChange(render);
   render();
   const stopScaling = configureGameScaling(required(root, "#game-viewport"), screen);
-  const stopGamepad = bindGamepad(controller, () => {
-    lastInputSource = "keyboard-or-gamepad";
-    settleMenuPointerGlide();
+  const stopGamepad = bindGamepad(controller, {
+    onInput: () => {
+      lastInputSource = "keyboard-or-gamepad";
+      settleMenuPointerGlide();
+    },
+    confirm: confirmAtCursor,
   });
   return () => {
     eventController.abort();
@@ -2837,7 +2846,10 @@ function required<T extends HTMLElement = HTMLElement>(root: ParentNode, selecto
   return element;
 }
 
-function bindGamepad(controller: GameController, onInput: () => void): () => void {
+function bindGamepad(
+  controller: GameController,
+  { onInput, confirm }: { onInput: () => void; confirm: () => void },
+): () => void {
   let priorButtons: boolean[] = [];
   let lastNavigation = 0;
   let animationFrame = 0;
@@ -2851,7 +2863,7 @@ function bindGamepad(controller: GameController, onInput: () => void): () => voi
         return;
       }
       const newlyPressed = (button: number) => pressed[button] && !priorButtons[button];
-      if (newlyPressed(0)) { onInput(); controller.primaryAtCursor(); }
+      if (newlyPressed(0)) { onInput(); confirm(); }
       if (newlyPressed(1)) { onInput(); controller.secondaryAction(); }
       if (controller.actionMode === "shotRoute") {
         if (newlyPressed(4)) { onInput(); controller.cycleMagicArcherRoute(-1); }

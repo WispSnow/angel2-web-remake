@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { PREBATTLE_STORY } from "../../src/game/content/dialogue";
 
 interface KeyboardControlState {
   cursor: { x: number; y: number };
@@ -69,39 +70,42 @@ test("modern keyboard defaults keep navigation, confirm, cancel and battle short
   await expect(page.getByTestId("objective-panel")).toBeHidden();
 });
 
-test("standard gamepad exposes the documented battle actions", async ({ page }) => {
-  await page.addInitScript(() => {
-    const buttons = Array.from({ length: 16 }, () => ({ pressed: false, touched: false, value: 0 }));
-    const gamepad = {
-      axes: [0, 0, 0, 0],
-      buttons,
-      connected: true,
-      hapticActuators: [],
-      id: "battle-controls-test-pad",
-      index: 0,
-      mapping: "standard",
-      timestamp: 0,
-      vibrationActuator: null,
-    } as unknown as Gamepad;
-    Object.defineProperty(navigator, "getGamepads", {
-      configurable: true,
-      value: () => [gamepad],
-    });
-    (window as typeof window & { __setBattlePadButton?: (index: number, down: boolean) => void })
-      .__setBattlePadButton = (index, down) => {
-        buttons[index] = { pressed: down, touched: down, value: down ? 1 : 0 };
-      };
+type PadWindow = typeof window & { __setBattlePadButton?: (index: number, down: boolean) => void };
+
+/** Replaces `navigator.getGamepads` with one standard pad whose buttons the test sets. */
+const installFakeGamepad = (page: Page) => page.addInitScript(() => {
+  const buttons = Array.from({ length: 16 }, () => ({ pressed: false, touched: false, value: 0 }));
+  const gamepad = {
+    axes: [0, 0, 0, 0],
+    buttons,
+    connected: true,
+    hapticActuators: [],
+    id: "battle-controls-test-pad",
+    index: 0,
+    mapping: "standard",
+    timestamp: 0,
+    vibrationActuator: null,
+  } as unknown as Gamepad;
+  Object.defineProperty(navigator, "getGamepads", {
+    configurable: true,
+    value: () => [gamepad],
   });
+  (window as PadWindow).__setBattlePadButton = (index, down) => {
+    buttons[index] = { pressed: down, touched: down, value: down ? 1 : 0 };
+  };
+});
+
+const setPadButton = (page: Page, button: number, down: boolean) => page.evaluate(
+  ([index, pressed]) => (window as PadWindow).__setBattlePadButton?.(index, pressed),
+  [button, down] as const,
+);
+
+test("standard gamepad exposes the documented battle actions", async ({ page }) => {
+  await installFakeGamepad(page);
   const pulse = async (button: number) => {
-    await page.evaluate((index) => {
-      (window as typeof window & { __setBattlePadButton?: (index: number, down: boolean) => void })
-        .__setBattlePadButton?.(index, true);
-    }, button);
+    await setPadButton(page, button, true);
     await page.waitForTimeout(70);
-    await page.evaluate((index) => {
-      (window as typeof window & { __setBattlePadButton?: (index: number, down: boolean) => void })
-        .__setBattlePadButton?.(index, false);
-    }, button);
+    await setPadButton(page, button, false);
     await page.waitForTimeout(40);
   };
 
@@ -135,4 +139,40 @@ test("standard gamepad exposes the documented battle actions", async ({ page }) 
   await expect(page.getByTestId("system-menu")).toBeVisible();
   await pulse(9);
   await expect(page.getByTestId("system-menu")).toBeHidden();
+});
+
+test("gamepad A shares the keyboard confirm: it completes a typing story page before turning it", async ({ page }) => {
+  // One glyph is 12 ms of program time under `?test=1`, and the pad is polled on
+  // animation frames. A paused clock holds page 2 mid-typing while A is pressed.
+  await installFakeGamepad(page);
+  await page.clock.install();
+  await page.goto("/?debugScenario=stage-00-prebattle&difficulty=0&test=1");
+  const layer = page.getByTestId("dialogue-layer");
+  const typedText = () => page.locator("#dialogue-text").evaluate((element) => element.textContent ?? "");
+  const pageText = (wait: number) => PREBATTLE_STORY[wait - 1].lower?.text ?? "";
+  await expect(layer).toHaveAttribute("data-source-wait", "1");
+  await expect.poll(typedText).toBe(pageText(1));
+  await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 500);
+  const pulseA = async () => {
+    await setPadButton(page, 0, true);
+    await page.clock.runFor(16);
+    await setPadButton(page, 0, false);
+    await page.clock.runFor(16);
+  };
+
+  // A on a finished page turns it; page 2 reuses the lower window and starts typing at once.
+  await pulseA();
+  await expect(layer).toHaveAttribute("data-source-wait", "2");
+  const partial = (await typedText()).length;
+  expect(partial).toBeGreaterThan(0);
+  expect(partial).toBeLessThan(pageText(2).length);
+
+  // The first A on the typing page only completes it, exactly like Enter or a click.
+  await pulseA();
+  expect(await layer.getAttribute("data-source-wait")).toBe("2");
+  expect(await typedText()).toBe(pageText(2));
+
+  await pulseA();
+  await expect(layer).toHaveAttribute("data-source-wait", "3");
+  await page.clock.resume();
 });
