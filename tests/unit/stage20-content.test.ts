@@ -144,7 +144,7 @@ describe("stage 20 content", () => {
     expect(flicker.lower?.timedPortraitCues).toBeUndefined();
     // Every other stage 20 page stays untimed, and both faces cross the stage gate.
     expect(Object.values(STAGE20_STORY_PAGES).flat()
-      .filter(({ upper, lower }) => upper?.timedPortraitCues ?? lower?.timedPortraitCues)).toEqual([flicker]);
+      .filter((page: DialoguePage) => page.upper?.timedPortraitCues ?? page.lower?.timedPortraitCues)).toEqual([flicker]);
     expect(stageDialoguePortraitRecords(STAGE20_DEFINITION)).toEqual(expect.arrayContaining([56, 67]));
   });
 });
