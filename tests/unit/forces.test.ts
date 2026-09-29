@@ -204,6 +204,30 @@ describe("force registry", () => {
     }], [units[0]])).toThrow(/Rally unit 1:2 is not a member/);
   });
 
+  it("accepts an expert keep-out only on automatic forces with real slot lists (REMAKE-173)", () => {
+    const units = [unit("1:1", 1), unit("2:1", 2)];
+    const keepOut = (slots: readonly number[]) => ({
+      strategy: "expert" as const,
+      keepOutTerrainSlotsByClass: { magician: slots },
+    });
+    const raiders = (slots: readonly number[]): ForceDefinition => ({
+      ...expertForce("raiders", 2, ["2:1"]),
+      doctrine: keepOut(slots),
+    });
+
+    expect(new ForceRegistry([expertForce("party", 1, ["1:1"]), raiders([18])], units)
+      .definitionForUnit("2:1")?.doctrine).toEqual(keepOut([18]));
+    // 玩家亲手移动自己的单位，禁区只会约束自动指令，读起来像随机拒绝。
+    expect(() => new ForceRegistry([
+      { ...expertForce("party", 1, ["1:1"]), doctrine: keepOut([18]) },
+      expertForce("raiders", 2, ["2:1"]),
+    ], units)).toThrow(/Only an independent AI force may keep out of terrain: party/);
+    for (const slots of [[], [-1], [1.5]]) {
+      expect(() => new ForceRegistry([expertForce("party", 1, ["1:1"]), raiders(slots)], units))
+        .toThrow(/invalid magician keep-out terrain list/);
+    }
+  });
+
   describe("terrain-hold release (REMAKE-172)", () => {
     const holdDoctrine = (whenForcesEliminated: readonly string[]) => ({
       strategy: "terrain-hold" as const,

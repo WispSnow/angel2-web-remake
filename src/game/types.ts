@@ -301,8 +301,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 126;
-  contentVersion: "fourth-corps-release-1";
+  version: 127;
+  contentVersion: "approach-reach-keep-out-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

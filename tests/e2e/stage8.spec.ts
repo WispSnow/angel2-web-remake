@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
+import {
+  STAGE8_WOODEN_FLOOR_TERRAIN_SLOT,
+  stage8TerrainSlotAt,
+} from "../../src/game/content/stage8";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { expectStoryBackground } from "./story-background";
@@ -161,6 +165,77 @@ test("S08-D/REMAKE-038: all eight allies are manual and all-rest skips NPC actio
     return holder.__stage8Trace ?? [];
   });
   expect(trace.some(({ statusMessage }) => statusMessage.includes("友軍 NPC"))).toBe(false);
+});
+
+test("S08-O/REMAKE-173: the raiding magician leaves the wall and never steps into the house", async ({ page }) => {
+  test.setTimeout(180_000);
+  const inHouse = ({ x, y }: { x: number; y: number }): boolean =>
+    stage8TerrainSlotAt({ x, y }) === STAGE8_WOODEN_FLOOR_TERRAIN_SLOT;
+  await page.goto("/?debugScenario=stage-08-safe-house&difficulty=2&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await page.evaluate(() => window.__ANGEL2__?.setPresentationFast(true));
+  const start = await state(page);
+  expect(start.units.find(({ id }) => id === "2:30")).toMatchObject({ classId: "magician", x: 28, y: 26 });
+  for (const ally of start.units.filter(({ side }) => side === 1)) {
+    expect(inHouse(ally), ally.id).toBe(true);
+  }
+
+  await page.evaluate(() => {
+    const trace: Array<{ round: number; x: number; y: number }> = [];
+    const interval = window.setInterval(() => {
+      const current = window.__ANGEL2__?.getState() as Stage8State | undefined;
+      const magician = current?.units.find(({ id }) => id === "2:30");
+      const last = trace.at(-1);
+      if (current && magician && (last?.x !== magician.x || last.y !== magician.y)) {
+        trace.push({ round: current.round, x: magician.x, y: magician.y });
+      }
+    }, 5);
+    Object.assign(window, { __stage8MagicianTrace: trace, __stage8MagicianInterval: interval });
+  });
+  // The template roster keeps 雷伊拉 one point short of promotion, so a
+  // counterattack between phases can open her class choice; take the first.
+  const settleIntoPlayerPhase = async (round: number) => {
+    await expect.poll(async () => {
+      const current = await state(page);
+      if (current.phase === "player" && current.round === round) return "ready";
+      const dialogue = page.getByTestId("dialogue-layer");
+      const promotionTarget = page.locator("[data-testid^='promotion-target-']").first();
+      if (await promotionTarget.isVisible()) {
+        await promotionTarget.click();
+      } else if (await dialogue.isVisible()
+        && await dialogue.getAttribute("data-source-record") === "promotion") {
+        await page.evaluate(() => window.__ANGEL2__?.advanceDialogue());
+      }
+      return `${current.phase} ${current.round}`;
+    }, { timeout: 80_000, intervals: [200] }).toBe("ready");
+  };
+  for (const nextRound of [2, 3]) {
+    await page.getByTestId("battle-canvas").focus();
+    await page.keyboard.press("g");
+    await expect(page.getByTestId("group-command-menu")).toBeVisible();
+    await page.getByTestId("group-command-allRest").click();
+    await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+    await page.getByTestId("dialogue-layer").click();
+    await settleIntoPlayerPhase(nextRound);
+  }
+  const trace = await page.evaluate(() => {
+    const holder = window as typeof window & {
+      __stage8MagicianTrace?: Array<{ round: number; x: number; y: number }>;
+      __stage8MagicianInterval?: number;
+    };
+    if (holder.__stage8MagicianInterval !== undefined) {
+      window.clearInterval(holder.__stage8MagicianInterval);
+    }
+    return holder.__stage8MagicianTrace ?? [];
+  });
+  // Every sampled step of both enemy phases stays outside, and she no longer
+  // holds the spot four straight cells from the party inside.
+  expect(trace.length).toBeGreaterThan(1);
+  for (const cell of trace) expect(inHouse(cell), `${cell.x},${cell.y}`).toBe(false);
+  expect(trace.at(-1)).not.toMatchObject({ x: 28, y: 26 });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage8-safe-house-magician.png`,
+  });
 });
 
 test("S08-L: a late soldier-to-sister-to-magician path keeps its map figure", async ({ page }) => {

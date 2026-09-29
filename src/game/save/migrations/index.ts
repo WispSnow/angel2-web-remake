@@ -770,6 +770,25 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-173 only changes where automatic ranged units plan to stand: approach
+ * rings follow the real range propagation, and stage 8's raiding magician keeps
+ * out of the wooden houses. Plans are rebuilt from the public board every action
+ * and the keep-out comes from stage content, so a v126 save only moves to the
+ * current identity.
+ */
+function migrateVersion126Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 126
+    || value.contentVersion !== "fourth-corps-release-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-172 lifts stage 3's fourth-corps hold once 莎第二軍團 is gone and
  * announces it with a one-off event. The release is read from the saved board
  * and the event only fires on a later automatic phase, so a v125 save only moves
@@ -3554,6 +3573,8 @@ function migratePreviousSaveData(raw: unknown): SaveData | undefined {
   const value = restoreStage11PursuerIdentity(
     rescaleLinearEnemyExperience(restoreOriginalStageTitle(addStage3CounterattackCompletion(raw))),
   );
+  const migratedVersion126 = migrateVersion126Save(value);
+  if (migratedVersion126) return migratedVersion126;
   const migratedVersion125 = migrateVersion125Save(value);
   if (migratedVersion125) return migratedVersion125;
   const migratedVersion124 = migrateVersion124Save(value);

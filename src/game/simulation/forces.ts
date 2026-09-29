@@ -6,6 +6,14 @@ export type ForceControl = "player" | "independent-ai";
 
 export interface ExpertForceAiDoctrine {
   strategy: "expert";
+  /**
+   * REMAKE-173. Stage-map terrain a member of a listed class never walks
+   * onto: no move ends there and no route crosses it. What the member plans
+   * still reads the whole board, so its spells and shots keep reaching into
+   * the zone. A member already standing inside (shoved there) walks out
+   * first. Slots are read from the stage map, never from player-built terrain.
+   */
+  keepOutTerrainSlotsByClass?: Readonly<Partial<Record<ClassId, readonly number[]>>>;
 }
 
 /**
@@ -111,6 +119,20 @@ export class ForceRegistry {
       }
       if (definition.control === "player" && definition.side !== 1) {
         throw new Error(`Player-controlled force ${definition.id} must be on side 1`);
+      }
+      if (definition.doctrine.strategy === "expert"
+        && definition.doctrine.keepOutTerrainSlotsByClass) {
+        // The player moves their own units, so a keep-out there would only
+        // bind the automatic commands and read as an arbitrary refusal.
+        if (definition.control !== "independent-ai") {
+          throw new Error(`Only an independent AI force may keep out of terrain: ${definition.id}`);
+        }
+        for (const [classId, slots] of Object.entries(definition.doctrine.keepOutTerrainSlotsByClass)) {
+          if (!slots || slots.length === 0
+            || slots.some((slot) => !Number.isInteger(slot) || slot < 0)) {
+            throw new Error(`Force ${definition.id} has an invalid ${classId} keep-out terrain list`);
+          }
+        }
       }
       if (definition.doctrine.strategy === "terrain-hold") {
         const doctrine = definition.doctrine;

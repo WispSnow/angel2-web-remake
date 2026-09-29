@@ -44,9 +44,12 @@ import type { ClassId } from "../content/classes";
 import {
   shootingRange,
   shootingLinePaths,
+  shootingStepsToTarget,
   NumericRangeMap,
   techniqueSelectionPath,
   techniqueSelectionRange,
+  techniqueStepsToTarget,
+  type RangeSteps,
 } from "./actions/range-map";
 import { iceAiFreezeReach } from "./actions/ice-displacement";
 import { prepareSpecialAction as resolveSpecialAction } from "./actions/resolve";
@@ -214,6 +217,52 @@ interface RangedPositionRisk {
   meleeExpectedDamage: number;
 }
 
+/**
+ * REMAKE-173: the propagation an approach ring is measured with. Shots and
+ * selected techniques flow around walls exactly as their range maps do; the
+ * ice freeze covers a plain diamond around the caster, so its ring stays one.
+ */
+type ApproachReachMetric = "shooting" | "technique" | "area";
+
+/**
+ * REMAKE-066/171/173: how far out one action's approach ring sits and which
+ * propagation measures it.
+ */
+function approachReach(actionId: BattleActionId): {
+  distance: number;
+  metric: ApproachReachMetric;
+} {
+  const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+  if ("maximumDistance" in definition.range) {
+    return { distance: definition.range.maximumDistance, metric: "shooting" };
+  }
+  // REMAKE-171: the ice effect's value-1 ring sits outside the AI's own
+  // candidate gate, so a wizard parked there could never cast.
+  if (isIceActionId(actionId)) return { distance: iceAiFreezeReach(actionId), metric: "area" };
+  if (definition.target === "self-area" && "effectRadius" in definition.range) {
+    return { distance: Math.max(1, definition.range.effectRadius - 1), metric: "area" };
+  }
+  const selectionRadius = "aiCandidateSelectionRadius" in definition.range
+    ? definition.range.aiCandidateSelectionRadius
+    : "selectionRadius" in definition.range
+      ? definition.range.selectionRadius
+      : 1;
+  return { distance: Math.max(1, selectionRadius - 1), metric: "technique" };
+}
+
+/**
+ * REMAKE-173: an expert doctrine's keep-out zone, as the three tests every
+ * planner that moves the unit applies.
+ */
+interface MovementKeepOut {
+  /** Cells a route may cross and an approach ring may use: anything outside. */
+  readonly transit: (position: Position) => boolean;
+  /** Where a move may end: outside, or the cell the unit already holds. */
+  readonly landing: (position: Position) => boolean;
+  /** A walk that never steps from outside the zone into it. */
+  readonly path: (path: readonly Position[]) => boolean;
+}
+
 const linePathKey = (path: readonly Position[]): string =>
   path.map(positionKey).join(";");
 
@@ -266,6 +315,8 @@ interface AiPlanningCache {
   signature: string;
   movementMaps: Map<string, MovementMap>;
   actionRanges: Map<string, NumericRangeMap>;
+  /** REMAKE-173 approach-ring propagation per target; `null` when unreachable. */
+  rangeSteps: Map<string, RangeSteps | null>;
   shootingLinePaths: Map<string, readonly Position[][]>;
   utilities: Map<string, ExpertAiUtility>;
   plannedActions: Map<string, AlliedAiAction | undefined>;
@@ -574,6 +625,7 @@ export class Stage0Battle {
       signature,
       movementMaps: new Map(),
       actionRanges: new Map(),
+      rangeSteps: new Map(),
       shootingLinePaths: new Map(),
       utilities: new Map(),
       plannedActions: new Map(),
@@ -660,6 +712,23 @@ export class Stage0Battle {
       cache.metrics.actionRangeBuilds += 1;
     }
     return range;
+  }
+
+  /** REMAKE-173: steps from every cell to `target` under the actor's own gate. */
+  private planningRangeSteps(
+    actor: Pick<BattleUnit, "classId">,
+    target: Position,
+    metric: Exclude<ApproachReachMetric, "area">,
+  ): RangeSteps | undefined {
+    const cache = this.activeAiPlanningCache;
+    const key = `${metric}:${actor.classId}:${target.x},${target.y}`;
+    const cached = cache?.rangeSteps.get(key);
+    if (cached !== undefined) return cached ?? undefined;
+    const steps = metric === "shooting"
+      ? shootingStepsToTarget(actor.classId, target, this.dynamicBattlefield)
+      : techniqueStepsToTarget(actor.classId, target, this.dynamicBattlefield);
+    cache?.rangeSteps.set(key, steps ?? null);
+    return steps;
   }
 
   private planningShootingLinePaths(
@@ -2313,16 +2382,22 @@ export class Stage0Battle {
    * empress/dragon classes take the first ascending range cell whose PIT bit
    * is clear. A unit that ends the action where it stands rests off any wound
    * (REMAKE-143): the player's answer to that is to leave it room to wander.
+   * A doctrine keep-out (REMAKE-173) still holds: the wander only samples the
+   * cells it permits.
    */
   protected planConfusedAiAction(unit: BattleUnit): AlliedAiAction {
+    const keepOut = this.keepOutFor(unit);
     if (classDefinition(unit.classId).actionCategory === "ordinary") {
-      const retreat = this.defensiveRetreatPath(unit);
+      const retreat = this.defensiveRetreatPath(unit, keepOut);
       return retreat
         ? { unitId: unit.id, kind: "move", path: retreat }
         : this.restOrWait(unit);
     }
 
     const reachable = this.reachableCells(unit.id)
+      .filter((position) => !keepOut || (keepOut.landing(position)
+        && (positionKey(position) === positionKey(unit)
+          || keepOut.path(this.movementPath(unit.id, position)))))
       .sort((left, right) => left.y * this.stage.width + left.x
         - (right.y * this.stage.width + right.x));
     for (const candidate of reachable) {
@@ -2334,6 +2409,72 @@ export class Stage0Battle {
       if (path.length > 1) return { unitId: unit.id, kind: "move", path };
     }
     return this.restOrWait(unit);
+  }
+
+  /**
+   * REMAKE-173: a unit shoved into its keep-out zone walks out before it does
+   * anything else, the way a terrain-hold member first returns to its ground.
+   * Progress is the real walking cost to the nearest cell outside; a unit that
+   * cannot shorten it this turn falls back to its ordinary plan.
+   */
+  private planKeepOutExit(
+    unit: BattleUnit,
+    keepOut: MovementKeepOut,
+  ): AlliedAiAction | undefined {
+    // Every way out first reaches a cell bordering the zone, so those alone
+    // seed the walking cost.
+    const doorsteps: Position[] = [];
+    for (let y = 0; y < this.stage.height; y += 1) {
+      for (let x = 0; x < this.stage.width; x += 1) {
+        const position = { x, y };
+        if (keepOut.transit(position)
+          && neighbors(position, this.dynamicBattlefield).some((cell) => !keepOut.transit(cell))) {
+          doorsteps.push(position);
+        }
+      }
+    }
+    const costs = movementCostsToNearestTarget(unit, doorsteps, this.units, this.dynamicBattlefield);
+    const originCost = costs.get(positionKey(unit));
+    if (originCost === undefined) return undefined;
+    const selected = this.reachableCells(unit.id)
+      .filter((position) => positionKey(position) !== positionKey(unit))
+      .map((position) => ({
+        position,
+        path: this.movementPath(unit.id, position),
+        remainingCost: costs.get(positionKey(position)) ?? Number.POSITIVE_INFINITY,
+      }))
+      .filter(({ path, remainingCost }) => path.length > 1
+        && remainingCost < originCost
+        && keepOut.path(path))
+      .sort((left, right) => left.remainingCost - right.remainingCost
+        || left.path.length - right.path.length
+        || left.position.y * this.stage.width + left.position.x
+          - (right.position.y * this.stage.width + right.position.x))[0];
+    return selected ? { unitId: unit.id, kind: "move", path: selected.path } : undefined;
+  }
+
+  /**
+   * REMAKE-173: the keep-out the unit's expert doctrine declares for its
+   * class. The zone is the stage map's own terrain, so nothing the player
+   * builds on the board moves it.
+   */
+  private keepOutFor(unit: BattleUnit): MovementKeepOut | undefined {
+    const doctrine = this.forceForUnit(unit.id)?.doctrine;
+    if (doctrine?.strategy !== "expert") return undefined;
+    const slots = doctrine.keepOutTerrainSlotsByClass?.[unit.classId];
+    if (!slots || slots.length === 0) return undefined;
+    const zoneSlots = new Set(slots);
+    const inZone = (position: Position): boolean =>
+      zoneSlots.has(this.scenario.terrainSlotAt(position));
+    const originKey = positionKey(unit);
+    return {
+      transit: (position) => !inZone(position),
+      landing: (position) => positionKey(position) === originKey || !inZone(position),
+      path: (path) => path.every((step, index) => {
+        const previous = path[index - 1];
+        return previous === undefined || !inZone(step) || inZone(previous);
+      }),
+    };
   }
 
   protected hasDamageActionThisTurn(id: string): boolean {
@@ -2367,14 +2508,23 @@ export class Stage0Battle {
       targetFilter?: (target: BattleUnit) => boolean;
     },
   ): AlliedAiAction {
+    const keepOut = this.keepOutFor(unit);
+    const exit = keepOut && intent === "pursuit" && !keepOut.transit(unit)
+      ? this.planKeepOutExit(unit, keepOut)
+      : undefined;
+    if (exit) {
+      this.recordExpertDecision(unit, [exit], exit);
+      return exit;
+    }
     const positionFilter = intent === "pursuit"
-      ? undefined
+      ? keepOut?.landing
       : (position: Position) => positionKey(position) === positionKey(unit);
     const iceIsForbidden = this.onlyIceCapableSideRemains(unit.side);
     const classAction = this.planClassAction(unit, undefined, {
       expertRanking: true,
       actionFilter: (actionId) => !iceIsForbidden || !isIceActionId(actionId),
       positionFilter,
+      ...(keepOut ? { pathFilter: keepOut.path } : {}),
       targetFilter: (target) => target.side === unit.side
         || (options.targetFilter?.(target) ?? true),
     });
@@ -2395,10 +2545,12 @@ export class Stage0Battle {
               ? this.planExpertTechniquePositioningAction(unit, {
                   iceIsForbidden,
                   targetFilter: options.targetFilter,
+                  keepOut,
                 })
               : undefined)
             ?? this.planExpertRangedApproachAction(unit, {
               targetFilter: options.targetFilter,
+              keepOut,
             })
           : this.restOrWait(unit);
       }
@@ -2407,6 +2559,7 @@ export class Stage0Battle {
         expertRanking: true,
         namedLeaderLineHold: this.isEnemyNamedLeader(unit),
         targetFilter: options.targetFilter,
+        ...(keepOut ? { destinationFilter: keepOut.landing, pathFilter: keepOut.path } : {}),
       });
     }
     const candidates = [classAction, fallbackAction]
@@ -2443,7 +2596,7 @@ export class Stage0Battle {
       return recovery;
     }
     if (selectedUtility.guaranteedKills === 0 && usesEmpressOrDragonAi(unit.classId)) {
-      const banded = this.planEmpressOrDragonLifeBand(unit, options);
+      const banded = this.planEmpressOrDragonLifeBand(unit, { ...options, keepOut });
       if (banded) {
         this.recordExpertDecision(unit, [...candidates, banded], banded);
         return banded;
@@ -2480,6 +2633,7 @@ export class Stage0Battle {
     options: {
       iceIsForbidden: boolean;
       targetFilter?: (target: BattleUnit) => boolean;
+      keepOut?: MovementKeepOut;
     },
   ): AlliedAiAction | undefined {
     const candidates: Array<{
@@ -2497,8 +2651,10 @@ export class Stage0Battle {
     }> = [];
     const riskAt = this.rangedRiskEvaluator(unit);
     const actionIds = techniqueActionIdsFor(unit);
+    const keepOut = options.keepOut;
     for (const position of this.reachableCells(unit.id)) {
-      if (positionKey(position) === positionKey(unit)) continue;
+      if (positionKey(position) === positionKey(unit)
+        || !(keepOut?.landing(position) ?? true)) continue;
       for (const [actionOrder, actionId] of actionIds.entries()) {
         const definition = BATTLE_ACTION_DEFINITIONS[actionId];
         const preparesAttack = definition.target === "enemy" || isIceActionId(actionId);
@@ -2515,6 +2671,7 @@ export class Stage0Battle {
             expertRanking: true,
             casterPosition: position,
             targetFilter: (candidate) => candidate.id === target.id,
+            ...(keepOut ? { pathFilter: keepOut.path } : {}),
           });
           if (forecast?.actionId !== actionId
             || forecast.targetId !== target.id
@@ -2595,11 +2752,19 @@ export class Stage0Battle {
   /**
    * REMAKE-066: ranged units without a current or forecasted action approach
    * an outer firing/support ring instead of borrowing melee frontage.
+   *
+   * REMAKE-173: the ring is as far as the action really reaches, counted with
+   * the propagation its own range map uses. A straight-line ring stopped a
+   * magician on the far side of a house wall at "four cells" from the party
+   * inside, where her fire had to walk around the wall and fell short; she
+   * then stood there for the rest of the battle, since she was already on
+   * the ring and no move could bring her closer to it.
    */
   private planExpertRangedApproachAction(
     unit: BattleUnit,
     options: {
       targetFilter?: (target: BattleUnit) => boolean;
+      keepOut?: MovementKeepOut;
     },
   ): AlliedAiAction {
     const shootingActionId = shootingActionIdFor(unit.classId, unit.side);
@@ -2634,22 +2799,23 @@ export class Stage0Battle {
     }
 
     const relevantActionIds = pureSupport ? actionIds : hostileActionIds;
-    const preferredRange = Math.max(1, ...relevantActionIds.map((actionId) => {
-      const definition = BATTLE_ACTION_DEFINITIONS[actionId];
-      if ("maximumDistance" in definition.range) return definition.range.maximumDistance;
-      // REMAKE-171: the ice effect's value-1 ring sits outside the AI's own
-      // candidate gate, so a wizard parked there could never cast.
-      if (isIceActionId(actionId)) return iceAiFreezeReach(actionId);
-      if (definition.target === "self-area" && "effectRadius" in definition.range) {
-        return Math.max(1, definition.range.effectRadius - 1);
-      }
-      const selectionRadius = "aiCandidateSelectionRadius" in definition.range
-        ? definition.range.aiCandidateSelectionRadius
-        : "selectionRadius" in definition.range
-          ? definition.range.selectionRadius
-          : 1;
-      return Math.max(1, selectionRadius - 1);
-    }));
+    const reaches = relevantActionIds.map(approachReach);
+    const preferredRange = Math.max(1, ...reaches.map(({ distance }) => distance));
+    const ringMetrics = [...new Set(reaches
+      .filter(({ distance }) => distance === preferredRange)
+      .map(({ metric }) => metric))];
+    if (ringMetrics.length === 0) ringMetrics.push("area");
+    const reachDistance = (
+      position: Position,
+      target: Position,
+      metric: ApproachReachMetric,
+    ): number | undefined => {
+      if (metric === "area") return manhattan(position, target);
+      // `shootingRange` also refuses the shooter's own cell and its four
+      // neighbours, however far the propagation had to walk.
+      if (metric === "shooting" && manhattan(position, target) <= 1) return undefined;
+      return this.planningRangeSteps(unit, target, metric)?.stepsAt(position);
+    };
     const occupied = new Set(this.units
       .filter((candidate) => candidate.id !== unit.id)
       .map(positionKey));
@@ -2659,7 +2825,9 @@ export class Stage0Battle {
         const position = { x, y };
         if (occupied.has(positionKey(position))
           || movementBlocked(unit.classId, position, this.dynamicBattlefield)
-          || !strategicTargets.some((target) => manhattan(position, target) === preferredRange)) continue;
+          || !(options.keepOut?.transit(position) ?? true)
+          || !strategicTargets.some((target) => ringMetrics.some((metric) =>
+            reachDistance(position, target, metric) === preferredRange))) continue;
         ringCells.push(position);
       }
     }
@@ -2681,11 +2849,14 @@ export class Stage0Battle {
     };
     const magicArcherSafe = (risk: RangedPositionRisk): boolean =>
       unit.classId !== "magic-archer" || risk.adjacentEnemyCount === 0;
+    const keepsOut = (position: Position, path: readonly Position[]): boolean =>
+      (options.keepOut?.landing(position) ?? true) && (options.keepOut?.path(path) ?? true);
     const costs = movementCostsToNearestTarget(
       unit,
       ringCells,
       this.units,
       this.dynamicBattlefield,
+      options.keepOut ? { positionFilter: options.keepOut.transit } : {},
     );
     const originCost = costs.get(positionKey(unit));
     if (originCost !== undefined) {
@@ -2694,10 +2865,11 @@ export class Stage0Battle {
           ...candidateDetails(position),
           remainingCost: costs.get(positionKey(position)),
         }))
-        .filter(({ path, remainingCost, risk }) => path.length > 1
+        .filter(({ position, path, remainingCost, risk }) => path.length > 1
           && remainingCost !== undefined
           && remainingCost < originCost
-          && magicArcherSafe(risk))
+          && magicArcherSafe(risk)
+          && keepsOut(position, path))
         .sort((left, right) => left.risk.meleeContactCount - right.risk.meleeContactCount
           || left.risk.meleeExpectedDamage - right.risk.meleeExpectedDamage
           || left.remainingCost! - right.remainingCost!
@@ -2718,17 +2890,38 @@ export class Stage0Battle {
       }
     }
 
-    const distanceToRing = (position: Position): number => Math.min(...strategicTargets.map((target) =>
+    // No route reaches the ring: close the gap to it with the same propagation.
+    // Only when that propagation cannot reach this unit at all — nothing here
+    // could ever be selected from where it stands — does the straight line
+    // stand in, as the geometric fallback for a broken route.
+    const propagatedRingGap = (position: Position): number | undefined => {
+      let gap: number | undefined;
+      for (const target of strategicTargets) {
+        for (const metric of ringMetrics) {
+          const distance = reachDistance(position, target, metric);
+          if (distance === undefined) continue;
+          const targetGap = Math.abs(distance - preferredRange);
+          if (gap === undefined || targetGap < gap) gap = targetGap;
+        }
+      }
+      return gap;
+    };
+    const geometricRingGap = (position: Position): number => Math.min(...strategicTargets.map((target) =>
       Math.abs(manhattan(position, target) - preferredRange)));
+    const originPropagatedGap = propagatedRingGap(unit);
+    const distanceToRing = originPropagatedGap === undefined
+      ? geometricRingGap
+      : (position: Position): number => propagatedRingGap(position) ?? Number.POSITIVE_INFINITY;
     const originDistance = distanceToRing(unit);
     const candidates = reachable
       .map((position) => ({
         ...candidateDetails(position),
         ringDistance: distanceToRing(position),
       }))
-      .filter(({ path, ringDistance, risk }) => path.length > 1
+      .filter(({ position, path, ringDistance, risk }) => path.length > 1
         && ringDistance < originDistance
-        && magicArcherSafe(risk))
+        && magicArcherSafe(risk)
+        && keepsOut(position, path))
       .sort((left, right) => left.risk.meleeContactCount - right.risk.meleeContactCount
         || left.risk.meleeExpectedDamage - right.risk.meleeExpectedDamage
         || left.ringDistance - right.ringDistance
@@ -2899,6 +3092,7 @@ export class Stage0Battle {
     options: {
       behavior: number;
       targetFilter?: (target: BattleUnit) => boolean;
+      keepOut?: MovementKeepOut;
     },
   ): AlliedAiAction | undefined {
     // REMAKE-145 takes the 剧情 Boss careers out of this band entirely: their
@@ -2915,7 +3109,9 @@ export class Stage0Battle {
     // labels the branch; the chosen action is unchanged.
     const sentry = options.behavior === 1;
     const adjacent = this.hasAdjacentOpponent(unit);
-    const retreat = !sentry && adjacent ? this.defensiveRetreatPath(unit) : undefined;
+    const retreat = !sentry && adjacent
+      ? this.defensiveRetreatPath(unit, options.keepOut)
+      : undefined;
     if (!retreat) {
       const recovery = this.planSelfRecoveryAction(unit);
       const banded: AlliedAiAction = sentry
@@ -2947,15 +3143,21 @@ export class Stage0Battle {
    * the movement range with no orthogonal opponent, highest terrain defense,
    * later scan cell on a tie. The actor's own cell is never a candidate
    * because the native scan requires an empty side-map byte, so a successful
-   * retreat always relocates.
+   * retreat always relocates. A doctrine keep-out (REMAKE-173) removes the
+   * cells it forbids before the scan.
    */
-  private defensiveRetreatPath(unit: BattleUnit): Position[] | undefined {
+  private defensiveRetreatPath(
+    unit: BattleUnit,
+    keepOut?: MovementKeepOut,
+  ): Position[] | undefined {
     const occupied = new Set(this.units.filter(({ id }) => id !== unit.id).map(positionKey));
     let destination: Position | undefined;
     let bestDefense = -1;
     const candidates = this.reachableCells(unit.id)
       .filter((position) => positionKey(position) !== positionKey(unit)
-        && !occupied.has(positionKey(position)))
+        && !occupied.has(positionKey(position))
+        && (!keepOut || (keepOut.landing(position)
+          && keepOut.path(this.movementPath(unit.id, position)))))
       .sort((left, right) => left.y * this.stage.width + left.x
         - (right.y * this.stage.width + right.x));
     for (const candidate of candidates) {

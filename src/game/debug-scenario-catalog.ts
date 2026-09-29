@@ -482,6 +482,14 @@ export const DEBUG_SCENARIOS = [
     fixture: true,
   },
   {
+    id: "stage-08-safe-house",
+    stageId: "stage-08",
+    title: "退守木屋",
+    phase: "REMAKE-173",
+    description: "八名我方已退進中央木屋，敵方魔術士位於東牆外；結束我方回合後，她繞到門外隔著門口施法，不踏進木屋。",
+    fixture: true,
+  },
+  {
     id: "stage-08-near-victory",
     stageId: "stage-08",
     title: "最後一名敵軍",

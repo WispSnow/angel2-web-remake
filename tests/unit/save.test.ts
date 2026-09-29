@@ -5842,6 +5842,23 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
   });
 
+  it("migrates version-126 saves by identity when ranged approach rings follow walls (REMAKE-173)", () => {
+    // REMAKE-173 只改自动远程单位的落点规划与第 8 关魔術士的禁区；规划每次行动都从公开棋盘
+    // 重算、禁区来自关卡内容，都不入档，所以 v126 战中档与完成档逐字段保留。
+    for (const current of [stage8BattleSave(), stage3BattleSave(), battleSave(), completedSave()]) {
+      expect(parseSaveData(JSON.stringify({
+        ...current,
+        version: 126,
+        contentVersion: "fourth-corps-release-1",
+      })), `${current.kind} ${current.stageId}`).toEqual(current);
+    }
+    expect(parseSaveData(JSON.stringify({
+      ...battleSave(),
+      version: 126,
+      contentVersion: "approach-reach-keep-out-1",
+    }))).toBeUndefined();
+  });
+
   it("migrates version-125 saves and adds the fourth-corps counterattack to stage-3 completions (REMAKE-172)", () => {
     // REMAKE-172 的解除从棋盘读出、从不入档；新事件只在之后的自动阶段触发，所以 v125
     // 战中档与完成档逐字段保留，只有第 3 关完成档要补上这条事件。

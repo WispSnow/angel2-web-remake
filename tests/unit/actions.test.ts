@@ -16,7 +16,9 @@ import { Stage0Battle } from "../../src/game/simulation/battle";
 import {
   archerShootingRange,
   shootingLinePaths,
+  shootingStepsToTarget,
   techniqueSelectionRange,
+  techniqueStepsToTarget,
 } from "../../src/game/simulation/actions/range-map";
 import { prepareSpecialAction } from "../../src/game/simulation/actions/resolve";
 import {
@@ -350,6 +352,63 @@ describe("Stage-0 class actions", () => {
     expect(technique.valueAt(actor)).toBe(5);
     expect(technique.valueAt({ x: 5, y: 1 })).toBe(1);
     expect(technique.valueAt({ x: 5, y: 0 })).toBe(0);
+  });
+
+  it("counts approach steps with the very gate each range map uses (REMAKE-173)", () => {
+    // `#` is slot 0 (rule 99 stops spells and arrows), `~` is slot 12 (rule 98:
+    // spells and arrows cross it, feet cannot). A target on a `#` cell is out
+    // of every range, so it has no step count at all.
+    const layout = [
+      "..........",
+      ".######...",
+      ".#....#.~.",
+      ".#.##.#.~.",
+      "......#~~.",
+      "..###.##..",
+      "....~.....",
+      ".#..~..#..",
+      ".#.....#..",
+      "..........",
+    ];
+    const walled = {
+      width: 10,
+      height: 10,
+      terrainSlotAt: ({ x, y }: Position) => {
+        const cell = layout[y]?.[x];
+        return cell === "#" ? 0 : cell === "~" ? 12 : 2;
+      },
+    };
+    const cells = layout.flatMap((row, y) => [...row].map((_, x) => ({ x, y })));
+    for (const target of cells) {
+      const techniqueSteps = techniqueStepsToTarget("magician", target, walled);
+      const shootingSteps = shootingStepsToTarget("archer", target, walled);
+      if (walled.terrainSlotAt(target) === 0) {
+        expect(techniqueSteps).toBeUndefined();
+        expect(shootingSteps).toBeUndefined();
+        continue;
+      }
+      for (const origin of cells) {
+        if (origin.x === target.x && origin.y === target.y) continue;
+        const straight = Math.abs(origin.x - target.x) + Math.abs(origin.y - target.y);
+        for (const seed of [2, 4, 5, 6]) {
+          const selectable = techniqueSelectionRange(
+            { ...origin, classId: "magician" },
+            walled,
+            seed,
+          ).valueAt(target) > 0;
+          const steps = techniqueSteps?.stepsAt(origin);
+          expect(steps !== undefined && steps <= seed - 1, `${seed}:${origin.x},${origin.y}`)
+            .toBe(selectable);
+        }
+        const shootable = archerShootingRange({ ...origin, classId: "archer" }, walled)
+          .valueAt(target) > 0;
+        const shotSteps = shootingSteps?.stepsAt(origin);
+        expect(shotSteps !== undefined && shotSteps <= 4 && straight >= 2).toBe(shootable);
+      }
+    }
+    // Around the wall, not through it: three cells apart, five steps round.
+    expect(techniqueStepsToTarget("magician", { x: 2, y: 3 }, walled)?.stepsAt({ x: 5, y: 3 }))
+      .toBe(5);
   });
 
   it("enumerates every shortest magic-arrow line in stable native direction order", () => {

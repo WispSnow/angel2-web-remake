@@ -358,6 +358,24 @@ test("REMAKE-170 把「時空異變」牆面上免疫法術的三名敵軍列入
   await expect(page.getByTestId("remake-note-REMAKE-170")).toHaveCount(0);
 });
 
+test("REMAKE-173 把「營地遭到偷襲 ２」魔術士不進木屋列入 Bug 修復", async ({ page }) => {
+  await page.goto("/");
+  // 使用者要求的、與原版不同的關卡改動一律算原版缺陷修復，不歸「平衡性調整」。
+  await openNotes(page, "fixes");
+  const keepOut = page.getByTestId("remake-note-REMAKE-173");
+  await expect(keepOut).toContainText("「營地遭到偷襲 ２」的敵方魔術士不會闖進木屋");
+  await expect(keepOut).toContainText("她會從門口走進屋內，在狹窄的屋裡近距離施法");
+  await expect(keepOut).toContainText("門口也算屋內");
+  await expect(keepOut).toContainText("其他襲擊者照常進屋");
+  await expect(keepOut.locator(".rn-note-id")).toHaveText("REMAKE-173");
+  await captureVisualAudit(keepOut, {
+    path: "artifacts/playwright/remake-notes-stage8-magician-keep-out.png",
+  });
+
+  await page.getByTestId("remake-notes-tab-balance").click();
+  await expect(page.getByTestId("remake-note-REMAKE-173")).toHaveCount(0);
+});
+
 test("REMAKE-162 把「騎士城堡前」隔河攻擊娜米的漏洞列入 Bug 修復", async ({ page }) => {
   await page.goto("/");
   // 使用者要求的、與原版不同的關卡改動一律算原版缺陷修復，不歸「平衡性調整」。

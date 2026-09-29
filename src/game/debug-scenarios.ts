@@ -3727,6 +3727,20 @@ const DEBUG_SCENARIO_FACTORIES = {
   "stage-08-opening": createStage8Opening,
   "stage-08-player": createStage8Player,
   "stage-08-free-action": createStage8FreeAction,
+  // REMAKE-173：玩家报告的局面——全员退守中央木屋，魔術士停在东墙外、与屋内直线 4 格。
+  "stage-08-safe-house": withSetup(createStage8Player, (controller) => {
+    const battle = controller.battle;
+    const houseCells = [
+      { x: 24, y: 29 }, { x: 23, y: 30 }, { x: 22, y: 29 }, { x: 25, y: 26 },
+      { x: 24, y: 27 }, { x: 27, y: 29 }, { x: 21, y: 28 }, { x: 28, y: 30 },
+    ];
+    battle.units
+      .filter(({ side }) => side === 1)
+      .forEach((ally, index) => Object.assign(ally, houseCells[index] ?? {}));
+    const magician = battle.units.find(({ side, classId }) => side === 2 && classId === "magician");
+    if (magician) Object.assign(magician, { x: 28, y: 26 });
+    controller.statusMessage = "調試場景：我方退守中央木屋；結束回合後，敵方魔術士只在屋外隔著門口施法。";
+  }),
   "stage-08-near-victory": withSetup(createStage8Player, (controller) => {
     controller.forceVictorySetupForTest();
   }),

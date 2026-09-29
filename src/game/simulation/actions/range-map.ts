@@ -60,12 +60,45 @@ const OFFSETS = [
 
 const copyPosition = ({ x, y }: Position): Position => ({ x, y });
 
+/** The terrain test a range propagation applies to every cell it enters. */
+interface RangeGate {
+  readonly movementRules: readonly number[];
+  readonly blocks: (movementRule: number) => boolean;
+}
+
+const refuses = (
+  gate: RangeGate,
+  battlefield: ActionBattlefield,
+  position: Position,
+): boolean => gate.blocks(gate.movementRules[battlefield.terrainSlotAt(position)] ?? 99);
+
+/**
+ * Mode `2` at `1000:3FA8` stops only on rules `0/99`, so the `98` that native
+ * shooters and casters carry where melee careers carry `99` is terrain their
+ * arrows cross but their feet cannot. REMAKE-149 points the water warrior's
+ * remake shot at the archer's profile; see SHOOTING_TERRAIN_PROFILE_OVERRIDES.
+ */
+function shootingGate(classId: BattleUnit["classId"]): RangeGate {
+  const terrainProfile = SHOOTING_TERRAIN_PROFILE_OVERRIDES[classId] ?? classId;
+  return {
+    movementRules: movementRulesFor(terrainProfile),
+    blocks: (movementRule) => movementRule === 0 || movementRule === 99,
+  };
+}
+
+/** Mode `0` at `1000:3BB0` compares the caster's own rule only against `99`. */
+function techniqueGate(classId: BattleUnit["classId"]): RangeGate {
+  return {
+    movementRules: movementRulesFor(classId),
+    blocks: (movementRule) => movementRule >= 99,
+  };
+}
+
 function buildUniformRange(
-  actor: Pick<BattleUnit, "x" | "y" | "classId">,
+  actor: Pick<BattleUnit, "x" | "y">,
   battlefield: ActionBattlefield,
   seed: number,
-  blocks: (movementRule: number) => boolean,
-  movementRules: readonly number[] = movementRulesFor(actor.classId),
+  gate: RangeGate,
 ): NumericRangeMap {
   const result = new NumericRangeMap(battlefield.width, battlefield.height);
   const pending: Position[] = [{ x: actor.x, y: actor.y }];
@@ -79,8 +112,7 @@ function buildUniformRange(
     for (const offset of OFFSETS) {
       const next = { x: current.x + offset.x, y: current.y + offset.y };
       if (!result.contains(next)) continue;
-      const movementRule = movementRules[battlefield.terrainSlotAt(next)] ?? 99;
-      if (blocks(movementRule) || result.valueAt(next) >= nextValue) continue;
+      if (refuses(gate, battlefield, next) || result.valueAt(next) >= nextValue) continue;
       result.set(next, nextValue);
       pending.push(next);
     }
@@ -88,25 +120,100 @@ function buildUniformRange(
   return result;
 }
 
-/**
- * Mode `2` at `1000:3FA8` stops only on rules `0/99`, so the `98` that native
- * shooters and casters carry where melee careers carry `99` is terrain their
- * arrows cross but their feet cannot. REMAKE-149 points the water warrior's
- * remake shot at the archer's profile; see SHOOTING_TERRAIN_PROFILE_OVERRIDES.
- */
 function shootingGradient(
   actor: Pick<BattleUnit, "x" | "y" | "classId">,
   battlefield: ActionBattlefield,
   nativeSeed: number,
 ): NumericRangeMap {
-  const terrainProfile = SHOOTING_TERRAIN_PROFILE_OVERRIDES[actor.classId] ?? actor.classId;
-  return buildUniformRange(
-    actor,
-    battlefield,
-    nativeSeed,
-    (movementRule) => movementRule === 0 || movementRule === 99,
-    movementRulesFor(terrainProfile),
-  );
+  return buildUniformRange(actor, battlefield, nativeSeed, shootingGate(actor.classId));
+}
+
+/**
+ * Propagation steps between every cell and one target, for REMAKE-173's
+ * approach rings. `stepsAt` is undefined where no propagation arrives.
+ */
+export class RangeSteps {
+  private readonly steps: Int32Array;
+
+  constructor(
+    readonly width: number,
+    readonly height: number,
+  ) {
+    this.steps = new Int32Array(width * height).fill(-1);
+  }
+
+  contains(position: Position): boolean {
+    return position.x >= 0
+      && position.y >= 0
+      && position.x < this.width
+      && position.y < this.height;
+  }
+
+  stepsAt(position: Position): number | undefined {
+    if (!this.contains(position)) return undefined;
+    const steps = this.steps[position.y * this.width + position.x] ?? -1;
+    return steps < 0 ? undefined : steps;
+  }
+
+  set(position: Position, steps: number): void {
+    if (!this.contains(position)) return;
+    this.steps[position.y * this.width + position.x] = steps;
+  }
+}
+
+/**
+ * How many steps a range propagation from each cell needs to reach `target`.
+ * Both native builders charge one step per cell entered and test only the
+ * cell being entered, never the actor's own, so this walks backwards from the
+ * target: a cell the gate refuses still receives its count — an actor may
+ * stand there — but nothing propagates through it. A target standing on a
+ * refused cell is out of every actor's reach.
+ */
+function rangeStepsToTarget(
+  target: Position,
+  battlefield: ActionBattlefield,
+  gate: RangeGate,
+): RangeSteps | undefined {
+  const result = new RangeSteps(battlefield.width, battlefield.height);
+  if (!result.contains(target) || refuses(gate, battlefield, target)) return undefined;
+  result.set(target, 0);
+  const pending: Position[] = [copyPosition(target)];
+  for (let index = 0; index < pending.length; index += 1) {
+    const current = pending[index];
+    const nextSteps = (result.stepsAt(current) ?? 0) + 1;
+    for (const offset of OFFSETS) {
+      const next = { x: current.x + offset.x, y: current.y + offset.y };
+      if (!result.contains(next) || result.stepsAt(next) !== undefined) continue;
+      result.set(next, nextSteps);
+      if (!refuses(gate, battlefield, next)) pending.push(next);
+    }
+  }
+  return result;
+}
+
+/**
+ * Steps a `techniqueSelectionRange` cast from each cell needs to select
+ * `target`: selectable with seed `n` exactly when the count is at most `n - 1`.
+ */
+export function techniqueStepsToTarget(
+  casterClassId: BattleUnit["classId"],
+  target: Position,
+  battlefield: ActionBattlefield,
+): RangeSteps | undefined {
+  return rangeStepsToTarget(target, battlefield, techniqueGate(casterClassId));
+}
+
+/**
+ * Steps a `shootingRange` from each cell needs to reach `target`. The shot
+ * also refuses the actor's own cell and its four neighbours, which is a
+ * straight-line rule the caller applies itself.
+ */
+export function shootingStepsToTarget(
+  shooterClassId: BattleUnit["classId"],
+  target: Position,
+  battlefield: ActionBattlefield,
+): RangeSteps | undefined {
+  return rangeStepsToTarget(target, battlefield, shootingGate(shooterClassId));
 }
 
 export function shootingRange(
@@ -256,12 +363,7 @@ export function techniqueSelectionRange(
   battlefield: ActionBattlefield,
   selectionSeed: number,
 ): NumericRangeMap {
-  return buildUniformRange(
-    actor,
-    battlefield,
-    selectionSeed,
-    (movementRule) => movementRule >= 99,
-  );
+  return buildUniformRange(actor, battlefield, selectionSeed, techniqueGate(actor.classId));
 }
 
 /**
@@ -276,12 +378,7 @@ export function techniqueSelectionPath(
   selectionSeed: number,
   choosePredecessor: (candidateCount: number) => number = () => 0,
 ): Position[] {
-  const gradient = buildUniformRange(
-    actor,
-    battlefield,
-    selectionSeed,
-    (movementRule) => movementRule >= 99,
-  );
+  const gradient = buildUniformRange(actor, battlefield, selectionSeed, techniqueGate(actor.classId));
   if (gradient.valueAt(target) === 0) return [];
 
   const path = [copyPosition(target)];
@@ -326,12 +423,10 @@ export function stompEffectRange(
   battlefield: ActionBattlefield,
   viewport: ActionViewport,
 ): NumericRangeMap {
-  const result = buildUniformRange(
-    { ...center, classId: actor.classId },
-    battlefield,
-    4,
-    (movementRule) => movementRule === 99,
-  );
+  const result = buildUniformRange(center, battlefield, 4, {
+    movementRules: movementRulesFor(actor.classId),
+    blocks: (movementRule) => movementRule === 99,
+  });
   for (let y = viewport.origin.y; y < viewport.origin.y + viewport.height; y += 1) {
     for (let x = viewport.origin.x; x < viewport.origin.x + viewport.width; x += 1) {
       result.set({ x, y }, 1);

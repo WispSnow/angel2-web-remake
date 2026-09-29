@@ -5,6 +5,7 @@ import {
   STAGE8_OBSTACLE_TERRAIN_SLOT,
   STAGE8_SEMANTIC_ALLIED_UNITS,
   STAGE8_SEMANTIC_ENEMY_UNITS,
+  STAGE8_WOODEN_FLOOR_TERRAIN_SLOT,
   stage8TerrainSlotAt,
 } from "../content/stage8";
 import type {
@@ -42,7 +43,12 @@ const STAGE8_FORCE_DEFINITIONS = [
     side: 2,
     control: "independent-ai",
     unitIds: sideUnitIds(2, [30, 35, 36, 38, 39, 40, 41, 42, 44, 45, 46]),
-    doctrine: { strategy: "expert" },
+    doctrine: {
+      strategy: "expert",
+      // REMAKE-173：玩家退守木屋反打是本关的解法；魔術士一旦进屋，在狭窄屋内近距离施法
+      // 就几乎无解。她仍可从屋外隔着门口把法术打进屋，只是自己不踏进任何一间木屋。
+      keepOutTerrainSlotsByClass: { magician: [STAGE8_WOODEN_FLOOR_TERRAIN_SLOT] },
+    },
   },
 ] as const satisfies readonly ForceDefinition[];
 

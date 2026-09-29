@@ -4,7 +4,10 @@ import {
   ArenaBattle,
   type ArenaBattleEnvironment,
 } from "../../src/game/simulation/arena-battle";
-import { shootingLineVisitProbabilities } from "../../src/game/simulation/actions/range-map";
+import {
+  shootingLineVisitProbabilities,
+  techniqueStepsToTarget,
+} from "../../src/game/simulation/actions/range-map";
 import {
   classCombatRole,
   classDefinition,
@@ -1069,6 +1072,47 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
       setupActionId: "fire-1",
       setupTargetId: "ally-target",
     });
+  });
+
+  it("walks a caster around a wall instead of idling on a straight-line ring (REMAKE-173)", () => {
+    // Stage 8 report: the magician stopped outside a house wall exactly four
+    // cells — fire's reach — from the party inside. Her spell had to walk
+    // around the wall and fell short, and a straight-line ring counted her as
+    // already in place, so she never moved again.
+    const walled: ArenaBattleEnvironment = {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: ({ x, y }) => x === 25 && y >= 24 && y <= 36 ? 0 : 2,
+    };
+    const battle = new ArenaBattle([
+      { id: "ally-behind-wall", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 27, y: 30 },
+      { id: "enemy-magician", side: 2 as const, slot: 0, classId: "magician" as const, level: 1 as const, x: 23, y: 30 },
+    ], 0, new DeterministicRng(0x3173), walled);
+    const target = battle.unit("ally-behind-wall")!;
+    const magician = battle.unit("enemy-magician")!;
+    const fireReach = BATTLE_ACTION_DEFINITIONS["fire-1"].range.selectionRadius - 1;
+    expect(manhattan(magician, target)).toBe(fireReach);
+    expect(battle.actionTargets("enemy-magician", "fire-1")).toEqual([]);
+    const stepsToTarget = techniqueStepsToTarget("magician", target, {
+      width: 50,
+      height: 50,
+      terrainSlotAt: walled.terrainSlotAt,
+    })!;
+
+    let cast: ReturnType<typeof battle.planEnemyAiAction>;
+    for (let turn = 0; turn < 6 && !cast; turn += 1) {
+      const action = battle.planEnemyAiAction("enemy-magician");
+      if (action?.kind === "special") {
+        cast = action;
+        break;
+      }
+      expect(action?.kind, `turn ${turn}`).toBe("move");
+      const destination = action!.path.at(-1)!;
+      expect(stepsToTarget.stepsAt(destination)!, `turn ${turn}`)
+        .toBeLessThan(stepsToTarget.stepsAt(magician)!);
+      expect(battle.moveUnit("enemy-magician", destination)).toBe(true);
+    }
+    expect(cast).toMatchObject({ kind: "special", targetId: "ally-behind-wall" });
+    expect(stepsToTarget.stepsAt(magician)).toBeLessThanOrEqual(fireReach);
   });
 
   it("keeps one forecast target fixed before maximizing that target's casting distance", () => {
