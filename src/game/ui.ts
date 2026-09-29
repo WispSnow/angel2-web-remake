@@ -58,7 +58,7 @@ import type {
 import type { TerrainInspection } from "./terrain-inspection";
 import type { AudioManager } from "./audio";
 import { renderNativeDialogueText } from "./dialogue-text";
-import { dialoguePortraitAfterTyping } from "./dialogue-portrait-cues";
+import { dialoguePortraitAfterTicks, dialoguePortraitAfterTyping } from "./dialogue-portrait-cues";
 import {
   dialogueWindowOpenAnimation,
   finishDialogueWindowClose,
@@ -138,6 +138,7 @@ import { DIFFICULTY_OPTIONS } from "./content/startup";
 import {
   clearProgramTimeout,
   isProgramPaused,
+  programNow,
   setProgramTimeout,
   type ProgramTimeout,
 } from "./program-clock";
@@ -512,6 +513,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let activeDialogueCueWindow: { slot: "upper" | "lower"; state: DialogueWindowState } | undefined;
   /** 上一次 `HD` 執行時窗內已畫出的字數；`render` 據此重畫同一張臉，不回到頁尾那張。 */
   let dialoguePortraitTyped = 0;
+  /** 本頁 `DL` 等待之間換肖像的計時器（SAY/0074 龍王石像變色）；還在跑時本頁不讀輸入。 */
+  let dialogueTimedPortraitTimer: ProgramTimeout | undefined;
+  /** 本頁已經等過的 `DL` native tick；`render` 據此重畫同一張臉，不回到頁尾那張。 */
+  let dialogueTimedPortraitTick = 0;
   /** 當前逐字所在的 `A/18` 面板；主操作要補完逐字時得先把它的展開跳到最後一格。 */
   let activeDialoguePanel: HTMLElement | undefined;
   /** 展開途中按下、待逐字開始才兌現的主操作；等同原版留在 DOS 鍵盤緩衝裡的那一下。 */
@@ -605,6 +610,41 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       true,
     );
     if (swapped && typed < dialogueFullText.length) startSpeaking(activeDialoguePortrait, true);
+  };
+  const stopTimedPortraitCues = () => {
+    if (dialogueTimedPortraitTimer !== undefined) clearProgramTimeout(dialogueTimedPortraitTimer);
+    dialogueTimedPortraitTimer = undefined;
+    dialogueTimedPortraitTick = 0;
+  };
+  /**
+   * 重放本頁在 `DL` 等待之間執行的 `HU`／`HD`。`D3B6` 等到計數器滿 n 才清零，每段等待
+   * 都從上一段結束時起算，所以換臉落在頁首起算的累計 tick 上，重畫本身不順延下一次。
+   * 計時走程式時鐘：全域暫停會停在當下那張臉。
+   */
+  const playTimedPortraitCues = (page: DialoguePage, key: string) => {
+    stopTimedPortraitCues();
+    const slots = (["upper", "lower"] as const).filter((slot) => page[slot]?.timedPortraitCues);
+    const ticks = [...new Set(slots.flatMap((slot) => (page[slot]?.timedPortraitCues ?? []).map(({ tick }) => tick)))]
+      .filter((tick) => tick > 0)
+      .sort((left, right) => left - right);
+    // 一個 native tick 是 10 ms；動畫加速只縮短等待，和逐字一樣按四分之一。
+    const tickMilliseconds = controller.presentationFast ? 2.5 : 10;
+    const startedAt = programNow();
+    const schedule = (index: number) => {
+      if (index >= ticks.length) return;
+      dialogueTimedPortraitTimer = setProgramTimeout(() => {
+        dialogueTimedPortraitTimer = undefined;
+        if (activeDialogueKey !== key) return;
+        dialogueTimedPortraitTick = ticks[index];
+        for (const slot of slots) {
+          const state = page[slot];
+          if (!state) continue;
+          showDialoguePortrait(slot, dialoguePortraitAfterTicks(state, dialogueTimedPortraitTick), page.activeSlot === slot);
+        }
+        schedule(index + 1);
+      }, startedAt + ticks[index] * tickMilliseconds - programNow());
+    };
+    schedule(0);
   };
   const stopDialogueTimer = () => {
     if (dialogueTimer !== undefined) clearProgramTimeout(dialogueTimer);
@@ -714,6 +754,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     });
   };
   const finishDialogueTyping = (): boolean => {
+    // `DL` 不讀輸入，其後的 `KY` 一進來就清掉主／次操作旗標：石像變色途中的按鍵既不
+    // 縮短等待，也不會留到變色結束後兌現成翻頁。
+    if (dialogueTimedPortraitTimer !== undefined) return true;
     if (!activeDialoguePortraitReady && activeDialogueText) return true;
     if (!dialogueFullText || !activeDialogueText || revealedCharacters >= dialogueFullText.length) return false;
     // 窗體還在展開、逐字也還沒起跑時字一個都還沒畫：把展開跳到最後一格，並把這一下記
@@ -1645,10 +1688,13 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           continue;
         }
         // The typing window of a page with mid-reveal `HD`s shows the face of
-        // the phrase being typed; a new page starts from its opening face.
-        const shown = active && state.portraitCues
-          ? dialoguePortraitAfterTyping(state, pageChanged ? page.revealStart ?? 0 : dialoguePortraitTyped)
-          : state;
+        // the phrase being typed, and a page with `DL`-timed redraws the face
+        // of the wait it has reached; a new page starts from its opening face.
+        const shown = state.timedPortraitCues
+          ? dialoguePortraitAfterTicks(state, pageChanged ? 0 : dialogueTimedPortraitTick)
+          : active && state.portraitCues
+            ? dialoguePortraitAfterTyping(state, pageChanged ? page.revealStart ?? 0 : dialoguePortraitTyped)
+            : state;
         elements.speaker.textContent = shown.speaker ?? "";
         // A slot with no text is a portrait the script left on screen after
         // closing its window; only .dialogue-copy carries the A/18 text panel,
@@ -1704,6 +1750,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         dialogueFullText = "";
         revealedCharacters = 0;
       }
+      if (pageChanged) playTimedPortraitCues(page, pageKey);
     } else {
       // These variants change the panel's layout and colours, so they can only
       // be dropped once the collapse they are still styling has finished.
@@ -1715,6 +1762,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         delete dialogueLayer.dataset.effectCenter;
       }
       stopDialogueTimer();
+      stopTimedPortraitCues();
       stopSpeaking(activeDialoguePortrait);
       activeDialogueKey = "";
       activeDialogueText = undefined;

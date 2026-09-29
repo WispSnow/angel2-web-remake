@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { STAGE20_STORY_PAGES } from "../../src/game/content/stage20-runtime.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { drawnFrames, MAP_COMBAT_FRAME_KEYS, recordCanvasFrames } from "./canvas-frame-recorder";
 import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
@@ -286,6 +287,92 @@ test("S20-F/G: boss victory plays Kins and Dragon King, then enters stage 21", a
     campaignRoute: "stage-21",
   });
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "42");
+});
+
+test("S20-J: SAY/0074 flickers the statue between D/56 and D/67 on the native DL ticks", async ({ page }) => {
+  // `DL n` waits n native ticks of 10 ms (`?test=1` does not shorten them) and
+  // reads no input. A paused clock stops each wait one tick short, then lands on
+  // the tick its `HU` redraws the statue.
+  await page.clock.install();
+  await page.goto("/?debugScenario=stage-20-victory-ready&difficulty=0&test=1");
+  const layer = page.getByTestId("dialogue-layer");
+  const sourceWait = () => layer.getAttribute("data-source-wait");
+  const shownStatue = () => page.evaluate(() => ({
+    portrait: Number(document.querySelector<HTMLElement>("#dialogue-portrait-upper")?.dataset.portraitRecord),
+    name: document.querySelector("#dialogue-portrait-name-upper .visually-hidden")?.textContent ?? "",
+    // A face swapped between 40 ms waits has no time to fetch: it must come from the stage gate.
+    staged: document.querySelector<HTMLImageElement>("#dialogue-portrait-upper .portrait-base")
+      ?.src.startsWith("blob:") ?? false,
+  }));
+  for (const [storyId, record] of [
+    ["stage-20-victory-1-story", "72"],
+    ["stage-20-victory-2-story", "73"],
+  ] as const) {
+    await page.waitForFunction(
+      (expected) => (window.__ANGEL2__?.getState() as Stage20State | undefined)?.activeStoryId === expected,
+      storyId,
+    );
+    await expect(layer).toHaveAttribute("data-source-record", record);
+    await skipStoryDialogue(page);
+  }
+  await page.waitForFunction(() =>
+    (window.__ANGEL2__?.getState() as Stage20State | undefined)?.activeStoryId === "stage-20-victory-3-story");
+  await expect(layer).toHaveAttribute("data-source-record", "74");
+  await expect.poll(async () => {
+    if (await sourceWait() === "1") await layer.click();
+    return sourceWait();
+  }, { intervals: [100] }).toBe("2");
+  await expect(page.locator("#dialogue-text"))
+    .toHaveText(STAGE20_STORY_PAGES["stage-20-victory-3-story"][1].lower?.text ?? "");
+  await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 500);
+
+  // Confirming KY 2 starts the DL/HU run on the grey statue; the narration stays.
+  await layer.click();
+  await expect(layer).toHaveAttribute("data-source-wait", "3");
+  expect(await shownStatue()).toEqual({ portrait: 56, name: "龍王", staged: true });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage20-statue-flicker-grey.png`,
+  });
+  let face = 56;
+  for (const [index, ticks] of [9, 9, 8, 8, 7, 7, 6, 6, 5, 5, 4].entries()) {
+    await page.clock.runFor(ticks * 10 - 1);
+    expect((await shownStatue()).portrait, `one tick before DL ${ticks} (#${index + 1}) ends`).toBe(face);
+    await page.clock.runFor(1);
+    face = face === 56 ? 67 : 56;
+    // D/67 has no metadata of its own, so D/56's nameplate stays up.
+    expect(await shownStatue(), `as DL ${ticks} (#${index + 1}) ends`)
+      .toEqual({ portrait: face, name: "龍王", staged: true });
+    if (index === 0) {
+      await captureVisualAudit(page.getByTestId("game-screen"), {
+        path: `${ARTIFACT_DIR}/stage20-statue-flicker-brown.png`,
+      });
+    }
+    if (index === 3) {
+      // `DL` reads no input: neither a click nor a key cuts the flicker short.
+      await layer.click();
+      await page.keyboard.press(" ");
+      expect(await sourceWait()).toBe("3");
+    }
+    if (index === 5) {
+      // The global pause keeps the rest of the running wait.
+      await page.keyboard.press("p");
+      await expect(page.getByTestId("program-pause-overlay")).toBeVisible();
+      await page.clock.runFor(500);
+      expect((await shownStatue()).portrait).toBe(face);
+      await page.keyboard.press("p");
+      await expect(page.getByTestId("program-pause-overlay")).toBeHidden();
+    }
+  }
+  expect(face).toBe(67);
+
+  // KY 3 clears the input flags on entry, so those presses were dropped, not queued.
+  await page.clock.runFor(500);
+  expect(await sourceWait()).toBe("3");
+  expect((await shownStatue()).portrait).toBe(67);
+  await layer.click();
+  await expect(layer).toHaveAttribute("data-source-wait", "4");
+  expect((await shownStatue()).portrait).toBe(67);
+  await page.clock.resume();
 });
 
 /**

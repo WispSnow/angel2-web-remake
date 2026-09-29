@@ -193,6 +193,14 @@ export interface DialoguePortraitCue {
   speaker?: string;
 }
 
+/** An `HD`/`HU` the script runs after `DL` waits, before the page's `KY`. */
+export interface DialogueTimedPortraitCue {
+  /** Native ticks (10 ms) after the previous `KY` returned; `DL n` adds `n`. */
+  tick: number;
+  portrait: PortraitRecord;
+  speaker?: string;
+}
+
 export interface DialogueWindowState {
   /** The portrait on screen at the page's `KY`; with cues, the last cue's. */
   portrait?: PortraitRecord;
@@ -204,6 +212,13 @@ export interface DialogueWindowState {
    * waits only once, at the end.
    */
   portraitCues?: readonly DialoguePortraitCue[];
+  /**
+   * Portraits drawn between `DL` waits before the page accepts input, in tick
+   * order; the first cue, at tick 0, is the face the page opens with. SAY/0074
+   * flips the Dragon King statue between D/56 and D/67 on shortening waits as
+   * it turns from grey to brown. No keypress shortens the waits.
+   */
+  timedPortraitCues?: readonly DialogueTimedPortraitCue[];
   /**
    * Native window text. Absent when the script keeps a portrait on screen with
    * its text window closed — `HD`/`HU` without `WD`/`WU`, as in SAY/0043 where

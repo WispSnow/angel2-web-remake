@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { classPresentationAssetUrls } from "../../src/game/content/class-presentation-assets";
 import {
+  dialoguePortraitRecords,
   portraitAssetUrls,
   portraitAssetUrlsForRecords,
   stageDialoguePortraitRecords,
@@ -37,6 +38,16 @@ describe("stage-scoped portrait assets", () => {
     const records = stageDialoguePortraitRecords(STAGE0_DEFINITION);
     expect(records).toEqual(expect.arrayContaining([45, 46, 47, 48]));
     expect(records.length).toBeLessThan(Object.keys(PORTRAIT_CATALOG).length);
+  });
+
+  test("stages faces a page only shows mid-reveal or between DL waits", () => {
+    // Neither swap can wait for decoding: SAY/0164 changes face between two
+    // glyphs, SAY/0074 between waits as short as 40 ms.
+    expect(dialoguePortraitRecords([{
+      source: { record: 74, wait: 3 },
+      upper: { portrait: 67, timedPortraitCues: [{ tick: 0, portrait: 56 }, { tick: 9, portrait: 67 }] },
+      lower: { text: "妳們曾經", portrait: 24, portraitCues: [{ at: 0, portrait: 25 }, { at: 2, portrait: 24 }] },
+    }])).toEqual([24, 25, 56, 67]);
   });
 
   test("adds requested portrait layers to the same stage presentation gate exactly once", () => {

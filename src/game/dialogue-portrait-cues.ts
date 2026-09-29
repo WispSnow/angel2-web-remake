@@ -1,4 +1,4 @@
-import type { DialoguePortraitCue, DialogueWindowState } from "./types";
+import type { DialoguePortraitCue, DialogueTimedPortraitCue, DialogueWindowState } from "./types";
 
 type ShownPortrait = Pick<DialogueWindowState, "portrait" | "speaker">;
 
@@ -13,6 +13,21 @@ export function dialoguePortraitAfterTyping(state: DialogueWindowState, typed: n
   let shown: ShownPortrait = cues[0] ?? state;
   for (const cue of cues) {
     if (cue.at > typed) break;
+    shown = cue;
+  }
+  return shown;
+}
+
+/**
+ * The face and nameplate a window shows `ticks` native ticks into its page's
+ * `DL` waits. The redraw that ends a wait belongs to the tick the wait ends on.
+ * Without timed cues the page's own portrait covers everything.
+ */
+export function dialoguePortraitAfterTicks(state: DialogueWindowState, ticks: number): ShownPortrait {
+  const cues: readonly DialogueTimedPortraitCue[] = state.timedPortraitCues ?? [];
+  let shown: ShownPortrait = cues[0] ?? state;
+  for (const cue of cues) {
+    if (cue.tick > ticks) break;
     shown = cue;
   }
   return shown;

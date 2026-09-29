@@ -31,6 +31,7 @@ export function dialoguePortraitRecords(pages: readonly DialoguePage[]): readonl
     if (window?.portrait !== undefined) records.add(window.portrait);
     // A mid-page swap has no time to wait for decoding, so it crosses the gate too.
     for (const cue of window?.portraitCues ?? []) records.add(cue.portrait);
+    for (const cue of window?.timedPortraitCues ?? []) records.add(cue.portrait);
   }
   return [...records].sort((left, right) => left - right);
 }

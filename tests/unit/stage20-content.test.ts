@@ -9,6 +9,7 @@ import {
   STAGE20_STORY_PAGES,
 } from "../../src/game/content/stage20";
 import { stageSimulationEffectFor } from "../../src/game/content/stage-effects";
+import { stageDialoguePortraitRecords } from "../../src/game/content/portrait-assets";
 import type { DialoguePage } from "../../src/game/types";
 
 describe("stage 20 content", () => {
@@ -112,12 +113,38 @@ describe("stage 20 content", () => {
     // SAY/0074 lines 5–19 raise records 56 and 67 with HU and never open WU, so
     // the statue must stay on screen above the narration window.
     const victory: readonly DialoguePage[] = STAGE20_STORY_PAGES["stage-20-victory-3-story"];
-    expect(victory.slice(0, 4).map(({ upper }) => upper))
+    expect(victory.slice(0, 4).map(({ upper }) => ({ portrait: upper?.portrait, speaker: upper?.speaker })))
       .toEqual([
         { portrait: 56, speaker: "龍王" },
         { portrait: 56, speaker: "龍王" },
         { portrait: 67, speaker: "龍王" },
         { portrait: 67, speaker: "龍王" },
       ]);
+  });
+
+  it("flickers the statue between D/56 and D/67 on SAY/0074's shortening DL waits", () => {
+    // Lines 11–43 run `DL 9,9,8,8,7,7,6,6,5,5,4`, each followed by `HU`, between
+    // KY 2 and KY 3; `D3B6` counts every wait from the end of the previous one.
+    const victory: readonly DialoguePage[] = STAGE20_STORY_PAGES["stage-20-victory-3-story"];
+    const flicker = victory[2];
+    expect(flicker).toMatchObject({
+      activeSlot: "lower",
+      source: { record: 74, wait: 3, address: "SAY/0074:44" },
+      // Nothing new to type: the narration read on KY 2 simply stays up.
+      revealStart: victory[1].lower?.text?.length,
+      lower: { text: victory[1].lower?.text },
+    });
+    const cues = flicker.upper?.timedPortraitCues ?? [];
+    expect(cues.map(({ portrait }) => portrait))
+      .toEqual([56, 67, 56, 67, 56, 67, 56, 67, 56, 67, 56, 67]);
+    expect(cues.slice(1).map(({ tick }, index) => tick - cues[index].tick))
+      .toEqual([9, 9, 8, 8, 7, 7, 6, 6, 5, 5, 4]);
+    // D/67 has no metadata, so the original keeps D/56's nameplate throughout.
+    expect(new Set(cues.map(({ speaker }) => speaker))).toEqual(new Set(["龍王"]));
+    expect(flicker.lower?.timedPortraitCues).toBeUndefined();
+    // Every other stage 20 page stays untimed, and both faces cross the stage gate.
+    expect(Object.values(STAGE20_STORY_PAGES).flat()
+      .filter(({ upper, lower }) => upper?.timedPortraitCues ?? lower?.timedPortraitCues)).toEqual([flicker]);
+    expect(stageDialoguePortraitRecords(STAGE20_DEFINITION)).toEqual(expect.arrayContaining([56, 67]));
   });
 });
