@@ -589,8 +589,22 @@ test("S03-V: the fourth corps counterattacks once the second corps falls, announ
     path: `${ARTIFACT_DIR}/stage3-remake172-daisy-order.png`,
   });
 
+  // 黛西的上窗跨两页保持打开：换页时不能先收合再重新展开（原版 SAY 双窗场景同样只换
+  // 下窗）。记录上窗面板在换页前后的每一次隐藏或收合。
+  await page.evaluate(() => {
+    const panel = document.querySelector<HTMLElement>("#dialogue-copy-upper")!;
+    const flickers: string[] = [];
+    (window as unknown as { __upperFlickers: string[] }).__upperFlickers = flickers;
+    new MutationObserver(() => {
+      if (panel.hidden) flickers.push("hidden");
+      if (panel.classList.contains("is-dialogue-window-closing")) flickers.push("closing");
+    }).observe(panel, { attributes: true, attributeFilter: ["hidden", "class"] });
+  });
   await layer.click();
   await expect(layer).toHaveAttribute("data-source-address", "REMAKE-172:2");
+  expect(await page.evaluate(
+    () => (window as unknown as { __upperFlickers: string[] }).__upperFlickers,
+  )).toEqual([]);
   await expect(layer).toHaveAttribute("data-active-slot", "lower");
   await expect(page.getByTestId("dialogue-window-lower")).toContainText("好！我們一起拿下梅蒂！");
   await expect(page.getByTestId("dialogue-window-upper")).toContainText("轉守為攻");

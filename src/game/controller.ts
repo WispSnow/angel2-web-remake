@@ -578,9 +578,16 @@ export class GameController {
   turnTransitionPresentationTrace: TurnTransitionPresentation[] = [];
   aiTechniqueDialogue?: AiTechniqueDialoguePresentation;
   contextualLineDialogue?: ContextualLineDialoguePresentation;
-  private battleContextDialogue?: { page: DialoguePage; resume: () => void };
-  /** Set by 跳過 so a multi-page battle dialogue drops its remaining pages. */
-  private battleContextDialogueSkipped = false;
+  /**
+   * A modal battle-map dialogue. Pages turn in place, like a story's KY waits,
+   * so a window open on both pages never collapses between them; `resume` runs
+   * once the last page closes.
+   */
+  private battleContextDialogue?: {
+    pages: readonly DialoguePage[];
+    index: number;
+    resume: () => void;
+  };
   movementPresentation?: MovementPresentation;
   statusMessage = "";
   pendingSaveSlot?: number;
@@ -1004,7 +1011,9 @@ export class GameController {
   }
 
   get currentDialogue(): DialoguePage | undefined {
-    if (this.battleContextDialogue) return this.battleContextDialogue.page;
+    if (this.battleContextDialogue) {
+      return this.battleContextDialogue.pages[this.battleContextDialogue.index];
+    }
     if (this.aiTechniqueDialogue) return this.aiTechniqueDialogue.page;
     if (this.contextualLineDialogue) return this.contextualLineDialogue.page;
     if (this.groupCommandDialogueId) {
@@ -1276,7 +1285,12 @@ export class GameController {
   advanceDialogue(): void {
     if (this.dialogueSkipConfirmOpen) return;
     if (this.battleContextDialogue) {
-      const { resume } = this.battleContextDialogue;
+      const { pages, index, resume } = this.battleContextDialogue;
+      if (index < pages.length - 1) {
+        this.battleContextDialogue.index = index + 1;
+        this.emit();
+        return;
+      }
       this.battleContextDialogue = undefined;
       this.emit();
       resume();
@@ -1318,7 +1332,8 @@ export class GameController {
     this.dialogueSkipConfirmOpen = false;
     this.dialogueSkipConfirmIndex = 1;
     if (this.battleContextDialogue) {
-      this.battleContextDialogueSkipped = true;
+      // 跳過 drops the remaining pages along with the current one.
+      this.battleContextDialogue.index = this.battleContextDialogue.pages.length - 1;
       this.advanceDialogue();
     } else if (this.groupCommandDialogueActive) this.advanceDialogue();
     else if (isStoryPhase(this.phase)) this.completeDialogue();
@@ -1593,17 +1608,12 @@ export class GameController {
     this.statusMessage = dialogue.statusText;
     this.emit();
     if (this.skippingScriptedSequence) return;
-    this.battleContextDialogueSkipped = false;
-    for (const page of dialogue.pages) {
-      if (this.battleContextDialogueSkipped) break;
-      await this.awaitBattleContextPage(page);
-    }
-    this.battleContextDialogueSkipped = false;
+    await this.awaitBattleContextPages(dialogue.pages);
   }
 
-  private async awaitBattleContextPage(page: DialoguePage): Promise<void> {
+  private async awaitBattleContextPages(pages: readonly DialoguePage[]): Promise<void> {
     await new Promise<void>((resolve) => {
-      this.battleContextDialogue = { page, resume: resolve };
+      this.battleContextDialogue = { pages, index: 0, resume: resolve };
       this.emit();
     });
   }
@@ -3146,7 +3156,8 @@ export class GameController {
       this.centerCamera(pending.before);
       if (!this.skippingScriptedSequence) {
         this.battleContextDialogue = {
-          page: {
+          index: 0,
+          pages: [{
             activeSlot: "lower",
             lower: {
               text: pending.context.text,
@@ -3158,7 +3169,7 @@ export class GameController {
               wait: pending.context.selector,
               address: pending.context.address,
             },
-          },
+          }],
           resume: () => undefined,
         };
         this.statusMessage = `${unitDisplayName(pending.before)}的形態正在變化……`;
