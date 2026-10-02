@@ -148,6 +148,11 @@ async function buildInventory(referenceDirectory, reverseDirectory) {
   const js3Config = await readJson(
     path.join(reverseDirectory, "parsed/native/AG2-JS3.json"),
   );
+  const terrainSlotNameCount = (mapRules?.terrainSlotNames?.slots ?? []).filter(
+    (entry) => typeof entry.label === "string" && entry.label.length > 0,
+  ).length;
+  const terrainSlotNameSignatureCount =
+    mapRules?.terrainSlotNames?.verifiedSignatures?.length ?? 0;
   const decodedSaveByName = new Map(
     (decodedSaves?.files ?? []).map((entry) => [entry.fileName, entry]),
   );
@@ -370,15 +375,19 @@ async function buildInventory(referenceDirectory, reverseDirectory) {
           battleMinimapOccupancyRenders?.stageCount ?? 0,
         terrainVisibleNameReadSitesAudited:
           terrainNameAudit?.descriptorTable?.verifiedReadSiteCount ?? 0,
-        nativeVisibleNameBindingFound:
+        // The audit's `false` covers only the DS:2E7D battle-runtime read sites;
+        // the slot names themselves come from the debug editor (DBG-003).
+        nativeBattleRuntimeTerrainNameBindingFound:
           terrainNameAudit?.conclusion?.visibleNameBindingFound ?? null,
+        nativeTerrainSlotNames: terrainSlotNameCount,
+        verifiedTerrainSlotNameSignatures: terrainSlotNameSignatureCount,
         rangeModeWritesAudited:
           mapRules?.semantics?.rangeBuilder?.producerAudit?.ghidraDirectReferenceCrossCheck?.totalWrites ?? 0,
         reachableMode1Producers:
           mapRules?.semantics?.rangeBuilder?.producerAudit?.mode1?.producers?.length ?? null,
         scriptedFmProducers:
           mapRules?.semantics?.rangeBuilder?.producerAudit?.fm?.producers?.length ?? 0,
-        status: "movement_terrain_defense_exact_player_and_ai_range_stage_token_to_logical_slot_40x44_visual_tile_minimap_color_and_overlay_mapping_confirmed; all reachable range modes bound; mode 1 confirmed producerless; only editor-friendly terrain labels remain non-native",
+        status: "movement_terrain_defense_exact_player_and_ai_range_stage_token_to_logical_slot_40x44_visual_tile_minimap_color_and_overlay_mapping_confirmed; all reachable range modes bound; mode 1 confirmed producerless; logical slot names 0..22 bound by the debug terrain editor DS:1585 (DBG-003), while normal battle play never draws a terrain name",
       };
     }
     if (fileName === "SAY.SWF") {
@@ -1322,8 +1331,10 @@ async function buildInventory(referenceDirectory, reverseDirectory) {
       minimapRules?.verifiedDataSignatures?.length ?? 0,
     auditedTerrainDescriptorReadSites:
       terrainNameAudit?.descriptorTable?.verifiedReadSiteCount ?? 0,
-    nativeTerrainVisibleNameBindingFound:
+    nativeBattleRuntimeTerrainNameBindingFound:
       terrainNameAudit?.conclusion?.visibleNameBindingFound ?? null,
+    nativeTerrainSlotNames: terrainSlotNameCount,
+    verifiedTerrainSlotNameSignatures: terrainSlotNameSignatureCount,
     decodedSaveStates: decodedSaves?.files?.length ?? 0,
     decodedSaveStateBytes: (decodedSaves?.files ?? []).reduce(
       (total, file) => total + (file.decoded?.decompressedBytes ?? 0),

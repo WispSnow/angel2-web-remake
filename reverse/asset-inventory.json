@@ -20,10 +20,20 @@
     "lzexeUnpackedRuntimeModules": 10,
     "lzexeUnpackedRuntimeImageBytes": 628256,
     "recoveredRuntimeRelocations": 2651,
+    "auditedNativeTimerRuntimeModules": 9,
+    "nativeTimerPitDivisor": 11932,
+    "nativeTimerNominalHz": 99.99849145155883,
+    "nativeTimerNominalMilliseconds": 10.00015085711987,
+    "webLogicalTickMilliseconds": 10,
+    "nativeTimerAllReleasedModulesClosed": true,
+    "phase1EvidenceRows": 171,
+    "phase1ConfirmedRows": 150,
+    "phase1MixedRows": 21,
+    "phase1ImplementationRequiredUnknowns": 0,
     "nativeUnitDisplayNames": 39,
     "verifiedUnitDescriptorCodeSignatures": 4,
     "nativePromotionEdges": 31,
-    "verifiedPromotionCodeSignatures": 3,
+    "verifiedPromotionCodeSignatures": 7,
     "consolidatedNativeUnitCatalogRecords": 39,
     "unitCatalogGuideExperienceValuesValidated": 195,
     "unitCatalogGuideOtherValuesValidated": 1170,
@@ -34,7 +44,7 @@
     "defeatObjectiveEntries": 42,
     "victoryObjectiveEntries": 42,
     "classifiedObjectiveEntries": 84,
-    "verifiedStageEventCodeAndDataRanges": 41,
+    "verifiedStageEventCodeAndDataRanges": 49,
     "nativePerStageBattleEventHandlers": 38,
     "structurallyClosedPerStageBattleEventHandlers": 38,
     "handlerDialogueRecordCount": 72,
@@ -112,7 +122,7 @@
       42
     ],
     "nativeSpecialStagePresentationsClosed": true,
-    "verifiedEndingPresentationRanges": 22,
+    "verifiedEndingPresentationRanges": 27,
     "verifiedEndingPresentationResources": 12,
     "reachablePostgameRosterCards": 22,
     "conditionalEpilogueTextBlocks": 8,
@@ -124,7 +134,7 @@
     "nativeDifficultyOptions": 4,
     "nativeContinueSlots": 5,
     "titleNewContinueFlowClosed": true,
-    "verifiedTitlePresentationCodeSignatures": 31,
+    "verifiedTitlePresentationCodeSignatures": 36,
     "verifiedTitlePresentationDataSignatures": 5,
     "nativeTitlePresentationGraphicRecords": 19,
     "nativeTitlePresentationAudioRecords": 2,
@@ -134,31 +144,31 @@
     "nativeIntroBackgroundTransitions": 6,
     "nativeIntroFixedWaitTicks": 7092,
     "nativeTitlePresentationTimelineClosed": true,
-    "verifiedStoryPresentationCodeSignatures": 31,
-    "verifiedStoryPresentationDataSignatures": 10,
+    "verifiedStoryPresentationCodeSignatures": 35,
+    "verifiedStoryPresentationDataSignatures": 15,
     "nativeStoryCommandScriptRecords": 93,
     "nativeStoryTextOrLabelOnlyRecords": 83,
     "nativeClosedRouteStoryCommandScripts": 89,
     "paletteCorrectStoryPresentationRenders": 97,
     "nativeStoryPresentationContactSheets": 4,
     "nativeStoryPresentationTimelineClosed": true,
-    "verifiedFeedbackPresentationCodeSignatures": 26,
+    "verifiedFeedbackPresentationCodeSignatures": 30,
     "verifiedFeedbackPresentationDataSignatures": 6,
     "nativeReachableDeploymentErrorMessages": 3,
     "nativeBattleOutcomePrompts": 4,
     "nativeFeedbackCreativeVoiceRecords": 16,
     "nativeFeedbackPresentationClosed": true,
-    "verifiedPasswordFlowRanges": 16,
+    "verifiedPasswordFlowRanges": 17,
     "nativePasswordChallenges": 28,
     "nativePasswordVisibleColorButtons": 6,
     "nativePasswordDirectResources": 8,
     "passwordGateStateMachineClosed": true,
-    "verifiedBattleLifecycleCodeSignatures": 15,
+    "verifiedBattleLifecycleCodeSignatures": 23,
     "mappedBattleDeploymentStages": 44,
     "interactiveBattleDeploymentStages": 33,
     "mappedBattleDeploymentCells": 423,
     "ordinaryBattleLifecycleClosed": true,
-    "verifiedInputUiCodeSignatures": 33,
+    "verifiedInputUiCodeSignatures": 55,
     "mappedDeploymentInputHitboxes": 19,
     "parsedBattleActionMenus": 7,
     "mappedBattleSidePanelHitboxes": 12,
@@ -168,22 +178,22 @@
     "physicalKeyboardTablesIdentical": true,
     "releaseDeveloperShortcutGateDisabled": true,
     "battleInputUiRuleLayerClosed": true,
-    "verifiedUnitDetailHudCodeSignatures": 18,
+    "verifiedUnitDetailHudCodeSignatures": 19,
     "verifiedUnitDetailHudDataSignatures": 4,
     "nativeUnitDetailHudRectangles": 23,
     "nativeUnitDetailHudStatRows": 5,
     "nativeUnitDetailHudStatusSlots": 8,
     "nativeUnitDetailHudStatusResources": 8,
-    "nativeUnitDetailHudClosed": true,
+    "nativeUnitDetailHudClosed": false,
     "verifiedBattleRangePresentationCodeSignatures": 34,
     "verifiedBattleRangePresentationDataSignatures": 1,
     "nativeBattleRangeScratchBytes": 2500,
     "nativeVisibleMapEffectCells": 70,
     "nativeBattleRangeDitherRetainedPixels": 440,
     "nativeBattleRangePresentationClosed": true,
-    "verifiedCombatCodeSignatures": 41,
-    "verifiedCombatPresentationCodeSignatures": 24,
-    "verifiedCombatPresentationDataSignatures": 3,
+    "verifiedCombatCodeSignatures": 44,
+    "verifiedCombatPresentationCodeSignatures": 79,
+    "verifiedCombatPresentationDataSignatures": 5,
     "nativeCombatPresentationClassRecords": 39,
     "nativeCombatPresentationGraphicRecords": 158,
     "nativeCombatPresentationAudioRecords": 37,
@@ -199,7 +209,7 @@
     "nativeShootingPlayerAiEvasionPresentationVariants": 2,
     "nativeLineEffectDescriptorStages": 9,
     "nativeLineEffectFinishSteps": 8,
-    "verifiedTechniquePresentationCodeSignatures": 46,
+    "verifiedTechniquePresentationCodeSignatures": 49,
     "verifiedTechniquePresentationDataSignatures": 9,
     "nativeTechniquePresentationFamilies": 5,
     "nativeTechniquePresentationActions": 18,
@@ -224,7 +234,7 @@
     "nativeTechniqueMenuClasses": 13,
     "nativeTechniqueDispatchEntries": 36,
     "confirmedShootingClasses": 3,
-    "verifiedTechniqueCodeSignatures": 36,
+    "verifiedTechniqueCodeSignatures": 63,
     "linkedTechniquePresentationGroups": 17,
     "nativeAiTechniquePoolClasses": 14,
     "nativeAiTechniqueActionEntries": 33,
@@ -232,7 +242,10 @@
       "FM",
       "SM"
     ],
-    "verifiedAiRuleCodeSignatures": 54,
+    "verifiedAiRuleCodeSignatures": 82,
+    "verifiedAiRuleDataSignatures": 9,
+    "nativeAiTechniqueDialogueGroups": 14,
+    "nativeAiTechniqueDialogueBindings": 33,
     "nativeAiBehaviorActiveInstances": 672,
     "nativeAiBehaviorStaticDomain": [
       0,
@@ -261,13 +274,21 @@
     "verifiedMinimapCodeSignatures": 17,
     "verifiedMinimapDataSignatures": 3,
     "auditedTerrainDescriptorReadSites": 6,
-    "nativeTerrainVisibleNameBindingFound": false,
+    "nativeBattleRuntimeTerrainNameBindingFound": false,
+    "nativeTerrainSlotNames": 23,
+    "verifiedTerrainSlotNameSignatures": 8,
     "decodedSaveStates": 6,
     "decodedSaveStateBytes": 68218,
     "decodedWarDynamicStateRecordsPerSide": 60,
     "nativeWarDynamicStatePointerTablesVerified": true,
     "verifiedSaveStateSemanticCodeSignatures": 16,
     "verifiedSaveStateSemanticDataSignatures": 1,
+    "verifiedSaveRobustnessCodeSignatures": 21,
+    "verifiedNativeSaveRobustnessSamples": 6,
+    "verifiedSaveCorruptionCases": 12,
+    "nativeSaveHasExplicitVersion": false,
+    "nativeSaveHasChecksum": false,
+    "nativeSaveSupportsDeterministicContinuation": false,
     "auditedRangeModeProducerWrites": 43,
     "scriptedFmRangeModeProducers": 10,
     "decodedWarTailStates": 5,
@@ -454,7 +475,7 @@
         "interactiveDeploymentStages": 33,
         "directWriteDeploymentStages": 11,
         "mappedDeploymentCells": 423,
-        "verifiedLifecycleCodeSignatures": 15,
+        "verifiedLifecycleCodeSignatures": 23,
         "ordinaryBattleLifecycleClosed": true,
         "stage37Objective": {
           "stage": 37,
@@ -475,7 +496,7 @@
         },
         "perStageBattleEvents": {
           "dispatcherHandlers": 38,
-          "verifiedCodeAndDataRanges": 41,
+          "verifiedCodeAndDataRanges": 49,
           "structurallyClosedHandlers": 38,
           "handlerDialogueRecords": 72,
           "closedStages": [
@@ -563,7 +584,7 @@
           "machineData": "reverse/parsed/native/stage-events.json"
         },
         "postgamePresentation": {
-          "verifiedCodeAndDataRanges": 22,
+          "verifiedCodeAndDataRanges": 27,
           "verifiedDirectResources": 12,
           "reachableRosterCards": 22,
           "conditionalEpilogueTexts": 8,
@@ -876,6 +897,12 @@
         "freshBattleSelector": "N",
         "unfilledDeploymentMarker": 255,
         "remainingDeploymentMarkersBecomeEmptyAtBattleLoad": true,
+        "reliabilityAudit": {
+          "nativeSampleVerified": true,
+          "explicitFormatVersion": false,
+          "checksum": false,
+          "safeImporterPolicyMachineSpecified": true
+        },
         "fullLayout": "confirmed template-specific layout"
       }
     },
@@ -972,7 +999,7 @@
           82,
           83
         ],
-        "verifiedCodeSignatures": 96,
+        "verifiedCodeSignatures": 99,
         "verifiedDataSignatures": 16,
         "contactSheets": 20,
         "status": "all player-accessible technique presentations closed"
@@ -997,11 +1024,13 @@
         "confirmedTerrainMinimapRenders": 44,
         "confirmedOccupancyMinimapRenders": 44,
         "terrainVisibleNameReadSitesAudited": 6,
-        "nativeVisibleNameBindingFound": false,
+        "nativeBattleRuntimeTerrainNameBindingFound": false,
+        "nativeTerrainSlotNames": 23,
+        "verifiedTerrainSlotNameSignatures": 8,
         "rangeModeWritesAudited": 43,
         "reachableMode1Producers": 0,
         "scriptedFmProducers": 10,
-        "status": "movement_terrain_defense_exact_player_and_ai_range_stage_token_to_logical_slot_40x44_visual_tile_minimap_color_and_overlay_mapping_confirmed; all reachable range modes bound; mode 1 confirmed producerless; only editor-friendly terrain labels remain non-native"
+        "status": "movement_terrain_defense_exact_player_and_ai_range_stage_token_to_logical_slot_40x44_visual_tile_minimap_color_and_overlay_mapping_confirmed; all reachable range modes bound; mode 1 confirmed producerless; logical slot names 0..22 bound by the debug terrain editor DS:1585 (DBG-003), while normal battle play never draws a terrain name"
       }
     },
     {
@@ -1126,8 +1155,8 @@
         "status": "complete_structural_parse_and_native_interpreter_semantics_closed"
       },
       "nativeStoryPresentation": {
-        "verifiedCodeSignatures": 31,
-        "verifiedDataSignatures": 10,
+        "verifiedCodeSignatures": 35,
+        "verifiedDataSignatures": 15,
         "paletteCorrectRenders": 97,
         "contactSheets": 4,
         "effectivePortraitMetadataEntries": 66,
@@ -1198,9 +1227,30 @@
         "recoveredMzRelocations": 2651,
         "reconstructionComplete": true
       },
+      "nativeTiming": {
+        "auditedRuntimeModules": [
+          21,
+          23,
+          25,
+          27,
+          29,
+          33,
+          35,
+          44,
+          46
+        ],
+        "pitChannel": 0,
+        "pitMode": 3,
+        "pitDivisor": 11932,
+        "nominalIrqHz": 99.99849145155883,
+        "nominalIrqMilliseconds": 10.00015085711987,
+        "webLogicalTickMilliseconds": 10,
+        "allReleasedRuntimeModulesClosed": true,
+        "machineData": "reverse/parsed/native/native-timing.json"
+      },
       "nativePasswordGate": {
         "module": 21,
-        "verifiedRanges": 16,
+        "verifiedRanges": 17,
         "attemptsPerSet": 3,
         "challengeCoordinates": 28,
         "visibleColorButtons": 6,
@@ -1312,6 +1362,13 @@
           "nativeTimerWaitFlagBound": true,
           "genericMenuStateBound": true
         },
+        "reliabilityAudit": {
+          "nativeSampleVerified": true,
+          "explicitFormatVersion": false,
+          "checksum": false,
+          "deterministicContinuation": false,
+          "safeImporterPolicyMachineSpecified": true
+        },
         "fullLayout": "confirmed_byte_layout_and_runtime_compatibility_behavior; a few original source-level names are unrecoverable"
       }
     },
@@ -1358,6 +1415,13 @@
           "dynamicWord06BehaviorClosed": true,
           "nativeTimerWaitFlagBound": true,
           "genericMenuStateBound": true
+        },
+        "reliabilityAudit": {
+          "nativeSampleVerified": true,
+          "explicitFormatVersion": false,
+          "checksum": false,
+          "deterministicContinuation": false,
+          "safeImporterPolicyMachineSpecified": true
         },
         "fullLayout": "confirmed_byte_layout_and_runtime_compatibility_behavior; a few original source-level names are unrecoverable"
       }
@@ -1406,6 +1470,13 @@
           "nativeTimerWaitFlagBound": true,
           "genericMenuStateBound": true
         },
+        "reliabilityAudit": {
+          "nativeSampleVerified": true,
+          "explicitFormatVersion": false,
+          "checksum": false,
+          "deterministicContinuation": false,
+          "safeImporterPolicyMachineSpecified": true
+        },
         "fullLayout": "confirmed_byte_layout_and_runtime_compatibility_behavior; a few original source-level names are unrecoverable"
       }
     },
@@ -1453,6 +1524,13 @@
           "nativeTimerWaitFlagBound": true,
           "genericMenuStateBound": true
         },
+        "reliabilityAudit": {
+          "nativeSampleVerified": true,
+          "explicitFormatVersion": false,
+          "checksum": false,
+          "deterministicContinuation": false,
+          "safeImporterPolicyMachineSpecified": true
+        },
         "fullLayout": "confirmed_byte_layout_and_runtime_compatibility_behavior; a few original source-level names are unrecoverable"
       }
     },
@@ -1499,6 +1577,13 @@
           "dynamicWord06BehaviorClosed": true,
           "nativeTimerWaitFlagBound": true,
           "genericMenuStateBound": true
+        },
+        "reliabilityAudit": {
+          "nativeSampleVerified": true,
+          "explicitFormatVersion": false,
+          "checksum": false,
+          "deterministicContinuation": false,
+          "safeImporterPolicyMachineSpecified": true
         },
         "fullLayout": "confirmed_byte_layout_and_runtime_compatibility_behavior; a few original source-level names are unrecoverable"
       }
