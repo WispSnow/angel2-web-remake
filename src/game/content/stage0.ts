@@ -16,8 +16,19 @@ import {
 } from "../simulation/status";
 import { musicAsset, STAGE0_SEAMLESS_MUSIC_ASSETS } from "./music-assets";
 import { STAGE0_FULL_COMBAT_ASSETS } from "./stage0-actions.generated";
+import * as extendedActionContent from "./stage1-actions.generated";
+import { registerActionContent } from "./actions";
 
 export { classStatsFor, nextExperienceThresholdFor };
+
+/**
+ * 本关我方虽然全是士兵，99 回合却足够修女反复治疗攒经验，在同一场战斗里一路转到
+ * 魔術士、僧侶乃至第 4 层法师，所以和其余关卡一样登记完整的技术规则目录。只靠
+ * `stage0-actions` 的初級炎暴／初級治療，二转后的技術選單会读不到定义而停在命令选单。
+ */
+export function activateStage0Content(): void {
+  registerActionContent(extendedActionContent);
+}
 
 const decode = (encoded: string): Uint8Array => {
   const binary = globalThis.atob(encoded);

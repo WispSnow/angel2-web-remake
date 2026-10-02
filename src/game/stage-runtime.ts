@@ -9,7 +9,8 @@ import type { CampaignRouteId } from "./content/stage-effects";
 import type { EnemyPhaseTailPresentationDefinition } from "./enemy-phase-tail-presentation";
 import { createStage0Units } from "./content/stage0";
 import { stage37BossMaximumLifeByDifficulty } from "./content/enemy-scaling";
-import type { BattleActionId } from "./content/actions";
+import { presentationActionIdsForClass, type BattleActionId } from "./content/actions";
+import { promotionReachableClassIds } from "./content/classes";
 import type { DeploymentRosterUnit } from "./deployment-session";
 import { Stage0Battle } from "./simulation/battle";
 import type { DeploymentResult } from "./simulation/deployment";
@@ -1979,6 +1980,16 @@ function createStage11SaveEnemyClasses(): readonly (readonly [string, UnitClassI
   ];
 }
 
+/**
+ * 第 0 关没有部署画面，开局棋盘上的我方就是本关全部可操作单位。它们都从士兵起步，
+ * 但 99 回合足够修女反复治疗攒经验，在同一场战斗里沿合法转职边一路走到第 4 层职业，
+ * 所以存档职业边界与地图技能预载都按这条完整闭包取值，不按“具名角色 299 经验只够
+ * 转一次”的旧假设手抄一转职业。
+ */
+const STAGE0_ALLY_CLASS_CLOSURE = promotionReachableClassIds(
+  createStage0Units().filter(({ side }) => side === 1).map(({ classId }) => classId),
+);
+
 /** The defeat condition most stages share: 妮雅 leaving the board. */
 const NIA_DEFEAT = { type: "unit-removed", side: 1, slot: 0 } as const satisfies StageObjectiveCondition;
 
@@ -1987,7 +1998,9 @@ export const STAGE_RUNTIME_MANIFEST = {
     ...STAGE_INDEX["stage-00"],
     nextStageId: "stage-01",
     focusUnitId: "1:0",
-    mapPresentationActionIds: ["archer-shot", "fire-1", "heal-1"],
+    mapPresentationActionIds: [...new Set(STAGE0_ALLY_CLASS_CLOSURE.flatMap(
+      (classId) => presentationActionIdsForClass(classId, 1),
+    ))],
     entry: {
       trigger: "campaign-entered",
       phase: "prebattleStory",
@@ -2009,7 +2022,7 @@ export const STAGE_RUNTIME_MANIFEST = {
       defeat: STAGE0_DEFINITION.objective.defeat,
       alliedUnits: {
         kind: "allowed-classes",
-        classIds: ["soldier", "cavalry", "warrior", "archer", "sister"],
+        classIds: STAGE0_ALLY_CLASS_CLOSURE,
       },
       enemyClassById: createStage0SaveEnemyClasses(),
       enemyAi: "none",

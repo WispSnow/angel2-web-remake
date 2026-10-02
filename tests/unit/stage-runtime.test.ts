@@ -8,7 +8,7 @@ import {
 } from "../../src/game/stage-runtime";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { CHARACTER_CATALOG } from "../../src/game/content/character-catalog.generated";
-import { usesClassIdentity } from "../../src/game/content/classes";
+import { promotionReachableClassIds, usesClassIdentity } from "../../src/game/content/classes";
 import { STAGE_ROUND_LIMIT } from "../../src/game/simulation/objectives";
 import { STAGE0_ACTION_PRESENTATION_ASSETS } from "../../src/game/content/stage0-actions.generated";
 import { presentationActionIdsForClass } from "../../src/game/content/actions";
@@ -900,9 +900,12 @@ describe("stage runtime manifest", () => {
    * finishes. Stage 22 shipped exactly that way: its demon dragon arrives by
    * story reinforcement and `WD` was missing from the list.
    *
-   * The reachable set is deliberately the units the stage really writes —
-   * board entries, story reinforcements and form transitions — not the whole
-   * promotion closure, which no released stage can traverse inside one battle.
+   * The reachable set is the units the stage really writes — board entries,
+   * deployment candidates, story reinforcements and form transitions — plus
+   * every class their side-1 members can promote into. A healer can farm
+   * experience until the round limit, so one battle is enough to walk the
+   * whole promotion tree: stage 0 shipped preloading only its first-promotion
+   * actions, and a sister promoted twice there could not open her 技術 menu.
    */
   it("preloads a map-action atlas for every action its reachable units can present", async () => {
     /**
@@ -917,6 +920,8 @@ describe("stage runtime manifest", () => {
       "stage-42-portal": ["empress", "magic-priest"],
       "stage-30": ["empress"],
     };
+    /** No side ever acts here, so nobody gains the experience to promote. */
+    const NON_INTERACTIVE_STAGES = new Set<StageId>(["stage-42-portal"]);
     const atlasIds = new Set<string>(MAP_ACTION_ATLAS_IDS);
     const alwaysLoaded = new Set(collectMapActionSources(STAGE0_ACTION_PRESENTATION_ASSETS)
       .map((source) => source.slice("/assets/original/map-actions/".length))
@@ -943,6 +948,18 @@ describe("stage runtime manifest", () => {
         for (const actor of effect.actors) {
           if (actor.forcedClassId) add(actor.forcedClassId, actor.source.side);
         }
+      }
+      if (!NON_INTERACTIVE_STAGES.has(stageId)) {
+        const candidates = runtime.preparation?.createRoster({
+          ...campaign,
+          stageId,
+          roster: completeCampaignRoster([]),
+        }) ?? [];
+        const allyClassIds = [
+          ...[...reachable.values()].filter(({ side }) => side === 1).map(({ classId }) => classId),
+          ...candidates.map(({ classId }) => classId),
+        ];
+        for (const classId of promotionReachableClassIds(allyClassIds)) add(classId, 1);
       }
       const preloaded = new Set([
         ...alwaysLoaded,

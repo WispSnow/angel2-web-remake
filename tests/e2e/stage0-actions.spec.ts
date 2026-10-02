@@ -1,11 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { captureVisualAudit } from "./visual-audit";
 
-type ClassActionId = "archer-shot" | "fire-1" | "heal-1";
-type PromotedClassId = "archer" | "cavalry" | "sister" | "warrior";
+type ClassActionId = "archer-shot" | "fire-1" | "heal-1" | "lightning-1" | "recovery-1";
+type PromotedClassId = "archer" | "cavalry" | "magician" | "monk" | "sister" | "warrior";
 
 interface ActionDebugState {
   phase: string;
+  statusMessage: string;
   round: number;
   actionMode: string;
   battlePresentation: "map" | "full";
@@ -68,6 +69,7 @@ interface ActionDebugState {
   };
   units: Array<{
     id: string;
+    side: 1 | 2;
     classId: string;
     x: number;
     y: number;
@@ -465,6 +467,83 @@ test("M00.6 sister technique menu preserves nested cancel and both native timeli
   }));
   expect(afterFire.units.find(({ id }) => id === enemyBefore.id)?.life)
     .toBe(enemyBefore.life - afterFire.lastSpecialAction!.damage);
+});
+
+// 第 0 关的修女靠反复治疗就能在回合上限内再转职（用户回报：第 43 回合转成魔術士／僧侶）。
+// 二转后的技術選單曾读不到第 1 关才登记的技术定义，渲染中途抛错而停在命令选单，
+// 存档也因第 0 关职业白名单只收一转职业而校验失败。
+test("second-promotion casters open their 技術 menu, cast and save in stage 0", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await waitForGameReady(page);
+  await page.evaluate(() => window.__ANGEL2__?.clearSaves());
+
+  await forceSetup(page, "monk");
+  const beforeRecovery = await state(page);
+  const woundedAlly = beforeRecovery.units.find(({ id }) => id === "1:1")!;
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-technique").click();
+  await expect.poll(async () => (await state(page)).actionMode).toBe("techniqueMenu");
+  await expect(page.getByTestId("action-menu")).toHaveAttribute("data-kind", "technique");
+  await expect(page.getByTestId("technique-heal-1")).toHaveText("初級治療");
+  await expect(page.getByTestId("technique-recovery-1")).toHaveText("初級回復");
+  await expect(page.getByTestId("unit-command-technique")).toHaveCount(0);
+  await page.getByTestId("technique-recovery-1").click();
+  await clickMapCell(page, 300, 177);
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState;
+    return current.lastSpecialAction?.actionId === "recovery-1"
+      && current.specialActionPresentation === undefined;
+  });
+  const afterRecovery = await state(page);
+  expect(afterRecovery.lastSpecialAction!.healing).toBeGreaterThan(0);
+  expect(afterRecovery.units.find(({ id }) => id === woundedAlly.id)?.life)
+    .toBe(woundedAlly.life + afterRecovery.lastSpecialAction!.healing);
+
+  await forceSetup(page, "magician");
+  const beforeLightning = await state(page);
+  const enemyBefore = beforeLightning.units.find(({ side, x, y }) =>
+    side === 2 && x === 30 && y === 26)!;
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-technique").click();
+  await expect(page.getByTestId("action-menu")).toHaveAttribute("data-kind", "technique");
+  await expect(page.getByTestId("technique-fire-1")).toHaveText("初級炎暴");
+  await expect(page.getByTestId("technique-lightning-1")).toHaveText("初級落雷");
+  await expect(page.getByTestId("technique-ice-1")).toHaveText("初級冰雪");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-magician-technique-menu.png",
+  });
+  await page.getByTestId("technique-lightning-1").click();
+  await expect.poll(async () => (await state(page)).actionMode).toBe("specialTarget");
+  await clickMapCell(page, 260, 177);
+  // 地图技能图集只按 `mapPresentationActionIds` 预载；漏列时这里画不出落雷。
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState;
+    return current.specialActionPresentation?.phase === "lightningMain"
+      && current.specialActionPresentation.frame >= 8;
+  });
+  await expect(page.getByTestId("battle-canvas"))
+    .not.toHaveAttribute("data-map-combat-effect-tile-count", "0");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-magician-lightning.png",
+  });
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState;
+    return current.lastSpecialAction?.actionId === "lightning-1"
+      && current.specialActionPresentation === undefined;
+  });
+  const afterLightning = await state(page);
+  expect(afterLightning.specialActionPresentationTrace.length).toBeGreaterThan(0);
+  expect(afterLightning.units.find(({ id }) => id === enemyBefore.id)?.life ?? 0)
+    .toBe(Math.max(0, enemyBefore.life - afterLightning.lastSpecialAction!.damage));
+
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-save").click();
+  await page.getByTestId("record-slot-1").click();
+  await expect.poll(async () => (await state(page)).statusMessage).toBe("已儲存至記錄 1。");
+  const saved = JSON.parse(
+    await page.evaluate(() => localStorage.getItem("angel2.save.1")) ?? "null",
+  ) as { battle: { units: Array<{ id: string; classId: string }> } };
+  expect(saved.battle.units.find(({ id }) => id === "1:0")?.classId).toBe("magician");
 });
 
 for (const [classId, nativeRecord, voiceRecord] of [

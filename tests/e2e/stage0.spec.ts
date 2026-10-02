@@ -1608,6 +1608,39 @@ test("turn handoff replays the native A/19 runners, hops, shadow and A/26 edge d
   });
 });
 
+// 通用单位按职业显示通用肖像，转职当场就换图。资源门原本只备在场单位的当前肖像，
+// 士兵A 转成修女后右栏肖像会绕过租约直接请求原始 URL。
+test("S00-V: a generic soldier promoted in stage 0 shows its class portrait from the staged pack", async ({ page }) => {
+  const originalPortraitImages: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (request.resourceType() === "image" && path.startsWith("/assets/original/portraits/")) {
+      originalPortraitImages.push(path);
+    }
+  });
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  await page.evaluate(() => window.__ANGEL2__?.forcePromotionThreshold("1:40"));
+  await page.getByTestId("battle-canvas").focus();
+  await page.keyboard.press(" ");
+  await page.getByTestId("unit-command-rest").click();
+  await confirmPromotion(page, "sister");
+  await expect.poll(async () => (await debugState(page)).units
+    .find(({ id }) => id === "1:40")).toMatchObject({ classId: "sister", portrait: 50 });
+
+  const portrait = page.getByTestId("unit-portrait");
+  await expect(portrait).toHaveAttribute("data-source-url", "/assets/original/portraits/0050/base.png");
+  await expect(portrait).toHaveAttribute("src", /^blob:/u);
+  await expect.poll(() => page.getByTestId("unit-portrait-composite").locator("img").evaluateAll(
+    (images) => images.every((image) => (image as HTMLImageElement).src.startsWith("blob:")),
+  )).toBe(true);
+  await page.waitForTimeout(120);
+  expect(originalPortraitImages).toEqual([]);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-promoted-generic-portrait.png",
+  });
+});
+
 test("S00-G: group commands provide allied AI handoff and confirmed retreat", async ({ page }) => {
   const enterPlayerPhase = async () => {
     await page.goto("/?test=1&skipStartup=1");
@@ -2600,7 +2633,9 @@ test("RHP-03c: a record the load path would reject leaves the slot and keeps the
   const kept = await page.evaluate(() => localStorage.getItem("angel2.save.1"));
   const keptCount = (JSON.parse(kept ?? "null") as { saveCount: number }).saveCount;
 
-  await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("magician"));
+  // 妮雅以 299 经验入关、经验只增不减，转职后也不再是士兵：0 经验的士兵妮雅
+  // 是读取路径必拒的棋盘。（二转职业不能再充当反例——第 0 关可以一路转到第 4 层。）
+  await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("soldier"));
   await page.keyboard.press("Escape");
   await page.getByTestId("system-command-save").click();
   await page.getByTestId("record-slot-1").click();

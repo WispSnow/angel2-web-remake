@@ -30,7 +30,7 @@ import {
   shootingActionIdFor,
   techniqueActionIdsFor,
 } from "../content/actions";
-import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, completeCampaignRoster, createStage0Units, effectiveStatsFor, isStage0Exit, nextExperienceThresholdAt, statsFor, terrainSlotAt } from "../content/stage0";
+import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, activateStage0Content, completeCampaignRoster, createStage0Units, effectiveStatsFor, isStage0Exit, nextExperienceThresholdAt, statsFor, terrainSlotAt } from "../content/stage0";
 import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
 import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, PortraitRecord, Position, SaveRosterEntry, SavedBattleState, Side, UnitClassId, UnitStats, UnitStatuses } from "../types";
 import { DeterministicRng } from "./rng";
@@ -555,6 +555,8 @@ export class Stage0Battle {
     public readonly rng = new DeterministicRng(),
     protected readonly scenario: BattleScenario = STAGE0_BATTLE_SCENARIO,
   ) {
+    // 第 0 关没有自己的战斗子类：其余关卡在 `super()` 之前各自登记技术目录，这里替它补上。
+    if (scenario === STAGE0_BATTLE_SCENARIO) activateStage0Content();
     this.stage = scenario.stage;
     this.units = scenario.createUnits(difficulty);
     this.forces = new ForceRegistry(scenario.forces ?? [], this.units);
