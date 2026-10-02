@@ -110,7 +110,12 @@ async function audit(modulePath, glyphPath, glyphMetadataPath, outputPath) {
       exactStatement:
         "no DS:2E7D consumer enters a glyph, string, or HUD-name renderer; the table is consumed only by rules, minimap color, terrain mutation/selection, and battle presentation",
       designConsequence:
-        "logical slots remain canonical numeric IDs 0..22; a future remake may attach editor-facing descriptive labels, but those labels must be marked inferred until separately proven",
+        "logical slots remain canonical numeric IDs 0..22; normal play never draws a terrain name",
+      laterNativeBinding: {
+        evidenceId: "DBG-003",
+        statement:
+          "outside this audit's scope, the debug terrain editor 0000:1B3A draws DS:1585 labels indexed by the same logical slot it uses for the MAP profiles; those are the original slot names (map-rules.json#terrainSlotNames)",
+      },
     },
     candidateVocabulary: {
       status: "unbound visual vocabulary only",

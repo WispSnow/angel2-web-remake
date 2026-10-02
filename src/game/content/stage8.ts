@@ -44,7 +44,7 @@ export const STAGE8_TOKEN_TO_TERRAIN_SLOT = decode(STAGE8_TOKEN_TO_SLOT_BASE64);
 export const STAGE8_IRON_PLATE_TERRAIN_SLOT = STAGE8_TOKEN_TO_TERRAIN_SLOT[27];
 export const STAGE8_OBSTACLE_TERRAIN_SLOT = STAGE8_TOKEN_TO_TERRAIN_SLOT[27];
 /**
- * Slot 18 (木板地面) is the floor of the camp's three wooden buildings, their
+ * Slot 18 (木板) is the floor of the camp's three wooden buildings, their
  * doorway gaps included; no other cell of the stage map carries it. The
  * REMAKE-173 keep-out reads it from the map, never from player constructions.
  */

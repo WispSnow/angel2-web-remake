@@ -6873,3 +6873,6 @@ export const CLASS_ID_BY_NATIVE_RECORD = {
   "37": "head",
   "38": "hand"
 } as const;
+
+/** [OF] DS:1585 labels the debug terrain editor (0000:1B3A) draws for logical slots 0..22 (DBG-003). */
+export const TERRAIN_SLOT_NATIVE_NAMES = ["不可","沙地","草地","樹林","坡璧","山地","橋","淺海","淺澤","深澤","地磚","城牆","深海","磁磚","階梯","王座","紅布","屋牆","木板","井","杉欄","木牌","鐵板"] as const;

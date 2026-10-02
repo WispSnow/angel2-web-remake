@@ -21,6 +21,21 @@ const RANGE_CALLBACK_LINEAR_OFFSET =
   RANGE_CODE_SEGMENT_LINEAR_BASE + RANGE_CALLBACK_NEAR_OFFSET;
 const EXPECTED_MODULE_SHA256 = "6e1ad6deb65fa9db48c9853f4b2564829d41954891d063ead84be027befc19c4";
 
+// The developer terrain editor (0000:1B3A) is the only native consumer of these
+// names: a 2x12 strip of `$`-terminated Big5 labels, five bytes apiece. The strip
+// has 24 cells because it mirrors the 24-word MAP window, so its last label sits
+// on the overlap word rather than on a 24th logical slot.
+const TERRAIN_NAME_TABLE = 0x1585;
+const TERRAIN_NAME_BYTES = 5;
+const TERRAIN_NAME_STRIP_ENTRIES = SERIALIZED_WORDS;
+const EXPECTED_TERRAIN_SLOT_NAMES = [
+  "不可", "沙地", "草地", "樹林", "坡璧", "山地", "橋", "淺海",
+  "淺澤", "深澤", "地磚", "城牆", "深海", "磁磚", "階梯", "王座",
+  "紅布", "屋牆", "木板", "井", "杉欄", "木牌", "鐵板",
+];
+const EXPECTED_TERRAIN_OVERLAP_LABEL = "障礙";
+const big5 = new TextDecoder("big5");
+
 const EXPECTED_RANGE_MODE_IMMEDIATE_WRITES = [
   [0x062c5, 0x0030], [0x0636b, 0x0030], [0x06a01, 0x004d],
   [0x06e9f, 0x004d], [0x072bd, 0x0032], [0x0733e, 0x004d],
@@ -63,6 +78,59 @@ const EXPECTED_PHASE_PURSUIT_MODE_IMMEDIATE_WRITES = [
   [0x114df, 0x5946],
   [0x11520, 0x4146],
   [0x11577, 0x4146],
+];
+
+// Kept apart from CODE_SIGNATURES so the battle-runtime signature count stays a
+// statement about rules code; these bind the editor's label index to MAP slots.
+const TERRAIN_NAME_SIGNATURES = [
+  {
+    address: "0000:1D89",
+    offset: 0x1d89,
+    hex: "c7068c310000c706aa140000b9020051c706a8140000b90c0051e81500ff068c318306a8143059e2f08306aa141959e2dec3",
+    meaning: "the editor strip draws two rows of twelve labels by calling 1DBB with DS:318C = 0..23",
+  },
+  {
+    address: "0000:1DE1",
+    offset: 0x1de1,
+    hex: "33d2a18c31bb0500f7e38bf081c68515",
+    meaning: "each label pointer is DS:1585 + DS:318C * 5",
+  },
+  {
+    address: "0000:1E38",
+    offset: 0x1e38,
+    hex: "bb1900f7f3a33a15a13a1533d2bb0c00f7e303063815a33c15",
+    meaning: "a strip pick resolves to row * 12 + column in DS:153C",
+  },
+  {
+    address: "0000:1C7F",
+    offset: 0x1c7f,
+    hex: "a13c15a35a16a38c31e83001",
+    meaning: "the pick becomes the selected terrain slot DS:165A and redraws that same label index through 1DBB",
+  },
+  {
+    address: "0000:1D1A",
+    offset: 0x1d1a,
+    hex: "e89b05e8bd058b1e5a1603db8b3649158b08",
+    meaning: "each class cell reads movement word [DS:1549 + DS:165A * 2] from the profile resolved by 22B8",
+  },
+  {
+    address: "0000:1D34",
+    offset: 0x1d34,
+    hex: "8b1e5a1603db8b364b158b08",
+    meaning: "and terrain-defense word [DS:154B + DS:165A * 2] from the profile resolved by 22DD",
+  },
+  {
+    address: "0000:22B8",
+    offset: 0x22b8,
+    hex: "8b0e8c31e889308b14bb00008b871c1f3bc2740583c304ebf383c3028bb71c1f89364915c3",
+    meaning: "the editor's movement profile pointer comes from the same DS:1F1C short-code table as battle movement",
+  },
+  {
+    address: "0000:22DD",
+    offset: 0x22dd,
+    hex: "8b0e8c31e864308b14bb00008b87ba263bc2740583c304ebf383c3028bb7ba2689364b15c3",
+    meaning: "the editor's terrain-defense profile pointer comes from the same DS:26BA short-code table as battle defense",
+  },
 ];
 
 const CODE_SIGNATURES = [
@@ -600,8 +668,8 @@ function fingerprint(values) {
   return sha256(buffer);
 }
 
-function verifySignatures(moduleBuffer) {
-  return CODE_SIGNATURES.map((signature) => {
+function verifySignatures(moduleBuffer, signatures = CODE_SIGNATURES) {
+  return signatures.map((signature) => {
     const expected = Buffer.from(signature.hex, "hex");
     const actual = moduleBuffer.subarray(
       signature.offset,
@@ -743,11 +811,65 @@ function profileGroups(records, field) {
   );
 }
 
-function slotSummary(records, field) {
+function readTerrainSlotNames(moduleBuffer) {
+  const verifiedSignatures = verifySignatures(moduleBuffer, TERRAIN_NAME_SIGNATURES);
+  const labels = Array.from({ length: TERRAIN_NAME_STRIP_ENTRIES }, (_, index) => {
+    const nearOffset = TERRAIN_NAME_TABLE + index * TERRAIN_NAME_BYTES;
+    const linear = DATA_LINEAR_BASE + nearOffset;
+    const bytes = moduleBuffer.subarray(linear, linear + TERRAIN_NAME_BYTES);
+    if (bytes.at(-1) !== 0x24) {
+      throw new Error(`terrain label ${index} at ${hex(DATA_SEGMENT)}:${hex(nearOffset)} is not $-terminated`);
+    }
+    return {
+      index,
+      address: `${hex(DATA_SEGMENT)}:${hex(nearOffset)}`,
+      bytesHex: bytes.toString("hex"),
+      label: big5.decode(bytes.subarray(0, -1)).trim(),
+    };
+  });
+  const slotNames = labels.slice(0, LOGICAL_TERRAIN_SLOTS).map((entry) => entry.label);
+  if (!arraysEqual(slotNames, EXPECTED_TERRAIN_SLOT_NAMES)) {
+    throw new Error(`terrain slot names changed: ${slotNames.join(" ")}`);
+  }
+  const overlap = labels[LOGICAL_TERRAIN_SLOTS];
+  if (overlap.label !== EXPECTED_TERRAIN_OVERLAP_LABEL) {
+    throw new Error(`terrain overlap label changed: ${overlap.label}`);
+  }
+  return {
+    evidenceLevel: "C",
+    evidenceId: "DBG-003",
+    consumer: "0000:1B3A developer terrain-data editor (地型); the only native code that draws these labels",
+    playerVisibility:
+      "drawn only inside the original debug mode; normal play never shows a terrain name, so these are the developers' names for the rule slots, not a shipped HUD string",
+    tableAddress: `${hex(DATA_SEGMENT)}:${hex(TERRAIN_NAME_TABLE)}`,
+    entryBytes: TERRAIN_NAME_BYTES,
+    encoding: "Big5, `$`-terminated, short labels padded with ASCII spaces",
+    binding:
+      "the strip index chosen by the editor is stored as the selected slot DS:165A and indexes word DS:165A of the same DS:1F1C movement and DS:26BA terrain-defense profiles used in battle, so label N names logical slot N",
+    slots: labels.slice(0, LOGICAL_TERRAIN_SLOTS).map(({ index, ...entry }) => ({
+      slot: index,
+      ...entry,
+    })),
+    overlapLabel: {
+      stripIndex: overlap.index,
+      address: overlap.address,
+      bytesHex: overlap.bytesHex,
+      label: overlap.label,
+      meaning:
+        "the 24th strip cell sits on the serialized overlap word, not a logical slot; editing it writes slot 0 of the next short-code profile",
+    },
+    textNotes: {
+      4: "the original bytes spell 坡璧 (jade 璧), most likely a typo for 坡壁; kept verbatim here",
+    },
+    verifiedSignatures,
+  };
+}
+
+function slotSummary(records, field, slotNames) {
   const ordinary = records.filter((record) => !record.specialRecord);
   return Array.from({ length: LOGICAL_TERRAIN_SLOTS }, (_, slot) => ({
     slot,
-    visibleName: null,
+    visibleName: slotNames[slot],
     allValues: uniqueSorted(records.map((record) => record[field][slot])),
     ordinaryValues: uniqueSorted(ordinary.map((record) => record[field][slot])),
   }));
@@ -825,6 +947,10 @@ async function extract(mapPath, modulePath, descriptorsPath, outputPath) {
     records,
   );
   const ordinaryRecords = records.filter((record) => !record.specialRecord);
+  const terrainSlotNames = readTerrainSlotNames(moduleBuffer);
+  const slotNames = terrainSlotNames.slots.map((entry) => entry.label);
+  const movementSlotSummary = slotSummary(records, "movementRules", slotNames);
+  const terrainDefenseSlotSummary = slotSummary(records, "terrainDefensePercents", slotNames);
   const result = {
     format: "ANGEL2 MAP.SWF native movement and terrain-defense rules",
     phase: "asset_and_gdd_reconstruction_only",
@@ -879,7 +1005,7 @@ async function extract(mapPath, modulePath, descriptorsPath, outputPath) {
         confirmed:
           "DS:01A7 addresses the 50x50 raw terrain-token map; the odd B record's first 256 bytes supply 128 offsets at DS:2E7D; each offset dereferences the first UN.SWF record-56 page to yield the logical profile slot and the second page to yield the 3x3 minimap-cell VGA color; raw token also directly selects one of 128 40x44 tiles, and the remaining 1024 bytes in every plane are zero-filled outside the addressable region",
         nameBindingAudit:
-          "logical slots use canonical numeric IDs 0..22; a separate audit of all six module29 DS:2E7D read sites found no glyph, string, or HUD-name consumer; A/0007 vocabulary remains unbound and must not be assigned by adjacency",
+          "logical slots use canonical numeric IDs 0..22; none of the six module29 DS:2E7D read sites reaches a glyph, string, or HUD-name consumer, so normal play never names a terrain; the native names come only from the debug terrain editor table recorded in terrainSlotNames; A/0007 glyph vocabulary is still not a slot binding by itself",
       },
       rangeBuilder: {
         evidenceLevel: "C",
@@ -975,18 +1101,18 @@ async function extract(mapPath, modulePath, descriptorsPath, outputPath) {
         },
       },
     },
+    terrainSlotNames,
     terrainSlots: Array.from({ length: LOGICAL_TERRAIN_SLOTS }, (_, slot) => ({
       slot,
-      visibleName: null,
-      movementValues: slotSummary(records, "movementRules")[slot],
-      terrainDefenseValues: slotSummary(records, "terrainDefensePercents")[slot],
+      visibleName: slotNames[slot],
+      movementValues: movementSlotSummary[slot],
+      terrainDefenseValues: terrainDefenseSlotSummary[slot],
     })),
     movementProfileGroups: profileGroups(records, "movementRules"),
     terrainDefenseProfileGroups: profileGroups(records, "terrainDefensePercents"),
     records,
     verifiedCodeSignatures,
     unresolved: [
-      "logical terrain slots 0..22 have no discovered native visible-name binding; optional editor aliases must remain explicitly inferred",
       "range mode 1 has no producer and is retained only as unreachable compatibility behavior; all FM producers are bound to scripted stage movement",
     ],
   };

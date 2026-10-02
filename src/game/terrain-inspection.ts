@@ -2,6 +2,7 @@ import {
   movementRulesFor,
   terrainDefensePercentFor,
 } from "./content/classes";
+import { TERRAIN_SLOT_NATIVE_NAMES } from "./content/class-catalog.generated";
 import type { BattleUnit, Position, UnitStats } from "./types";
 
 export interface TerrainInspection {
@@ -18,37 +19,22 @@ export interface TerrainInspection {
 }
 
 /**
- * [DD] Player-facing visual classifications for the original numeric rule slots.
- * The original runtime has no visible slot-name table, and some tilesets reuse a
- * slot for visually related materials, so active stages may provide a narrower
- * label below without changing the canonical numeric rule identity.
+ * `REMAKE-175`: the fallback is the original developers' slot names from the
+ * debug terrain editor (DS:1585, `[OF]`), with two `[DD]` substitutions:
+ * slot 0's 「不可」 is a rule flag rather than a place, and slot 4's 「坡璧」 is a
+ * typo for 坡壁. Stages may still give a narrower look-of-this-board label below
+ * without changing the canonical numeric rule identity.
  */
-const TERRAIN_SLOT_DISPLAY_NAMES: readonly string[] = [
-  "地圖邊界",
-  "沙地",
-  "平原",
-  "森林",
-  "山地",
-  "陡坡",
-  "橋樑",
-  "海域",
-  "沙漠",
-  "流沙與陷阱",
-  "石砌地面",
-  "城牆與岩壁",
-  "深水與斷崖",
-  "室內地面",
-  "階梯",
-  "要地",
-  "通道",
-  "未分類地形",
-  "木板地面",
-  "水井",
-  "場景設施",
-  "冰面",
-  "未分類地形",
-];
+const TERRAIN_SLOT_DISPLAY_SUBSTITUTIONS: Readonly<Partial<Record<number, string>>> = {
+  0: "地圖邊界",
+  4: "坡壁",
+};
 
+const TERRAIN_SLOT_DISPLAY_NAMES: readonly string[] = TERRAIN_SLOT_NATIVE_NAMES.map(
+  (name, slot) => TERRAIN_SLOT_DISPLAY_SUBSTITUTIONS[slot] ?? name,
+);
+
+/** `[DD]` look-of-this-board refinements; each still names the same native slot. */
 const STAGE_TERRAIN_DISPLAY_NAMES: Readonly<
   Record<string, Readonly<Partial<Record<number, string>>>>
 > = {
@@ -87,9 +73,19 @@ const STAGE_TERRAIN_DISPLAY_NAMES: Readonly<
     3: "森林",
     5: "山地",
   },
+  // REMAKE-175: the boards below reuse slot 12 (深海), 16 (紅布) or 20 (杉欄) for
+  // terrain that looks nothing like the native name, so they name what is drawn.
+  "stage-04": { 16: "地毯" },
+  "stage-05": { 16: "地毯" },
+  "stage-06": { 12: "深淵" },
+  "stage-10": { 12: "雲海" },
+  "stage-20": { 16: "地毯" },
+  "stage-23": { 12: "斷崖" },
+  "stage-24": { 12: "斷崖" },
   // Valkyrie's coastal city. Slots 9 and 21 exist on the base board only as the
   // engineer's two construction source cells `(16,26)` and `(16,25)`, so their
-  // labels double as the names of whatever `2K` and `1K` build.
+  // labels double as the names of whatever `2K` and `1K` build. They keep the
+  // technique names over the native slot names 深澤／木牌 (REMAKE-175).
   "stage-27": {
     0: "地圖邊界",
     1: "岸邊沙地",
@@ -101,6 +97,10 @@ const STAGE_TERRAIN_DISPLAY_NAMES: Readonly<
     12: "深水",
     21: "鐵板",
   },
+  "stage-34": { 16: "地毯" },
+  // Includes the three REMAKE-170 wall cells the simulation resolves as slot 20.
+  "stage-35": { 16: "地毯", 20: "碎牆台" },
+  "stage-36": { 20: "碎牆台" },
 };
 
 export function terrainDisplayNameForSlot(

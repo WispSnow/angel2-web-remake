@@ -288,9 +288,9 @@ async function extract(
     configuredSlotCoverage,
     usedSlotCoverage,
     stages,
-    unresolved: [
-      "name logical terrain slots 0..22 from native UI evidence",
-    ],
+    // Slot names are no longer open: map-rules.json#terrainSlotNames carries the
+    // native debug-editor labels from DS:1585 (DBG-003).
+    unresolved: [],
   };
 
   await mkdir(path.dirname(outputPath), { recursive: true });

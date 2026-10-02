@@ -200,6 +200,13 @@ export async function buildClassReference() {
   if (terrainTokenMap.data.logicalTerrainSlots !== LOGICAL_TERRAIN_SLOTS) {
     fail("terrain token map disagrees on the logical terrain slot count");
   }
+  const terrainSlotNames = (mapRules.data.terrainSlotNames?.slots ?? []).map((entry) => entry.label);
+  if (
+    terrainSlotNames.length !== LOGICAL_TERRAIN_SLOTS
+    || terrainSlotNames.some((name) => typeof name !== "string" || name.length === 0)
+  ) {
+    fail("map rules do not carry the native DS:1585 name for every logical terrain slot");
+  }
   if (techniqueRules.data.techniqueMenu?.tierSelector !== TECHNIQUE_TIER_SELECTOR) {
     fail("technique tier selector evidence changed; the 技術階級 note must be re-derived");
   }
@@ -386,7 +393,8 @@ export async function buildClassReference() {
     "   同一格对不同职业的减伤并不相同，脱离地形 profile 比较防御会失真。",
     "8. `[OF]` 普通反击伤害减半且**没有 `4..7` 随机加成**，先攻则有 `8..14`。高攻低防单位换血占优。",
     "9. `[OF]` 鋼甲戰士 side 2 短码为 `0C`（与神劍戰士撞码）是原版内部不一致，本表原样保留，不得统一。",
-    "10. `[OF]` 逻辑地形槽**没有已确认的原版显示名**，一律以槽号 `0..22` 标识，不得按瓦片外观命名。",
+    "10. `[OF]` 逻辑地形槽的原版名称只见于调试模式地形编辑器（DS:`1585`，`DBG-003`），普通游玩从不显示；",
+    "   规则身份仍是槽号 `0..22`，下表按「槽号 原名」标注。槽 4「坡璧」是原文字形，不是本表笔误。",
   );
 
   const usedSlots = new Set(terrainTokenMap.data.usedLogicalSlots);
@@ -704,7 +712,7 @@ export async function buildClassReference() {
     const rows = [];
     for (let slot = 0; slot < LOGICAL_TERRAIN_SLOTS; slot += 1) {
       rows.push([
-        `槽 ${slot}${usedSlots.has(slot) ? "" : " ·"}`,
+        `槽 ${slot} ${terrainSlotNames[slot]}${usedSlots.has(slot) ? "" : " ·"}`,
         ...profileIndexes.map((index) => String(valuesByProfile.get(index)[slot])),
       ]);
     }
