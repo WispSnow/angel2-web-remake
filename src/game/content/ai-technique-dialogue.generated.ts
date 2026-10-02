@@ -535,6 +535,20 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
       "digits": "00000",
       "writer": "0000:EF56"
     }
+  },
+  "headache": {
+    "record": "headache",
+    "selector": 34,
+    "pointerEntry": "DS:84FF",
+    "address": "DS:8762",
+    "gate": "direct",
+    "randomGate": false,
+    "text": "我．．．我好難過．．．\n頭好痛啊！",
+    "emitters": [
+      "0000:3241",
+      "0000:9764",
+      "1000:4F5F"
+    ]
   }
 } as const;
 

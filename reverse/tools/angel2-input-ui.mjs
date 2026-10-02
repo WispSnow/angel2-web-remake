@@ -735,14 +735,14 @@ async function extract(module27Path, module29Path, outputPath) {
         { scanCode: 0x3d, key: "F3", rawAddress: "1EBA:F6E6", action: "freeAction" },
         { scanCode: 0x3e, key: "F4", rawAddress: "1EBA:F6E7", action: "retreat" },
       ],
-      releaseDisabledDeveloperChords: {
-        gate: { address: "1EBA:132F", releaseInitialValue: "N", directWriterInModule29: false, interpretation: "developer/debug shortcut master gate; the shipped module leaves it disabled" },
+      developerModeChords: {
+        gate: { address: "1EBA:132F", releaseInitialValue: "N", writer: "0000:11CC", detector: "0000:116C", interpretation: "developer/debug master gate; opened in the shipped game by holding keypad 1+3+5 and pressing S, W, F in order (full map in debug-mode.json)" },
         modifier: { scanCode: 0x3a, key: "Caps Lock", rawAddress: "1EBA:F6E3", requiredState: 1 },
         chords: [
           { key: "J", scanCode: 0x24, rawAddress: "1EBA:F6CD", effect: "set battle outcome DS:2F83 to 999 and enter the normal victory/event dispatcher" },
           { key: "keypad *", scanCode: 0x37, rawAddress: "1EBA:F6E0", effect: "leave the battle module with nextModule=33, the normally post-stage-49 presentation/status module" },
         ],
-        availability: "unreachable in the shipped release state unless DS:132F is externally patched away from 'N'",
+        availability: "release-reachable once the combo opens DS:132F for the current battle; the main loop tests these chords directly, without the Caps-gated dispatcher at 0000:B78C",
       },
     },
     sharedActions: {

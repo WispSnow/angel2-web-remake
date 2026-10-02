@@ -168,6 +168,23 @@ function renderControls(): string {
             ])}
           </div>
         </article>
+        <article class="rn-control-card is-legacy" data-testid="remake-controls-original-debug">
+          <header><span>DEBUG</span><h3>原版除錯</h3></header>
+          <p class="rn-control-note">先在畫面下方工具列打開「原版除錯」，再於戰場待機時打開 Caps Lock 使用。</p>
+          <div class="rn-control-list">
+            ${renderControlRows([
+              { keys: ["F3", "F4"], action: "敵方／我方全體生命", detail: "全滿、全滅或設為 1" },
+              { keys: ["F10"], action: "我方全員再行動" },
+              { keys: ["U", "D"], action: "游標下單位經驗 ±50" },
+              { keys: ["－"], action: "游標下單位生命 −10" },
+              { keys: ["S"], action: "台詞預覽" },
+              { keys: ["2"], action: "游標格號與難度值" },
+              { keys: ["J"], action: "即時勝利" },
+              { keys: ["＊", "Shift＋8"], action: "直達主線結局" },
+              { keys: ["M"], action: "音樂盒", detail: "也可從「音樂開關」面板進入" },
+            ])}
+          </div>
+        </article>
       </div>
     </section>`;
 }

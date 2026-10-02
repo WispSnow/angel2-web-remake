@@ -211,6 +211,9 @@ describe("native contextual battle lines", () => {
       // and the player's own 技術 commit, all three writing the award first.
       ["experienceGain", 0x18, "DS:8654", "direct", "得經驗值00000 點",
         ["0000:7678", "0000:91C1", "0000:924F"]],
+      // The stage-30 form chain and the original debug mode's S key.
+      ["headache", 0x22, "DS:8762", "direct", "我．．．我好難過．．．\n頭好痛啊！",
+        ["0000:3241", "0000:9764", "1000:4F5F"]],
     ]);
 
     // 0Ah..17h belong to the 33 AI action rows; these lines have their own
@@ -275,6 +278,7 @@ describe("native contextual battle-line gates", () => {
         "confusedActor",
         "counterattack",
         "experienceGain",
+        "headache",
       ]);
     expect(byGate("mixed")).toEqual(["dodgedShot"]);
   });
@@ -294,7 +298,7 @@ describe("native contextual battle-line gates", () => {
     const uncoined = Object.entries(NATIVE_CONTEXTUAL_BATTLE_LINES)
       .filter(([, line]) => !line.randomGate)
       .map(([key]) => key);
-    expect(uncoined).toEqual(["experienceGain"]);
+    expect(uncoined).toEqual(["experienceGain", "headache"]);
   });
 
   test("REMAKE-161 rolls the six-in-ten coin for every selector 0000:C981 does not exempt", () => {

@@ -58,6 +58,8 @@ export class AudioManager {
   private previousBattleMusicSide?: BattleMusicSide;
   private previousCueSequence = 0;
   private selectedMusic?: MusicProgram;
+  private musicBoxSequence = 0;
+  private musicBoxBase?: { id: string | undefined; expired: boolean };
   private readonly music: MusicTransport;
   private readonly effects: SoundEffectTransport;
   private readonly effectRequestCounts: Record<SoundEffectChannel, number> = {
@@ -261,11 +263,41 @@ export class AudioManager {
       desired = undefined;
     }
 
+    ({ desired, restart } = this.applyMusicBoxPlayback(desired, restart));
+
     if (desired?.id !== this.selectedMusic?.id || restart) {
       this.selectedMusic = desired;
       this.music.select(desired, restart);
     }
     this.previousBattleMusicSide = side;
+  }
+
+  /**
+   * `REMAKE-174` 音樂盒。原版 `1000:32D1` 把所選曲直接交給 RIX 驅動，關掉小框也不換回，
+   * 直到遊戲自己下一次選曲（換階段、劇情或換關）。這裡記下試聽開始那一刻遊戲本來要播的
+   * 曲子；只要遊戲的選曲換了（或在階段邊界要求重播），試聽就退場，不再搶回來。
+   */
+  private applyMusicBoxPlayback(
+    natural: MusicProgram | undefined,
+    restart: boolean,
+  ): { desired: MusicProgram | undefined; restart: boolean } {
+    const playback = this.controller.musicBoxPlayback;
+    if (!playback) {
+      this.musicBoxBase = undefined;
+      return { desired: natural, restart };
+    }
+    if (playback.sequence !== this.musicBoxSequence) {
+      this.musicBoxSequence = playback.sequence;
+      this.musicBoxBase = { id: natural?.id, expired: false };
+      return { desired: playback.program, restart: true };
+    }
+    const base = this.musicBoxBase;
+    if (!base || base.expired) return { desired: natural, restart };
+    if (natural?.id !== base.id || restart) {
+      base.expired = true;
+      return { desired: natural, restart };
+    }
+    return { desired: playback.program, restart: false };
   }
 
   private applyMusicVolume(): void {

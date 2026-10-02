@@ -128,6 +128,7 @@ v72/v71/v70 与 stage 49 主线结局入口；冰雪轮頭最后与碧娜維姬 
 | [`systems/debug-harness.md`](systems/debug-harness.md) | 按关选择、快速结算与确定性测试场景 | 开发工具 / 已实现 |
 | [`systems/portrait-animation.md`](systems/portrait-animation.md) | 全战役肖像、眨眼、逐字口型与生成目录 | 表现系统 / 已实现并随第 1 关接受 |
 | [`systems/program-pause.md`](systems/program-pause.md) | DOSBox 风格的全局程序冻结、恢复输入、音画时钟与确定性边界 | 功能增强 / 已实现并通过定向验收 |
+| [`systems/original-debug-mode.md`](systems/original-debug-mode.md) | 原版除错模式（宿主开关、Caps Lock 热键、双方生命、经验、即时胜利、直达结局）与常驻音乐盒 | `REMAKE-174` / 第一批已实现，第二、三批纸面合同 |
 
 ## 写作规范
 

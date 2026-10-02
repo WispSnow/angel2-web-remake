@@ -392,7 +392,7 @@ async function extract(module29Path, planarRoot, outputJsonPath, outputSvgPath) 
       condition: "release developer flag DS:132F != 'Y' AND current stage DS:2E77 == 37 AND selected side DS:31C9 == 2",
       effect: "replace all nine five-character numeric fields in the five stat templates with ?????",
       fields: ["current life", "maximum life", "effective attack", "base/current attack", "effective defense", "base/current defense", "level/growth row", "current experience", "next experience threshold"],
-      developerPatchBoundary: "if DS:132F is externally patched to 'Y', the concealment branch is skipped; this is not a player-facing option",
+      developerModeBoundary: "DS:132F becomes 'Y' through the release keyboard combo at 0000:116C (see debug-mode.json); the original debug mode then skips this concealment and the matching side-2 map life labels",
     },
     round: {
       source: "DS:2F83",

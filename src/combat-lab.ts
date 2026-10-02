@@ -829,6 +829,7 @@ buildScenario(playing);
 configureGameScaling(
   required<HTMLElement>("#combat-lab-viewport"),
   required<HTMLElement>("#combat-lab-screen"),
+  { originalDebugToggle: false },
 );
 updateToggleLabel();
 requestAnimationFrame(tick);

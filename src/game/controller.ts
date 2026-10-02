@@ -1,4 +1,8 @@
-import { STAGE0, initialEnemyExperience } from "./content/stage0";
+import { STAGE0, completeCampaignRoster, initialEnemyExperience } from "./content/stage0";
+import { NATIVE_DEBUG_SIDE_LIFE_MENUS } from "./content/debug-mode.generated";
+import { MUSIC_BOX_TRACKS, musicBoxProgram } from "./content/music-box";
+import type { MusicProgram } from "./music-transport";
+import { originalDebugModeEnabled, type OriginalDebugHotkey } from "./original-debug-mode";
 import {
   cameraContains,
   cameraFocusForOrigin,
@@ -532,6 +536,20 @@ export class GameController {
   groupCommandOpen = false;
   groupCommandIndex = 0;
   groupCommandDialogueId?: SpokenGroupCommandId;
+  /** `REMAKE-174` 原版除錯 F3（敵方）／F4（我方）生命選單。 */
+  debugLifeMenu?: { side: 1 | 2; index: number };
+  /** `REMAKE-174` 原版除錯鍵 2 的格號讀數；游標或鏡頭一動就失效，與原版被下一次視口重畫蓋掉一致。 */
+  debugCellReadout?: { cell: number; difficulty: number; cursor: Position; cameraOrigin: Position };
+  /** `REMAKE-174` 音樂盒。 */
+  musicBoxOpen = false;
+  musicBoxIndex = 0;
+  musicBoxReturn?: "battle" | "musicSettings";
+  /**
+   * 音樂盒正在試聽的曲子。原版關掉小框後所選曲照常播放，直到遊戲自己下一次選曲；
+   * `AudioManager` 依 `sequence` 認出新的試聽，並在遊戲改選別的曲子時讓它退場。
+   */
+  musicBoxPlayback?: { trackId: string; program: MusicProgram; sequence: number };
+  private musicBoxSequence = 0;
   retreatConfirmOpen = false;
   retreatConfirmIndex = 1;
   presentationFast = false;
@@ -1160,6 +1178,8 @@ export class GameController {
       || this.aiTechniqueDialogueActive
       || this.contextualLineDialogueActive
       || this.groupCommandDialogueActive
+      || this.debugLifeMenu !== undefined
+      || this.musicBoxOpen
       || this.promotionUnitIds.length > 0;
   }
 
@@ -3371,6 +3391,8 @@ export class GameController {
     this.soundSettingsReturn = undefined;
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
+    this.musicBoxOpen = false;
+    this.debugLifeMenu = undefined;
     this.minimapPreviewOrigin = undefined;
     this.terrainInspectionPosition = undefined;
     this.groupCommandIndex = 0;
@@ -4553,6 +4575,8 @@ export class GameController {
     this.soundSettingsReturn = undefined;
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
+    this.musicBoxOpen = false;
+    this.debugLifeMenu = undefined;
     this.groupCommandOpen = false;
     this.minimapPreviewOrigin = undefined;
     this.terrainInspectionPosition = undefined;
@@ -4592,6 +4616,8 @@ export class GameController {
     this.soundSettingsReturn = undefined;
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
+    this.musicBoxOpen = false;
+    this.debugLifeMenu = undefined;
     this.emit();
   }
 
@@ -4705,9 +4731,287 @@ export class GameController {
     this.emit();
   }
 
+  // ── REMAKE-174 原版除錯模式與音樂盒 ─────────────────────────────────────────
+  // 原版（模組 29）的除錯分發器 `0000:30CE` 只在待機戰場按住 Caps Lock 時運行；這裡的
+  // 每個入口都對應 `reverse/notes/developer-debug-mode.md` 的一個處理器。除錯操作不消耗
+  // 戰鬥 PRNG，改動的單位狀態與一般狀態一樣保存。
+
+  /** 開關只在正式戰役生效；實驗室的記憶體戰鬥不接受除錯。 */
+  get originalDebugActive(): boolean {
+    return this.campaignPersistenceEnabled && originalDebugModeEnabled();
+  }
+
+  /** 待機戰場才接受除錯熱鍵：選格、選單、對白、演出與轉職等待中一律不收。 */
+  get originalDebugHotkeysAvailable(): boolean {
+    return this.originalDebugActive
+      && this.phase === "player"
+      && !this.busy
+      && this.actionMode === "idle"
+      && !this.hasBlockingOverlay;
+  }
+
+  /** 回傳除錯是否消費了這個按鍵；沒有消費時按鍵照常走一般語義。 */
+  runOriginalDebugHotkey(hotkey: OriginalDebugHotkey): boolean {
+    if (!this.originalDebugHotkeysAvailable) return false;
+    switch (hotkey) {
+      case "enemyLifeMenu": this.openDebugLifeMenu(2); break;
+      case "allyLifeMenu": this.openDebugLifeMenu(1); break;
+      case "refreshAllies": this.debugRefreshAllies(); break;
+      case "experienceUp": this.debugAdjustExperience(50); break;
+      case "experienceDown": this.debugAdjustExperience(-50); break;
+      case "lifeDown": this.debugReduceLife(); break;
+      case "headacheLine": void this.debugHeadacheLine(); break;
+      case "cellReadout": this.debugShowCellReadout(); break;
+      case "instantVictory": this.debugInstantVictory(); break;
+      case "skipToEnding": this.debugSkipToEnding(); break;
+      case "musicBox": this.openMusicBox("battle"); break;
+      case "pending":
+        this.statusMessage = "原版除錯：這個功能將在後續版本復刻。";
+        this.emit();
+        break;
+    }
+    return true;
+  }
+
+  get debugLifeMenuItems(): typeof NATIVE_DEBUG_SIDE_LIFE_MENUS.enemy.items
+    | typeof NATIVE_DEBUG_SIDE_LIFE_MENUS.ally.items
+    | readonly [] {
+    const menu = this.debugLifeMenu;
+    if (!menu) return [];
+    return menu.side === 2 ? NATIVE_DEBUG_SIDE_LIFE_MENUS.enemy.items : NATIVE_DEBUG_SIDE_LIFE_MENUS.ally.items;
+  }
+
+  /** F3（敵方）／F4（我方），原版選單 DS:`4156`／`416C`。 */
+  openDebugLifeMenu(side: 1 | 2): void {
+    this.minimapPreviewOrigin = undefined;
+    this.terrainInspectionPosition = undefined;
+    this.debugLifeMenu = { side, index: 0 };
+    this.statusMessage = side === 2 ? "原版除錯：設定敵方全體生命。" : "原版除錯：設定我方全體生命。";
+    this.emit();
+  }
+
+  closeDebugLifeMenu(): void {
+    if (!this.debugLifeMenu) return;
+    this.debugLifeMenu = undefined;
+    this.statusMessage = "已返回戰場。";
+    this.emit();
+  }
+
+  moveDebugLifeMenuSelection(delta: number): void {
+    const menu = this.debugLifeMenu;
+    const count = this.debugLifeMenuItems.length;
+    if (!menu || delta === 0 || count === 0) return;
+    this.debugLifeMenu = { ...menu, index: (menu.index + Math.sign(delta) + count) % count };
+    this.emit();
+  }
+
+  selectDebugLifeMenuItem(index: number): void {
+    const menu = this.debugLifeMenu;
+    if (!menu || index < 0 || index >= this.debugLifeMenuItems.length || index === menu.index) return;
+    this.debugLifeMenu = { ...menu, index };
+    this.emit();
+  }
+
+  activateDebugLifeMenuSelection(): void {
+    const menu = this.debugLifeMenu;
+    const item = menu ? this.debugLifeMenuItems[menu.index] : undefined;
+    if (!menu || !item) return;
+    this.debugLifeMenu = undefined;
+    const count = this.battle.debugSetSideLife(menu.side, item.effect);
+    const sideName = menu.side === 2 ? "敵方" : "我方";
+    const effectText = item.effect === "full"
+      ? "生命全滿"
+      : item.effect === "remove" ? "全部移出戰場" : "生命設為 1";
+    this.finishOriginalDebugMutation(`原版除錯：${sideName} ${count} 人${effectText}。`);
+  }
+
+  private debugCursorUnit(): BattleUnit | undefined {
+    const unit = this.battle.unitAt(this.cursor);
+    if (!unit) {
+      this.statusMessage = "原版除錯：游標下沒有單位。";
+      this.emit();
+    }
+    return unit;
+  }
+
+  /** U／D（`0000:32DA/32FD`）。原版待機循環每輪都做轉職掃描，所以經驗跨過門檻就會轉職。 */
+  debugAdjustExperience(delta: 50 | -50): void {
+    const unit = this.debugCursorUnit();
+    if (!unit) return;
+    if (!this.battle.debugAdjustExperience(unit.id, delta)) {
+      this.statusMessage = `原版除錯：${unitDisplayName(unit)}的經驗不能再減少。`;
+      this.emit();
+      return;
+    }
+    this.battle.focusId = unit.id;
+    this.finishOriginalDebugMutation(
+      `原版除錯：${unitDisplayName(unit)}經驗 ${delta > 0 ? "＋50" : "−50"}，現為 ${unit.experience}。`,
+    );
+  }
+
+  /** 數字鍵盤 `-`（`0000:551A`）；`[SR]` 生命不超過 10 時不扣，不留下 0 生命的在場單位。 */
+  debugReduceLife(): void {
+    const unit = this.debugCursorUnit();
+    if (!unit) return;
+    if (!this.battle.debugReduceLife(unit.id)) {
+      this.statusMessage = `原版除錯：${unitDisplayName(unit)}的生命不超過 10，不再減少。`;
+      this.emit();
+      return;
+    }
+    this.battle.focusId = unit.id;
+    this.finishOriginalDebugMutation(`原版除錯：${unitDisplayName(unit)}生命 −10，現為 ${unit.life}。`);
+  }
+
+  /** F10（`1000:147E`）：只清我方已行動狀態，不解除冰封。 */
+  debugRefreshAllies(): void {
+    this.battle.clearActionState(1);
+    this.statusMessage = "原版除錯：我方全員可再次行動。";
+    this.emit();
+  }
+
+  /** S（`0000:3232`）：以游標下單位的肖像強制說台詞 `22h`；這一句不擲 `0000:CAC3` 的硬幣。 */
+  private async debugHeadacheLine(): Promise<void> {
+    const unit = this.debugCursorUnit();
+    if (!unit) return;
+    this.busy = true;
+    try {
+      await this.presentContextualLine(unit, "headache", "原版除錯：台詞預覽。");
+    }
+    finally {
+      this.busy = false;
+      this.emit();
+    }
+  }
+
+  /** 2（`0000:324A`）：原版格號是 `y × 50 + x`，與各關地圖實際寬度無關；第二欄是難度值。 */
+  debugShowCellReadout(): void {
+    this.debugCellReadout = {
+      cell: this.cursor.y * 50 + this.cursor.x,
+      difficulty: this.difficulty,
+      cursor: { ...this.cursor },
+      cameraOrigin: { ...this.cameraOrigin },
+    };
+    this.statusMessage = "原版除錯：左上為游標格號與難度值。";
+    this.emit();
+  }
+
+  /** 讀數只活到游標或鏡頭下一次移動，與原版被下一次視口重畫蓋掉一致。 */
+  get visibleDebugCellReadout(): { cell: number; difficulty: number } | undefined {
+    const readout = this.debugCellReadout;
+    if (!readout || !this.originalDebugActive) return undefined;
+    if (readout.cursor.x !== this.cursor.x || readout.cursor.y !== this.cursor.y
+      || readout.cameraOrigin.x !== this.cameraOrigin.x || readout.cameraOrigin.y !== this.cameraOrigin.y) {
+      return undefined;
+    }
+    return { cell: readout.cell, difficulty: readout.difficulty };
+  }
+
+  /** Caps Lock+J（`0000:4A6E`）：不看任何目標條件，直接走本關正常勝利流程。 */
+  debugInstantVictory(): void {
+    this.battle.debugForceVictory();
+    this.statusMessage = "原版除錯：即時勝利。";
+    this.resolveOutcome();
+    this.emit();
+  }
+
+  /**
+   * Caps Lock+數字鍵盤 `*`（`0000:4AA6`）：原版以下一模組 33 直接離開戰鬥，不經
+   * `1000:05E5` 把本場結果寫回戰役，所以戰績卡讀的是本關進場時的名冊與戰績；模組 25 的
+   * 劇情 70 也一併跳過，直接從戰績卡開始。
+   */
+  debugSkipToEnding(): void {
+    const campaign = cloneCampaignState(this.stageEntrySnapshot);
+    const ending = new Stage49EndingSession(
+      { ...campaign, roster: completeCampaignRoster(campaign.roster) },
+      this.campaignSaveCount,
+    );
+    ending.startAtRoster();
+    this.stage49Ending = ending;
+    this.resetAction();
+    this.campaignRoute = "stage-49";
+    this.phase = "ending";
+    this.statusMessage = "原版除錯：直達主線結局。";
+    this.emit();
+  }
+
+  private finishOriginalDebugMutation(message: string): void {
+    this.statusMessage = message;
+    const promotionPause = this.pauseForPromotions();
+    if (promotionPause) {
+      void promotionPause.then(() => {
+        this.resolveOutcome();
+        this.emit();
+      });
+      return;
+    }
+    this.resolveOutcome();
+    this.emit();
+  }
+
+  get musicBoxTracks(): typeof MUSIC_BOX_TRACKS {
+    return MUSIC_BOX_TRACKS;
+  }
+
+  /** 「音樂開關」面板常駐的入口，或除錯模式下的 Caps Lock+M。 */
+  openMusicBox(from: "battle" | "musicSettings"): void {
+    if (from === "musicSettings" ? !this.musicSettingsOpen : !this.originalDebugHotkeysAvailable) return;
+    this.musicSettingsOpen = false;
+    this.musicSettingsReturn = undefined;
+    this.minimapPreviewOrigin = undefined;
+    this.terrainInspectionPosition = undefined;
+    this.musicBoxOpen = true;
+    this.musicBoxReturn = from;
+    this.emit();
+  }
+
+  closeMusicBox(): void {
+    if (!this.musicBoxOpen) return;
+    this.musicBoxOpen = false;
+    if (this.musicBoxReturn === "musicSettings") {
+      this.musicSettingsOpen = true;
+      this.musicSettingsReturn = "battle";
+    }
+    this.musicBoxReturn = undefined;
+    this.emit();
+  }
+
+  moveMusicBoxSelection(delta: number): void {
+    const count = MUSIC_BOX_TRACKS.length;
+    if (!this.musicBoxOpen || delta === 0 || count === 0) return;
+    this.musicBoxIndex = (this.musicBoxIndex + Math.sign(delta) + count) % count;
+    this.emit();
+  }
+
+  selectMusicBoxTrack(index: number): void {
+    if (!this.musicBoxOpen || index < 0 || index >= MUSIC_BOX_TRACKS.length || index === this.musicBoxIndex) return;
+    this.musicBoxIndex = index;
+    this.emit();
+  }
+
+  playMusicBoxSelection(): void {
+    const track = MUSIC_BOX_TRACKS[this.musicBoxIndex];
+    if (!this.musicBoxOpen || !track) return;
+    this.musicBoxSequence += 1;
+    this.musicBoxPlayback = {
+      trackId: track.id,
+      program: musicBoxProgram(track),
+      sequence: this.musicBoxSequence,
+    };
+    this.emit();
+  }
+
+  /** 交回遊戲自己的選曲。 */
+  restoreGameMusic(): void {
+    if (!this.musicBoxPlayback) return;
+    this.musicBoxPlayback = undefined;
+    this.emit();
+  }
+
   systemAction(): void {
     if (this.promotionUnitIds.length > 0 || this.groupCommandDialogueActive) return;
     if (this.dialogueSkipConfirmOpen) this.cancelDialogueSkip();
+    else if (this.musicBoxOpen) this.closeMusicBox();
+    else if (this.debugLifeMenu) this.closeDebugLifeMenu();
     else if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
     else if (this.soundSettingsOpen) this.closeSoundSettings();
@@ -4735,6 +5039,8 @@ export class GameController {
     if (this.promotionUnitIds.length > 0) return true;
     if (this.groupCommandDialogueActive) return true;
     if (this.phase === "saveSlots") this.cancelPostSaveSlots();
+    else if (this.musicBoxOpen) this.closeMusicBox();
+    else if (this.debugLifeMenu) this.closeDebugLifeMenu();
     else if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
     else if (this.soundSettingsOpen) this.closeSoundSettings();
@@ -4873,6 +5179,8 @@ export class GameController {
       this.settingsOpen = false;
       this.soundSettingsOpen = false;
       this.musicSettingsOpen = false;
+      this.musicBoxOpen = false;
+      this.debugLifeMenu = undefined;
       this.recordMenuMode = undefined;
       this.dialogueSkipConfirmOpen = false;
       this.dialogueSkipConfirmIndex = 1;
@@ -4907,6 +5215,8 @@ export class GameController {
     this.soundSettingsReturn = undefined;
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
+    this.musicBoxOpen = false;
+    this.debugLifeMenu = undefined;
     this.recordMenuMode = undefined;
     this.recordMenuIndex = 0;
     this.dialogueSkipConfirmOpen = false;
@@ -5297,6 +5607,8 @@ export class GameController {
     this.soundSettingsReturn = undefined;
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
+    this.musicBoxOpen = false;
+    this.debugLifeMenu = undefined;
     this.dialogueSkipConfirmOpen = false;
     this.dialogueSkipConfirmIndex = 1;
     this.quitConfirmOpen = false;
@@ -5443,6 +5755,14 @@ export class GameController {
       return;
     }
     if (this.phase !== "player" || this.objectiveOpen || this.busy) return;
+    if (this.musicBoxOpen) {
+      if (delta.y !== 0) this.moveMusicBoxSelection(delta.y);
+      return;
+    }
+    if (this.debugLifeMenu) {
+      if (delta.y !== 0) this.moveDebugLifeMenuSelection(delta.y);
+      return;
+    }
     if (this.recordMenuMode) {
       if (delta.y !== 0) this.moveRecordMenuSelection(delta.y);
       else if (delta.x !== 0) this.moveRecordMenuPage(delta.x);
@@ -5583,6 +5903,8 @@ export class GameController {
       else this.skipSave();
     }
     else if (this.phase === "saveSlots") this.selectSaveSlot(this.postSaveSlotIndex + 1);
+    else if (this.musicBoxOpen) this.playMusicBoxSelection();
+    else if (this.debugLifeMenu) this.activateDebugLifeMenuSelection();
     else if (this.recordMenuMode) this.activateRecordMenuSelection();
     else if (this.quitConfirmOpen) this.activateQuitSelection();
     else if (this.settingsOpen) this.activateSettingsMenuSelection();
@@ -6476,6 +6798,8 @@ export class GameController {
       this.soundSettingsReturn = undefined;
       this.musicSettingsOpen = false;
       this.musicSettingsReturn = undefined;
+      this.musicBoxOpen = false;
+      this.debugLifeMenu = undefined;
       this.recordMenuMode = undefined;
       this.dialogueSkipConfirmOpen = false;
       this.dialogueSkipConfirmIndex = 1;
@@ -6502,6 +6826,8 @@ export class GameController {
       this.soundSettingsReturn = undefined;
       this.musicSettingsOpen = false;
       this.musicSettingsReturn = undefined;
+      this.musicBoxOpen = false;
+      this.debugLifeMenu = undefined;
       this.recordMenuMode = undefined;
       this.dialogueSkipConfirmOpen = false;
       this.dialogueSkipConfirmIndex = 1;

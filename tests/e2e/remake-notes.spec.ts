@@ -376,6 +376,22 @@ test("REMAKE-173 把「營地遭到偷襲 ２」魔術士不進木屋列入 Bug 
   await expect(page.getByTestId("remake-note-REMAKE-173")).toHaveCount(0);
 });
 
+test("REMAKE-174 把原版除錯模式與音樂盒列入功能增強，並在操作說明列出熱鍵", async ({ page }) => {
+  await page.goto("/");
+  await openNotes(page, "features");
+  const debugMode = page.getByTestId("remake-note-REMAKE-174");
+  await expect(debugMode).toContainText("原版除錯模式與音樂盒");
+  await expect(debugMode).toContainText("按住數字鍵盤 1、3、5");
+  await expect(debugMode).toContainText("「原版除錯」開關");
+  await expect(debugMode).toContainText("音樂盒常駐「音樂開關」面板");
+  await expect(debugMode.locator(".rn-note-id")).toHaveText("REMAKE-174");
+
+  await page.getByTestId("remake-notes-tab-controls").click();
+  const card = page.getByTestId("remake-controls-original-debug");
+  await expect(card).toContainText("原版除錯");
+  await expect(card.locator("kbd")).toContainText(["F3", "F4", "F10", "U", "D", "－", "S", "2", "J", "＊", "Shift＋8", "M"]);
+});
+
 test("REMAKE-162 把「騎士城堡前」隔河攻擊娜米的漏洞列入 Bug 修復", async ({ page }) => {
   await page.goto("/");
   // 使用者要求的、與原版不同的關卡改動一律算原版缺陷修復，不歸「平衡性調整」。
@@ -489,7 +505,7 @@ test("操作說明在窄螢幕收為單欄且分頁列可橫向捲動", async ({
   await openNotes(page, "controls");
 
   const cards = page.getByTestId("remake-controls").locator(".rn-control-card");
-  await expect(cards).toHaveCount(4);
+  await expect(cards).toHaveCount(5);
   const [first, second] = await Promise.all([cards.nth(0).boundingBox(), cards.nth(1).boundingBox()]);
   expect(first).not.toBeNull();
   expect(second).not.toBeNull();

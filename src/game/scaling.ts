@@ -14,6 +14,7 @@ import {
   initializeDesktopRuntime,
 } from "./desktop-runtime";
 import { LOGICAL_SCREEN_HEIGHT, LOGICAL_SCREEN_WIDTH } from "./scaling-constants";
+import { mountOriginalDebugModeToggle } from "./original-debug-mode";
 import { mountProgramPauseButton } from "./program-pause";
 import { mountNativePointer } from "./native-pointer";
 
@@ -72,13 +73,28 @@ export function computeGameOffset(
   return Math.floor((slack / 2) * ratio) / ratio;
 }
 
-export function configureGameScaling(viewport: HTMLElement, screen: HTMLElement): () => void {
+export interface GameScalingOptions {
+  /**
+   * `REMAKE-174` 的「原版除錯」開關屬於正式遊戲表面；實驗室各有自己的內存場景，
+   * 掛上去只會讓人以為那裡也吃這個開關。
+   */
+  readonly originalDebugToggle?: boolean;
+}
+
+export function configureGameScaling(
+  viewport: HTMLElement,
+  screen: HTMLElement,
+  options: GameScalingOptions = {},
+): () => void {
   const desktop = initializeDesktopRuntime();
   const unmountControls = mountImageScalingControls(viewport);
   const panel = viewport.parentElement
     ?.querySelector<HTMLElement>(":scope > .display-settings");
   const extras = hostChromeExtrasSlot(viewport);
   const unmountProgramPause = extras ? mountProgramPauseButton(extras) : () => undefined;
+  const unmountOriginalDebug = extras && options.originalDebugToggle !== false
+    ? mountOriginalDebugModeToggle(extras)
+    : () => undefined;
   const unmountOverlays = extras ? mountHostOverlays(extras) : () => undefined;
   const interfaceSlot = hostChromeInterfaceSlot(viewport);
   const unmountInterfaceZoom = interfaceSlot
@@ -166,6 +182,7 @@ export function configureGameScaling(viewport: HTMLElement, screen: HTMLElement)
     pointer.dispose();
     unmountInterfaceZoom();
     unmountOverlays();
+    unmountOriginalDebug();
     unmountProgramPause();
     unmountControls();
   };

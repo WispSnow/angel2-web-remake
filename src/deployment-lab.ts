@@ -60,7 +60,7 @@ const destroyUi = mountDeploymentUi(uiRoot, session, {
   minimumUnits: STAGE1_DEFINITION.deployment.fixedPlacements.length,
 });
 const game = startDeploymentPhaser(session);
-const destroyScaling = configureGameScaling(viewport, screen);
+const destroyScaling = configureGameScaling(viewport, screen, { originalDebugToggle: false });
 uiRoot.focus({ preventScroll: true });
 
 window.addEventListener("pagehide", () => {

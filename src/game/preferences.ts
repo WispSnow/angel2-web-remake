@@ -211,3 +211,39 @@ export function saveDisplayPreferences(
 ): void {
   storage.setItem(DISPLAY_PREFERENCES_KEY, JSON.stringify(preferences));
 }
+
+/**
+ * `REMAKE-174`：原版除錯模式只由宿主工具列的開關開啟，並按瀏覽器保存。它和畫面縮放一樣
+ * 屬於宿主偏好，不進模擬狀態、PRNG、規則身份或存檔。
+ */
+export interface DebugPreferences {
+  originalDebugMode: boolean;
+}
+
+export const DEBUG_PREFERENCES_KEY = "angel2.preferences.debug.v1";
+
+export const DEFAULT_DEBUG_PREFERENCES: Readonly<DebugPreferences> = {
+  originalDebugMode: false,
+};
+
+export function loadDebugPreferences(storage: PreferenceStorage): DebugPreferences {
+  const raw = storage.getItem(DEBUG_PREFERENCES_KEY);
+  if (!raw) return { ...DEFAULT_DEBUG_PREFERENCES };
+  try {
+    const candidate = JSON.parse(raw) as Partial<DebugPreferences>;
+    return {
+      originalDebugMode: typeof candidate.originalDebugMode === "boolean"
+        ? candidate.originalDebugMode
+        : DEFAULT_DEBUG_PREFERENCES.originalDebugMode,
+    };
+  } catch {
+    return { ...DEFAULT_DEBUG_PREFERENCES };
+  }
+}
+
+export function saveDebugPreferences(
+  storage: PreferenceStorage,
+  preferences: DebugPreferences,
+): void {
+  storage.setItem(DEBUG_PREFERENCES_KEY, JSON.stringify(preferences));
+}

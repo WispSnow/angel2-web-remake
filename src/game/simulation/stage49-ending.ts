@@ -49,6 +49,15 @@ export class Stage49EndingSession {
     this.dominantClassFamily = this.resolveDominantClassFamily(campaign.roster);
   }
 
+  /**
+   * `REMAKE-174` 原版除錯 Caps Lock+數字鍵盤 `*`：模組 29 直接以下一模組 33 離開戰鬥，
+   * 不經模組 25 的劇情 70，所以從戰績卡開始。
+   */
+  startAtRoster(): void {
+    this.section = "roster";
+    this.index = 0;
+  }
+
   get storyPage() {
     return this.section === "story" ? STAGE49_STORY_PAGES[this.index] : undefined;
   }

@@ -68,6 +68,10 @@ const CONTEXTUAL_LINES = [
   // five ASCII digits before the window opens, so the digits ship verbatim and
   // the runtime substitutes them the same way the native does.
   { key: "experienceGain", selector: "18h", record: "experience-gain", gate: "direct", text: "得經驗值00000 點" },
+  // `22h` has two kinds of speaker: the stage-30 form chain (`0000:9764`, `1000:4F5F`) and the
+  // original debug mode's S key (`0000:3241`), which forces it with the cursor unit's portrait.
+  // `0000:C981` exempts it from the coin, so it always opens.
+  { key: "headache", selector: "22h", record: "headache", gate: "direct", text: "我．．．我好難過．．．|頭好痛啊！" },
 ];
 const NUMERIC_CONTEXTUAL_LINES = new Map([["experienceGain", { digits: "00000", writer: "0000:EF56" }]]);
 const contextualTable = evidence.rules?.contextualBattleLines;

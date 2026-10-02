@@ -1029,13 +1029,19 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       return { container, sprite, iceDisabledOverlay, lifeDigits, actedBadge, npcAllyBadge };
     }
 
-    private drawLifeDigits(view: UnitView, unit: BattleUnit): void {
+    /** 回傳是否畫了數字；第 37 關被隱藏的 side 2 單位回傳 `false`。 */
+    private drawLifeDigits(view: UnitView, unit: BattleUnit): boolean {
       const graphics = view.lifeDigits;
+      graphics.clear();
+      // 模組 29 `0000:8168 → 81A2`：第 37 關 side 2 的地圖生命數字不畫，只有原版除錯模式
+      // （DS:`132F` = `Y`）才補上；與右欄的 `?????` 是同一個門（`REMAKE-174`）。
+      if (unit.side === 2 && controller.battle.stage.id === "stage-37" && !controller.originalDebugActive) {
+        return false;
+      }
       const digits = String(Math.max(0, unit.life));
       const digitWidth = 7;
       const startX = -Math.floor(digits.length * digitWidth / 2);
       const sideColor = unit.side === 1 ? 0x236be8 : 0xe52d30;
-      graphics.clear();
 
       for (let digitIndex = 0; digitIndex < digits.length; digitIndex += 1) {
         const x = startX + digitIndex * digitWidth;
@@ -1051,6 +1057,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           }
         }
       }
+      return true;
     }
 
     private drawUnits(): void {
@@ -1073,6 +1080,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       }
       const active = new Set<string>();
       const renderedLifeByUnitId: Record<string, number> = {};
+      const concealedLifeUnitIds: string[] = [];
       const renderedTextureByUnitId: Record<string, string> = {};
       let visibleCount = 0;
       for (const unit of displayedUnits.values()) {
@@ -1142,7 +1150,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         view.container.setVisible(shown);
         if (shown) visibleCount += 1;
         renderedLifeByUnitId[unit.id] = displayedLife;
-        this.drawLifeDigits(view, { ...unit, life: displayedLife });
+        if (!this.drawLifeDigits(view, { ...unit, life: displayedLife })) concealedLifeUnitIds.push(unit.id);
         // Frozen units are state-driven and untargetable; keep the shell visible
         // while unrelated area techniques play until dispel or phase cleanup.
         view.iceDisabledOverlay?.setVisible(unit.actionDisabled && !figurePending);
@@ -1166,6 +1174,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         );
         this.game.canvas.dataset.unitLifeLabelCount = String(visibleCount);
         this.game.canvas.dataset.unitDisplayedLifeById = JSON.stringify(renderedLifeByUnitId);
+        this.game.canvas.dataset.concealedLifeUnitIds = concealedLifeUnitIds.join(" ");
         this.game.canvas.dataset.unitTextureById = JSON.stringify(renderedTextureByUnitId);
         this.game.canvas.dataset.unitVisualOffsetById = JSON.stringify(renderedVisualOffsetByUnitId);
         this.game.canvas.dataset.actedBadgeCount = String(controller.battle.units.filter((unit) => unit.acted).length);

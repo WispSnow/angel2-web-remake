@@ -257,7 +257,8 @@ export interface DialoguePage {
       | "confused-actor"
       | "dodged-shot"
       | "counterattack"
-      | "experience-gain";
+      | "experience-gain"
+      | "headache";
     wait: number;
     address?: string;
     /** Native PP background record active at this KY checkpoint. */

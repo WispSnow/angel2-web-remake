@@ -925,6 +925,9 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .music-settings-menu h2 { margin: 3px 0 8px; color: #f3d466; font-size: 18px; }
 .music-settings-list { display: grid; grid-template-columns: 1fr; gap: 3px; }
 .music-settings-list > button { min-width: 0; padding: 4px 8px; font-size: 12px; }
+/* `REMAKE-174`：「音樂盒」與「返回」並排在同一列，面板高度不因新入口而增加，返回鍵留在畫面內。 */
+.music-settings-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.music-settings-menu .music-settings-footer > button { min-width: 0; padding: 4px 4px; font-size: 12px; }
 .music-settings-list > button[role="radio"].is-selected {
   color: #fff;
   background: #8d342f;
@@ -1081,6 +1084,56 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   color: #81766d;
   background: transparent;
 }
+/* `REMAKE-174` 原版除錯 F3／F4 生命選單：與集體命令同一個原版選單外框，三列。 */
+.debug-life-menu { left: 276px; top: 92px; width: 144px; height: 100px; }
+.debug-life-menu button { width: 136px; height: 24px; }
+/* 原版除錯鍵 2：`0000:326A` 先以色 0 填 48×16 的框，再畫五位數字，覆蓋在戰場視口上。 */
+.debug-cell-readout { position: absolute; z-index: 8; inset: 0; pointer-events: none; }
+.debug-cell-readout[hidden] { display: none; }
+.debug-cell-readout-field { position: absolute; display: block; background: #000; }
+/* 音樂盒是複刻自己的清單介面（`REMAKE-174`）；原版那一行 `MUSIC-  NN-名稱.RIX` 用等寬字
+   呈現，用途說明是複刻自撰文字。 */
+.music-box-panel {
+  position: absolute;
+  z-index: 15;
+  left: 70px;
+  top: 22px;
+  width: 500px;
+  padding: 10px 14px 12px;
+  text-align: left;
+}
+.music-box-panel[hidden] { display: none; }
+.music-box-panel h2 { margin: 2px 0 6px; color: #f3d466; font-size: 18px; text-align: center; }
+.music-box-panel .panel-kicker { display: block; text-align: center; }
+.music-box-list {
+  display: grid;
+  gap: 2px;
+  max-height: 196px;
+  overflow-y: auto;
+  padding-right: 4px;
+  overscroll-behavior: contain;
+}
+.music-box-heading { margin: 4px 0 1px; color: #d8b96e; font-size: 11px; letter-spacing: .1em; }
+.music-box-panel .music-box-track {
+  display: grid;
+  grid-template-columns: 172px 1fr;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 8px;
+  border-color: #6d3c26;
+  color: #f4e6c4;
+  background: #2a1418;
+  text-align: left;
+}
+.music-box-panel .music-box-track.is-selected { border-color: #f4d34b; background: #6b2a2c; }
+.music-box-panel .music-box-track[data-playing="true"] .music-box-native::after { content: " ♪"; color: #f4d34b; }
+.music-box-native { font: 12px/1.4 ui-monospace, "SFMono-Regular", Menlo, monospace; white-space: pre; }
+.music-box-usage { overflow: hidden; color: #cdb995; font-size: 11px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.music-box-panel .music-box-track.is-selected .music-box-usage { white-space: normal; }
+.music-box-detail { min-height: 16px; margin: 6px 0; color: #e7d6b2; font-size: 11px; line-height: 1.45; }
+.music-box-actions { display: flex; justify-content: center; gap: 8px; }
+.music-box-panel .music-box-actions > button { min-width: 0; padding: 4px 14px; font-size: 12px; }
 
 /* 選單開闔動畫。原版通用命令選單是「存背景 → 一次貼上 `A/0001` 外框 → 關閉還原背景」
    （模組 29 `0000:5651/566A/5779`），沒有逐步縮放；這段縮放開闔是複刻版的表現決定，
@@ -2255,6 +2308,26 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   cursor: progress;
   opacity: .72;
 }
+/* `REMAKE-174`「原版除錯」：宿主開關，開啟時沿用畫面縮放的選中金色，讓玩家一眼看出
+   這一局戰鬥的 Caps Lock 熱鍵是活的。 */
+.original-debug-trigger { display: flex; margin-right: 4px; }
+.original-debug-trigger > button {
+  padding: 3px 10px;
+  border: 1px solid #4b3527;
+  border-radius: 2px;
+  color: #c9b590;
+  background: linear-gradient(#1d1519, #140e11);
+  cursor: pointer;
+  font: 12px/1.5 system-ui, sans-serif;
+  white-space: nowrap;
+}
+.original-debug-trigger > button:hover { border-color: var(--gold-dark); color: var(--gold); }
+.original-debug-trigger > button[aria-pressed="true"] {
+  border-color: var(--gold);
+  color: var(--ink);
+  background: var(--gold);
+}
+.original-debug-trigger > button:focus-visible { outline: 2px solid #9fd9ff; outline-offset: 2px; }
 .display-settings-hint { flex: 1 1 100%; margin: 0; color: #8d7c65; font-size: 11px; }
 
 @media (max-width: 560px) {

@@ -69,6 +69,12 @@ import {
 } from "./dialogue-window-animation";
 import { finishMenuClose, setMenuOpen } from "./menu-animation";
 import {
+  installCapsLockTracker,
+  onOriginalDebugModeChange,
+  originalDebugHotkey,
+} from "./original-debug-mode";
+import { mountOriginalDebugUi, ORIGINAL_DEBUG_UI_MARKUP } from "./original-debug-ui";
+import {
   isKeyboardCancel,
   isKeyboardConfirm,
   keyboardDirection,
@@ -225,7 +231,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 ${["無聲", "1", "2", "3", "最大"].map((label, level) =>
                   `<button role="radio" data-action="music-volume" data-music-level="${level}"
                     data-testid="music-volume-${level}">${label}</button>`).join("")}
-                <button data-action="close-music-settings" data-testid="close-music-settings">返回</button>
+                <div class="music-settings-footer">
+                  <button data-debug-action="open-music-box" data-testid="open-music-box">音樂盒</button>
+                  <button data-action="close-music-settings" data-testid="close-music-settings">返回</button>
+                </div>
               </div>
             </section>
             <section class="record-menu record-panel" id="record-menu" data-testid="record-menu" role="menu" aria-label="戰役記錄" hidden></section>
@@ -247,6 +256,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               </div>
             </section>
             <section class="group-command-menu action-menu native-command-menu" id="group-command-menu" data-testid="group-command-menu" role="menu" aria-label="集體命令" hidden></section>
+            ${ORIGINAL_DEBUG_UI_MARKUP}
             <section class="retreat-confirm native-feedback-confirm" id="retreat-confirm" data-testid="retreat-confirm" role="dialog" aria-label="全面撤退確認" hidden>
               ${animatedPortraitMarkup(46, {
                 alt: "妮雅肖像",
@@ -439,6 +449,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let recordBackupUi: SaveBackupUi;
   const quitConfirm = required(root, "#quit-confirm");
   const groupCommandMenu = required(root, "#group-command-menu");
+  const renderOriginalDebug = mountOriginalDebugUi(root, controller, eventController.signal);
+  installCapsLockTracker(eventController.signal);
   const retreatConfirm = required(root, "#retreat-confirm");
   const resultLayer = required(root, "#result-layer");
   const commandMenuPointer = required(root, "#command-menu-pointer");
@@ -1161,6 +1173,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     lastInputSource = "keyboard-or-gamepad";
     settleMenuPointerGlide();
     if (recordBackupUi.handleKeyDown(event)) return;
+    // `REMAKE-174`：開關開啟且 Caps Lock 開著時，原版除錯熱鍵先於一般鍵位；待機戰場以外
+    // 不消費，S／D／M 等鍵照常走平常的意思。
+    const debugHotkey = controller.originalDebugActive && !event.repeat
+      ? originalDebugHotkey(event)
+      : undefined;
+    if (debugHotkey && controller.runOriginalDebugHotkey(debugHotkey)) {
+      event.preventDefault();
+      return;
+    }
     const key = event.key;
     const lower = key.toLowerCase();
     const focusedHotspot = document.activeElement instanceof HTMLButtonElement
@@ -1508,6 +1529,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         button.setAttribute("aria-current", String(selected));
       }
     }
+    renderOriginalDebug();
     if (setMenuOpen(groupCommandMenu, controller.groupCommandOpen)) {
       groupCommandMenu.innerHTML = controller.groupCommands.map((command, index) => {
         const action = command.id === "allRest"
@@ -1846,7 +1868,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   });
   const unsubscribe = controller.onChange(render);
   render();
-  const stopScaling = configureGameScaling(required(root, "#game-viewport"), screen);
+  const stopScaling = configureGameScaling(required(root, "#game-viewport"), screen, {
+    originalDebugToggle: controller.isCampaignPersistenceEnabled,
+  });
+  // 開關是宿主偏好，不經控制器；切換時重畫一次，讓第 37 關的顯形與熱鍵狀態立即生效。
+  const stopOriginalDebugSubscription = onOriginalDebugModeChange(() => controller.emit());
   const stopGamepad = bindGamepad(controller, {
     onInput: () => {
       lastInputSource = "keyboard-or-gamepad";
@@ -1859,6 +1885,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     unsubscribe();
     stopNativePresentationAssetRefresh();
     stopScaling();
+    stopOriginalDebugSubscription();
     stopGamepad();
     recordBackupUi.dispose();
     battleChrome.dispose();
@@ -2426,7 +2453,9 @@ function nativeUnitDetailText(
   stats: UnitStats,
 ): NativeUnitDetailText {
   const baseStats = controller.battle.statsFor(unit);
-  const concealed = controller.battle.stage.id === "stage-37" && unit.side === 2;
+  // `0000:8BD6`：原版除錯模式打開時跳過第 37 關的 `?????` 隱藏（`REMAKE-174`）。
+  const concealed = controller.battle.stage.id === "stage-37" && unit.side === 2
+    && !controller.originalDebugActive;
   const field = (value: number) => concealed ? NATIVE_CONCEALED_FIELD : nativeNumericField(value);
   return {
     occupation: unit.className,
@@ -2460,7 +2489,8 @@ function renderHud(
   stats: UnitStats,
 ): string {
   const baseStats = controller.battle.statsFor(unit);
-  const concealedBossStats = controller.battle.stage.id === "stage-37" && unit.side === 2;
+  const concealedBossStats = controller.battle.stage.id === "stage-37" && unit.side === 2
+    && !controller.originalDebugActive;
   const hpPercent = Math.max(0, Math.min(100, Math.floor(unit.life / stats.maxLife * 100)));
   const nextExperience = controller.battle.nextExperienceThresholdFor(unit);
   const expPercent = Math.max(0, Math.min(100, Math.floor(unit.experience * 100 / Math.max(1, nextExperience))));

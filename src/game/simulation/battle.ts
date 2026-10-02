@@ -547,6 +547,8 @@ export class Stage0Battle {
   private readonly terrainOverrideByPosition = new Map<string, DynamicTerrainKind>();
   private readonly expertAiTraceByUnitId = new Map<string, ExpertAiDecisionTrace>();
   private readonly pendingTransformations: PendingUnitTransformation[] = [];
+  /** `REMAKE-174` Caps Lock+J 的即時勝利；與原版的 999 一樣只活在本場戰鬥的記憶體。 */
+  private debugVictory = false;
   private aiPlanningCache?: AiPlanningCache;
   private activeAiPlanningCache?: AiPlanningCache;
 
@@ -4140,6 +4142,57 @@ export class Stage0Battle {
     }
   }
 
+  /**
+   * `REMAKE-174` 原版除錯 F3／F4。模組 29 `540D` 逐槽裝入該方單位後呼叫 `5475`（生命 = 上限）、
+   * `5461`（生命 = 1），或 `546B` 寫 0 再由 `5435` 清掉該方全部棋盤格。「全滅」只清棋盤：
+   * 原版不走死亡表現，也不經過擊殺替補或形態轉換，所以這裡直接移除，不呼叫 `removeSharedUnit`。
+   * 不消耗戰鬥 PRNG；回傳受影響的單位數。
+   */
+  debugSetSideLife(side: BattleUnit["side"], effect: "full" | "remove" | "one"): number {
+    const targets = this.units.filter((unit) => unit.side === side);
+    if (effect === "remove") {
+      this.units = this.units.filter((unit) => unit.side !== side);
+      return targets.length;
+    }
+    for (const unit of targets) unit.life = effect === "full" ? this.statsFor(unit).maxLife : 1;
+    return targets.length;
+  }
+
+  /**
+   * `REMAKE-174` 原版除錯 U／D（`0000:32DA/32FD`）：累計經驗 ±50，−50 只在結果大於 0 時寫入。
+   * 原版不壓生命；`[SR]` 生命高於新上限時壓到上限，避免右欄出現「生命 200／180」。
+   */
+  debugAdjustExperience(id: string, delta: 50 | -50): boolean {
+    const unit = this.unit(id);
+    if (!unit) return false;
+    const experience = unit.experience + delta;
+    if (experience <= 0) return false;
+    unit.experience = experience;
+    unit.life = Math.min(unit.life, this.statsFor(unit).maxLife);
+    this.synchronizeWaterWarriorState(unit);
+    return true;
+  }
+
+  /**
+   * `REMAKE-174` 原版除錯數字鍵盤 `-`（`0000:551A`）：生命不小於 10 時減 10，可能留下 0 生命
+   * 仍在場的單位。`[SR]` 只在生命大於 10 時扣，結果至少為 1。
+   */
+  debugReduceLife(id: string): boolean {
+    const unit = this.unit(id);
+    if (!unit || unit.life <= 10) return false;
+    unit.life -= 10;
+    this.synchronizeWaterWarriorState(unit);
+    return true;
+  }
+
+  /**
+   * `REMAKE-174` 原版除錯 Caps Lock+J（`0000:4A6E`）：主循環把戰鬥結果直接寫成 999，再走
+   * 正常勝利分發。這是本場戰鬥的記憶體狀態，不入存檔；勝利流程隨後交給完成記錄。
+   */
+  debugForceVictory(): void {
+    this.debugVictory = true;
+  }
+
   enemyMovementRange(id: string): Position[] {
     const unit = this.unit(id);
     const route = this.scenario.routeEnemy;
@@ -4437,6 +4490,7 @@ export class Stage0Battle {
   }
 
   outcome(): BattleOutcome {
+    if (this.debugVictory) return "victory";
     if (this.pendingTransformations.length > 0) return "ongoing";
     const objectiveOutcome = battleOutcomeForObjective(this.units, this.stage.objective);
     // REMAKE-110 的逾时判负只接管「目标还没分出结果」的局面：上限回合内打出的胜利
