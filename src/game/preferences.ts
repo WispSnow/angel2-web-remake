@@ -213,7 +213,7 @@ export function saveDisplayPreferences(
 }
 
 /**
- * `REMAKE-174`：原版除錯模式只由宿主工具列的開關開啟，並按瀏覽器保存。它和畫面縮放一樣
+ * `REMAKE-174`：原版Debug模式只由宿主工具列的開關開啟，並按瀏覽器保存。它和畫面縮放一樣
  * 屬於宿主偏好，不進模擬狀態、PRNG、規則身份或存檔。
  */
 export interface DebugPreferences {

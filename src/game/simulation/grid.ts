@@ -171,6 +171,12 @@ export interface MovementMap {
    * leader/follower test asks exactly that question.
    */
   reaches: (position: Position) => boolean;
+  /**
+   * `REMAKE-174` 原版Debug Caps Lock+1：同一次傳播在這一格留下的原版範圍值（DS:`01A9`）。
+   * 起點是移動力，其餘是「移動力 − 進入成本」，進入對方控制區的格是 1（`1000:39D4` 把
+   * `FFh` 保留格轉成 1），沒到達是 0。
+   */
+  rangeValueAt: (position: Position) => number;
 }
 
 type Direction = Readonly<Position>;
@@ -268,12 +274,13 @@ export function movementMap(
   // Mode `0` reads neither the side map nor the `FFh` reservation, so the water
   // warrior walks through enemies and out of an enemy's control zone. `occupied`
   // below still keeps every held cell an illegal landing.
+  const controlZone = controlZoneFor(unit, units, battlefield);
   const result = search(
     unit,
     unit.classId,
     movementBudget,
     opposingOccupants(unit, units),
-    controlZoneFor(unit, units, battlefield),
+    controlZone,
     undefined,
     battlefield,
   );
@@ -287,6 +294,12 @@ export function movementMap(
       ? []
       : reconstructPath(unit, destination, result),
     reaches: (position) => result.costs.has(positionKey(position)),
+    rangeValueAt: (position) => {
+      const key = positionKey(position);
+      const cost = result.costs.get(key);
+      if (cost === undefined) return 0;
+      return key !== originKey && controlZone.has(key) ? 1 : movementBudget - cost;
+    },
   };
 }
 

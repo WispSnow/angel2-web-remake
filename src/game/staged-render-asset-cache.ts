@@ -150,6 +150,15 @@ function entrySource(assets: ActiveStagedRenderAssets, entry: StagedRenderAssetE
   return entry.source;
 }
 
+/**
+ * 這個 URL 現在能不能不發原始請求就拿到：在目前的租約裡，或根本沒有啟用租約（開發與單元
+ * 測試）。原版Debug的 EDIT 據此只開放這場戰鬥已備妥棋子的職業。
+ */
+export function stagedRenderAssetAvailable(url: string): boolean {
+  const assets = activeAssets;
+  return !assets || assets.released || assets.entries.has(url);
+}
+
 export function stagedRenderAssetSource(url: string): string {
   const assets = activeAssets;
   if (!assets || assets.released) return url;

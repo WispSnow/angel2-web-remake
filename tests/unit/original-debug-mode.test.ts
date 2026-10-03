@@ -78,7 +78,7 @@ describe("REMAKE-174 original debug hotkeys", () => {
     expect(originalDebugHotkey(keyEvent("F3", "F3", { ctrlKey: true }))).toBeUndefined();
   });
 
-  it("maps the phase-one native keys and marks the later batches as pending", () => {
+  it("maps every native dispatcher key the remake reproduces", () => {
     const mapped = Object.fromEntries([
       ["F4", "F4"], ["F10", "F10"], ["KeyU", "U"], ["KeyD", "D"], ["NumpadSubtract", "-"],
       ["Minus", "-"], ["KeyS", "S"], ["Digit2", "2"], ["KeyJ", "J"], ["NumpadMultiply", "*"],
@@ -96,11 +96,11 @@ describe("REMAKE-174 original debug hotkeys", () => {
       KeyJ: "instantVictory",
       NumpadMultiply: "skipToEnding",
       KeyM: "musicBox",
-      F1: "pending",
-      F2: "pending",
-      F5: "pending",
-      F6: "pending",
-      Digit1: "pending",
+      F1: "behaviourEditor",
+      F2: "editMenu",
+      F5: "techniqueAttack",
+      F6: "techniqueSupport",
+      Digit1: "rangeReadout",
     });
     // Keyboards without a keypad reach the native keypad * through Shift+8.
     expect(originalDebugHotkey(keyEvent("Digit8", "*"))).toBe("skipToEnding");
@@ -176,22 +176,23 @@ describe("REMAKE-174 debug commands on a real battle", () => {
     const controller = await openScenario("stage-00-player");
     const rng = { state: controller.battle.rng.state, calls: controller.battle.rng.calls };
     expect(controller.runOriginalDebugHotkey("enemyLifeMenu")).toBe(true);
-    expect(controller.debugLifeMenu).toEqual({ side: 2, index: 0 });
-    controller.selectDebugLifeMenuItem(2);
-    controller.activateDebugLifeMenuSelection();
+    expect(controller.debugMenu).toEqual({ kind: "life", side: 2, index: 0 });
+    expect(controller.debugMenuItems.map(({ label }) => label)).toEqual(["敵全滿  ", "敵全滅  ", "敵  1   "]);
+    controller.selectDebugMenuItem(2);
+    controller.activateDebugMenuSelection();
     expect(controller.battle.units.filter(({ side }) => side === 2).map(({ life }) => life))
       .toEqual(controller.battle.units.filter(({ side }) => side === 2).map(() => 1));
 
-    controller.openDebugLifeMenu(2);
-    controller.activateDebugLifeMenuSelection();
+    controller.runOriginalDebugHotkey("enemyLifeMenu");
+    controller.activateDebugMenuSelection();
     for (const unit of controller.battle.units.filter(({ side }) => side === 2)) {
       expect(unit.life).toBe(controller.battle.statsFor(unit).maxLife);
     }
     expect({ state: controller.battle.rng.state, calls: controller.battle.rng.calls }).toEqual(rng);
 
-    controller.openDebugLifeMenu(2);
-    controller.selectDebugLifeMenuItem(1);
-    controller.activateDebugLifeMenuSelection();
+    controller.runOriginalDebugHotkey("enemyLifeMenu");
+    controller.selectDebugMenuItem(1);
+    controller.activateDebugMenuSelection();
     expect(controller.battle.units.some(({ side }) => side === 2)).toBe(false);
     expect(controller.phase).not.toBe("player");
   });
@@ -240,7 +241,7 @@ describe("REMAKE-174 debug commands on a real battle", () => {
     controller.cursor = { x: 0, y: 0 };
     expect(controller.battle.unitAt(controller.cursor)).toBeUndefined();
     controller.runOriginalDebugHotkey("experienceUp");
-    expect(controller.statusMessage).toBe("原版除錯：游標下沒有單位。");
+    expect(controller.statusMessage).toBe("原版Debug：游標下沒有單位。");
   });
 
   it("re-arms every acted ally on F10 and speaks line 22h with the cursor unit's portrait", async () => {

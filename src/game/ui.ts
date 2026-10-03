@@ -69,6 +69,7 @@ import {
 } from "./dialogue-window-animation";
 import { finishMenuClose, setMenuOpen } from "./menu-animation";
 import {
+  capsLockEngaged,
   installCapsLockTracker,
   onOriginalDebugModeChange,
   originalDebugHotkey,
@@ -451,6 +452,20 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const groupCommandMenu = required(root, "#group-command-menu");
   const renderOriginalDebug = mountOriginalDebugUi(root, controller, eventController.signal);
   installCapsLockTracker(eventController.signal);
+  // `REMAKE-174` Caps Lock+1 範圍讀數只在兩鍵都按住時顯示（`0000:8448` 讀的是原始按鍵狀態）。
+  let rangeReadoutDigitHeld = false;
+  const releaseRangeReadout = (event?: KeyboardEvent) => {
+    if (!event || event.code === "Digit1") rangeReadoutDigitHeld = false;
+    controller.setDebugRangeReadoutHeld(
+      rangeReadoutDigitHeld && event !== undefined && capsLockEngaged(event),
+    );
+  };
+  window.addEventListener("keyup", (event) => {
+    if (event.code === "Digit1" || event.code === "CapsLock" || event.key === "CapsLock") {
+      releaseRangeReadout(event);
+    }
+  }, { signal: eventController.signal });
+  window.addEventListener("blur", () => releaseRangeReadout(), { signal: eventController.signal });
   const retreatConfirm = required(root, "#retreat-confirm");
   const resultLayer = required(root, "#result-layer");
   const commandMenuPointer = required(root, "#command-menu-pointer");
@@ -1173,11 +1188,17 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     lastInputSource = "keyboard-or-gamepad";
     settleMenuPointerGlide();
     if (recordBackupUi.handleKeyDown(event)) return;
-    // `REMAKE-174`：開關開啟且 Caps Lock 開著時，原版除錯熱鍵先於一般鍵位；待機戰場以外
+    // `REMAKE-174`：開關開啟且 Caps Lock 開著時，原版Debug熱鍵先於一般鍵位；待機戰場以外
     // 不消費，S／D／M 等鍵照常走平常的意思。
     const debugHotkey = controller.originalDebugActive && !event.repeat
       ? originalDebugHotkey(event)
       : undefined;
+    if (debugHotkey === "rangeReadout" && controller.phase === "player") {
+      rangeReadoutDigitHeld = true;
+      controller.setDebugRangeReadoutHeld(true);
+      event.preventDefault();
+      return;
+    }
     if (debugHotkey && controller.runOriginalDebugHotkey(debugHotkey)) {
       event.preventDefault();
       return;
@@ -2453,7 +2474,7 @@ function nativeUnitDetailText(
   stats: UnitStats,
 ): NativeUnitDetailText {
   const baseStats = controller.battle.statsFor(unit);
-  // `0000:8BD6`：原版除錯模式打開時跳過第 37 關的 `?????` 隱藏（`REMAKE-174`）。
+  // `0000:8BD6`：原版Debug模式打開時跳過第 37 關的 `?????` 隱藏（`REMAKE-174`）。
   const concealed = controller.battle.stage.id === "stage-37" && unit.side === 2
     && !controller.originalDebugActive;
   const field = (value: number) => concealed ? NATIVE_CONCEALED_FIELD : nativeNumericField(value);

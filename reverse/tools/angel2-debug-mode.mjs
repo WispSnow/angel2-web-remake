@@ -122,6 +122,13 @@ function verifySignatures(image) {
     expectBytes(image, 0x3133, `
       e8 73 d9 c6 06 d3 7f 01 c3 e8 55 d9 c6 06 d3 7f 02 c3 e8 4c e1 90 0e e8 a0 22 90 0e e8 ab 22 c3 e8 e4 e9 c3`,
     "F2 results: 我EDIT 0AA9, 敵EDIT 0A94, 兵種 1294 + HP clamp, 地型 1B3A"),
+    expectBytes(image, 0x3113, "83 3e 4a 3d 58 75 01 c3 a1 4a 3d 3d 31 44 74 10 3d 32 44 74 14 3d 33 44 74 18 3d 34 44 74 21 c3",
+      "F2 result codes 1D/2D/3D/4D branch in menu order"),
+    expectBytes(image, 0x6c66, `
+      a1 4a 3d 3d 31 3f 74 24 3d 32 3f 74 26 3d 33 3f 74 28 3d 34 3f 74 2a 3d 35 3f 74 2c 3d 36 3f 74 2e 3d 37 3f 74 30
+      3d 38 3f 74 32 c3 c7 06 ba 3d 68 3e c3 c7 06 ba 3d 82 3e c3 c7 06 ba 3d 9c 3e c3 c7 06 ba 3d ee 3e c3
+      c7 06 ba 3d 16 3f c3 c7 06 ba 3d 94 3f c3 c7 06 ba 3d 58 3f c3 c7 06 ba 3d 76 3f c3`,
+    "technique test categories 1?..8? open rank menus 3E68/3E82/3E9C/3EEE/3F16/3F94/3F58/3F76"),
     expectBytes(image, 0x3157, "80 3e e6 f6 01 74 01 c3 b8 56 41 a3 ba 3d e8", "F3 opens menu 4156"),
     expectBytes(image, 0x3195, "80 3e e7 f6 01 74 01 c3 b8 6c 41 a3 ba 3d e8", "F4 opens menu 416C"),
     expectBytes(image, 0x31d3, `
@@ -131,6 +138,55 @@ function verifySignatures(image) {
     expectBytes(image, 0x31fa, "80 3e ba f6 01 74 01 c3 be 6c 1b 9a 04 00 18 19 e8 a8 00 c3", "W writes an A##.PCX capture"),
     expectBytes(image, 0x320e, "80 3e ed f6 01 74 01 c3 c6 06 ed f6 00 9a 0e 00 47 11 c3", "F10 clears every side-1 acted bit"),
     expectBytes(image, 0x3221, "80 3e e4 f6 01 74 01 c3 c6 06 e4 f6 00 e8 d1 f0 c3", "F1 opens the AI behaviour editor 2302"),
+    expectBytes(image, 0x2302, `
+      8b 36 09 5a 8b de e8 1f 2d 81 36 82 f8 00 08 a1 80 f8 e8 e3 d4 a1 8c 31 be 72 16 e8 30 ad be 7c 16 e8 2a ad
+      c7 06 84 f8 2d 02 8b 16 7c 16 8b 1e 7e 16 8b 0e 8c 31 e8 c3 b6 8b 16 7c 16 8b 1e 7e 16 8b 0e 8c 31 e8 4a b4
+      e8 3c 00 a1 80 f8 bb de 01 e8 03 d5 e8 7e 00 e8 9f 00 e8 b9 00 e8 38 01 80 3e 91 f5 01 74 02 eb e2`,
+    "F1 editor: load the cursor unit, fill 1672/167C, draw its frame from the side-2 sheet DS:022D, loop until secondary"),
+    expectBytes(image, 0x2389, `
+      be 00 00 8b 16 7c 16 8b 1e 7e 16 83 c3 06 83 c2 38 8b 84 b4 16 3d ff ff 74 33 56 53 52 c7 06 3c f9 0f 00
+      d1 ee 3b 36 f6 3b 75 06 c7 06 3c f9 0b 00 8b f0 8b c2 a3 ba f8 8b c3 a3 bc f8 8b f6 e8 39 c6 5a 5b 5e
+      83 c3 14 83 c6 02 eb c4 c3`,
+    "F1 labels: (inner.x+38h, inner.y+6) step 14h, ink 0Fh, the current value DS:3BF6 in 0Bh"),
+    expectBytes(image, 0x23d7, `
+      a1 23 fb 3d 38 00 72 07 3d 14 01 77 02 eb 07 c7 06 88 16 ff ff c3 2d 38 00 33 d2 bb 14 00 f7 f3 a3 88 16 c3
+      a1 21 fb 3d 88 00 72 07 3d b0 00 77 02 eb 07 c7 06 86 16 ff ff c3 c7 06 86 16 00 00 c3`,
+    "F1 hover: y 38h..114h -> row (y-38h)/14h, x 88h..B0h"),
+    expectBytes(image, 0x2440, `
+      b8 80 00 a3 8c 16 a3 96 16 a3 a0 16 05 30 00 a3 aa 16 33 d2 a1 88 16 bb 14 00 f7 e3 05 38 00 a3 8e 16 a3 98 16
+      a3 ac 16 05 14 00 a3 a2 16 b8 0b 00 e8 01 00 c3`,
+    "F1 hover box: four 1px rects at x 80h, y 38h+14h*row, colour 0Bh"),
+    expectBytes(image, 0x24aa, "80 3e 90 f5 01 74 01 c3 c6 06 90 f5 00 8b 1e f8 3b a1 88 16 89 07 a3 f6 3b a1 80 f8 e8 31 d3 e8 bd fe c3",
+      "F1 primary click writes the hovered row into the unit's behaviour word [3BF8] and DS:3BF6"),
+    expectBytes(image, 0x0df3, `
+      c7 06 e2 07 08 00 b9 03 00 51 c7 06 e4 07 0a 00 b9 05 00 51 e8 9d 00 83 06 e4 07 3c 59 e2 f4 81 06 e2 07 b8 00
+      59 e2 e1 e8 22 00 c7 06 e2 07 48 02 c7 06 e4 07 2c 01 e8 4d 00 b8 4b 02 a3 ba f8 b8 2f 01 a3 bc f8 be 78 0c
+      e8 c5 db c3`,
+    "EDIT page: 3 columns x 5 rows from (8,10) step (B8h,3Ch), EXIT box at (248h,12Ch)"),
+    expectBytes(image, 0x0e40, `
+      c7 06 e2 07 48 02 c7 06 e4 07 32 00 b9 04 00 51 e8 27 00 83 06 e4 07 28 59 e2 f4 33 d2 a1 9a 08 bb 28 00
+      f7 e3 05 32 00 40 a3 60 08 a1 e2 07 40 a3 5e 08 be 5e 08 e8 d7 c1 c3`,
+    "EDIT page tabs: four boxes at x 248h from y 32h step 28h; the active page is filled with 085E"),
+    expectBytes(image, 0x0ea7, `
+      a1 e2 07 a3 e6 07 40 a3 f0 07 a3 fa 07 a1 e4 07 a3 e8 07 40 a3 f2 07 a3 fc 07 a1 e2 07 05 08 00 a3 04 08 40
+      a3 0e 08 a3 18 08 a1 e4 07 05 02 00 a3 06 08 40 a3 10 08 a3 1a 08 a1 e2 07 05 40 00 a3 22 08 40 a3 2c 08 a3
+      36 08 a1 e4 07 05 18 00 a3 24 08 40 a3 2e 08 a3 38 08 a1 e2 07 05 40 00 a3 72 08 40 a3 7c 08 a3 86 08 a1 e4
+      07 05 02 00 a3 74 08 40 a3 7e 08 a3 88 08`,
+    "EDIT slot boxes: frame, figure well (+8,+2), name box (+40h,+18h), behaviour box (+40h,+2)"),
+    expectBytes(image, 0x0fa4, `
+      8b 16 e2 07 8b 1e e4 07 83 c2 78 83 c3 04 89 16 68 08 89 1e 6a 08 be 68 08 e8 90 c0 8b 0e 9c 08 be 9e 08 e8
+      8c df 8b 16 e2 07 8b 1e e4 07 83 c2 68 83 c3 04 8b c2 a3 ba f8 8b c3 a3 bc f8 be 9e 08 e8 1c da 8b 16 e2 07
+      8b 1e e4 07 83 c2 41 83 c3 19 89 16 36 08 89 1e 38 08 be 36 08 e8 4c c0 8b 16 e2 07 8b 1e e4 07 83 c2 09 83
+      c3 03 89 16 18 08 89 1e 1a 08 be 18 08 e8 30 c0 c7 06 3c f9 0f 00 8b 1e 9c 08 03 db 8b 87 3c 09 3d 00 00 74
+      0c c7 06 3c f9 00 00 c7 06 3e f9 08 00 8b 1e 9c 08 03 db 03 1e da 0c 8b 37 83 c6 05 8b 16 e2 07 8b 1e e4 07
+      83 c2 48 83 c3 1b 8b c2 a3 ba f8 8b c3 a3 bc f8 8b f6 e8 97 d9 8b 1e 9c 08 03 db 8b 36 dd 0c 8b 00 a3 a4 08
+      e8 7e 00 8b 16 e2 07 8b 1e e4 07 83 c2 09 83 c3 04 52 53 8b d2 8b db 8b 0e a4 08 e8 64 c9 5b 5a 8b d2 8b db
+      8b 0e a4 08 e8 ed c6 c7 06 3c f9 0f 00 c7 06 3e f9 00 00 8b 16 e2 07 8b 1e e4 07 83 c2 41 83 c3 03 89 16 86
+      08 89 1e 88 08 be 86 08 e8 81 bf 8b 1e 9c 08 03 db 8b 9f 44 56 03 db 8b b7 7d 0c 8b 16 e2 07 8b 1e e4 07 83
+      c2 42 83 c3 04 8b c2 a3 ba f8 8b c3 a3 bc f8 8b f6 e8 08 d9 c3`,
+    "EDIT slot contents: slot number, name (dark when present, white when absent), figure, side-2 behaviour label"),
+    expectBytes(image, 0x10fd, "b8 ad 32 39 06 da 0c 74 07 c7 06 84 f8 19 02 c3 c7 06 84 f8 2d 02 c3",
+      "EDIT figure sheet: side 2 when editing the side-2 name table, otherwise side 1"),
     expectBytes(image, 0x3232, "80 3e c8 f6 01 74 01 c3 8b 1e 09 5a b8 22 00 e8 3a 97 c6 06 c8 f6 00 c3", "S forces battle line 22h"),
     expectBytes(image, 0x324a, "80 3e ac f6 01 74 01 c3 c6 06 ac f6 00", "2 prints cursor cell and DS:0000"),
     expectBytes(image, 0x32cb, `
@@ -236,6 +292,136 @@ function parseLabelTable(image, tableOffset, count) {
   });
 }
 
+/**
+ * F1 行为编辑器 `0000:2302` 的版面。常数直接从上面已核验的指令里读：
+ * 文字落点 `2389`、悬停区 `23D7`、悬停框 `2440`；面板两张矩形是 DS:`1672/167C`。
+ */
+function parseBehaviourEditorLayout(image, labelCount) {
+  const imm16 = (offset) => image.readUInt16LE(offset);
+  const panel = parseRect(image, 0x1672);
+  const inner = parseRect(image, 0x167c);
+  const labels = {
+    x: inner.x + image[0x2389 + 16],
+    y: inner.y + image[0x2389 + 13],
+    pitch: image[0x2389 + 71],
+    ink: image[0x2389 + 33],
+    currentInk: image[0x2389 + 47],
+  };
+  const hover = {
+    xMin: imm16(0x23d7 + 40),
+    xMax: imm16(0x23d7 + 45),
+    yMin: imm16(0x23d7 + 4),
+    yMax: imm16(0x23d7 + 9),
+    pitch: imm16(0x23d7 + 28),
+  };
+  assert(hover.pitch === labels.pitch, "F1 hover rows must use the label pitch");
+  const highlight = {
+    x: imm16(0x2440 + 1),
+    yBase: imm16(0x2440 + 29),
+    width: imm16(0x2440 + 13),
+    height: imm16(0x2440 + 41),
+    colour: imm16(0x2440 + 47),
+    eraseColour: inner.colour,
+  };
+  assert(highlight.yBase === hover.yMin, "F1 hover box must start where the hover rows start");
+  // 行号 = (y − yMin) / pitch，y 最大只到 yMax：最后一行只剩 yMax 那一条像素线，再往下的行点不到。
+  const lastSelectableRow = Math.floor((hover.yMax - hover.yMin) / hover.pitch);
+  const lastRowPixelRows = hover.yMax - (hover.yMin + lastSelectableRow * hover.pitch) + 1;
+  assert(lastSelectableRow === 11 && lastRowPixelRows === 1, "F1 selectable rows changed");
+  assert(labelCount === 13, "F1 must list 13 behaviour names");
+  return {
+    panel,
+    inner,
+    figure: {
+      x: inner.x,
+      y: inner.y,
+      sheet: "side-2 map figure sheet DS:022D (A/3; A/11 on scene 37), whatever the unit's side",
+      frame: "DS:318C after 0000:502A loads the cursor unit",
+    },
+    labels,
+    hover,
+    highlight,
+    selectableValues: Array.from({ length: lastSelectableRow + 1 }, (_, value) => value),
+    lastRowPixelRows,
+    note: "13 names are drawn but the pointer rows stop at y = yMax: 正 1 (11) is a one-pixel strip and 目地 (12) cannot be picked; the editor has no keyboard rows and closes on the secondary button",
+  };
+}
+
+/**
+ * 我／敵 EDIT（`0000:0ABE`）的整屏版面。格子原点与步长取自 `0DF3/0F6A`，页签取自 `0E40`，
+ * 各框的相对位移取自 `0EA7/0FA4`，尺寸与颜色取自 DS:`07D8..0886` 的矩形描述。每个框都是
+ * 三张矩形：第一张的颜色留在上缘与左缘，第二张（右下移 1）留在下缘与右缘，第三张填内部。
+ */
+function parseUnitEditorLayout(image) {
+  const imm8 = (offset) => image[offset];
+  const imm16 = (offset) => image.readUInt16LE(offset);
+  const bevel = (outer, edge, fill, dx, dy) => {
+    const [a, b, c] = [outer, edge, fill].map((offset) => parseRect(image, offset));
+    assert(b.width === a.width - 1 && b.height === a.height - 1 && c.width === a.width - 2 && c.height === a.height - 2,
+      `bevel ${ds(outer)} sizes drifted`);
+    return { dx, dy, width: a.width, height: a.height, topLeft: a.colour, bottomRight: b.colour, fill: c.colour };
+  };
+  const item = 0xfa4;
+  const grid = {
+    x: imm16(0x0df3 + 4),
+    xStep: imm16(0x0df3 + 35),
+    columns: imm8(0x0df3 + 7),
+    y: imm16(0x0df3 + 14),
+    yStep: imm8(0x0df3 + 27),
+    rows: imm8(0x0df3 + 17),
+    order: "column-major: slot = page * 15 + column * 5 + row",
+  };
+  assert(grid.columns * grid.rows === 15, "the unit editor page must hold 15 slots");
+  const pageTab = bevel(0x0840, 0x084a, 0x0854, 0, 0);
+  const active = parseRect(image, 0x085e);
+  return {
+    background: parseRect(image, 0x07d8),
+    grid,
+    frame: bevel(0x07e6, 0x07f0, 0x07fa, 0, 0),
+    figureWell: bevel(0x0804, 0x080e, 0x0818, imm16(0x0ea7 + 30), imm16(0x0ea7 + 46)),
+    nameBox: bevel(0x0822, 0x082c, 0x0836, imm16(0x0ea7 + 62), imm16(0x0ea7 + 78)),
+    behaviourBox: bevel(0x0872, 0x087c, 0x0886, imm16(0x0ea7 + 94), imm16(0x0ea7 + 110)),
+    figure: {
+      dx: imm8(item + 229),
+      dy: imm8(item + 232),
+      sheets: "side 1 DS:0219, side 2 DS:022D (0000:10FD picks by the name table); frame = the slot's class record",
+    },
+    slotNumber: {
+      backing: { ...parseRect(image, 0x0868), dx: imm8(item + 10), dy: imm8(item + 13) },
+      text: { dx: imm8(item + 48), dy: imm8(item + 51), digits: 5, base: 0 },
+    },
+    name: {
+      dx: imm8(item + 182),
+      dy: imm8(item + 185),
+      skip: imm8(item + 171),
+      present: { ink: imm8(item + 149), outline: imm8(item + 155) },
+      absent: { ink: imm8(item + 128), outline: 0 },
+    },
+    behaviour: {
+      dx: imm8(item + 325),
+      dy: imm8(item + 328),
+      ink: imm8(item + 263),
+      outline: imm8(item + 269),
+      table: ds(imm16(item + 307)),
+      labels: ds(imm16(item + 313)),
+    },
+    pageTabs: {
+      x: imm16(0x0e40 + 4),
+      y: imm16(0x0e40 + 10),
+      yStep: imm8(0x0e40 + 23),
+      count: imm8(0x0e40 + 13),
+      box: pageTab,
+      active: { dx: 1, dy: 1, width: active.width, height: active.height, colour: active.colour },
+    },
+    exit: {
+      x: imm16(0x0df3 + 47),
+      y: imm16(0x0df3 + 53),
+      box: pageTab,
+      text: { x: imm16(0x0df3 + 59), y: imm16(0x0df3 + 65), label: dollarString(image, imm16(0x0df3 + 71)) },
+    },
+  };
+}
+
 function parseTerrainLabels(image) {
   return Array.from({ length: 24 }, (_, slot) => ({
     slot,
@@ -282,6 +468,8 @@ async function extract(modulePath, outputPath) {
     "the 治療 header must open the 回復 ranks (original label swap)");
 
   const behaviourLabels = parseLabelTable(image, 0x16b4, 13);
+  assert(word(image, 0x16b4 + 13 * 2) === 0xffff, "the F1 label table must end after 13 entries");
+  const behaviourEditorLayout = parseBehaviourEditorLayout(image, behaviourLabels.length);
   const output = {
     format: "ANGEL2 module 29 developer debug mode",
     semanticVersion: 1,
@@ -354,9 +542,21 @@ async function extract(modulePath, outputPath) {
       f4: { side: 1, descriptor: menus.f4.descriptor, results: { "1M": "full", "2M": "remove", "3M": "one" } },
       batch: "0000:540D walks slots 0..56 of the side; full = max life DS:31C3, one = 1, remove = life 0 then 0000:5435 clears both board maps without death handling",
     },
+    editMenu: {
+      descriptor: menus.f2.descriptor,
+      results: {
+        "1D": { target: "allyUnitEditor", handler: "0000:0AA9" },
+        "2D": { target: "enemyUnitEditor", handler: "0000:0A94" },
+        "3D": { target: "classDataEditor", handler: "0000:1294" },
+        "4D": { target: "terrainDataEditor", handler: "0000:1B3A" },
+      },
+    },
     musicBox: parseMusicBox(image),
     techniqueTest: {
       handler: "0000:6C16",
+      firstLevel: { F5: menus.f5.descriptor, F6: menus.f6.descriptor },
+      rankMenuByCategory: Object.fromEntries(Object.entries(menus.techniqueRanks)
+        .map(([category, menu]) => [category, menu.descriptor])),
       caster: "the unit under the cursor, either side; only an empty cell is refused",
       bypassed: "class technique list, stage selector, spell seal, acted state, freeze and AI behaviour",
       kept: "normal 75E4 commit: native range seed, absolute-side target filter (damage needs a non-side-1 target, support a non-side-2 target), full presentation, real effects, caster EXP and acted bit",
@@ -368,12 +568,13 @@ async function extract(modulePath, outputPath) {
       { site: "0000:8BD6", effect: "skip the nine-field ????? HUD concealment" },
       { site: "0000:81A2", effect: "draw the side-2 map life labels that stage 37 otherwise hides" },
     ],
-    aiBehaviourEditor: { handler: "0000:2302", labels: behaviourLabels },
+    aiBehaviourEditor: { handler: "0000:2302", labels: behaviourLabels, layout: behaviourEditorLayout },
     unitEditor: {
       entries: { "我 EDIT": "0000:0AA9", "敵 EDIT": "0000:0A94" },
       slots: "60 slots (4 pages x 15, column-major); slots 60..74 unreachable",
       edits: "name box toggles presence (removal is immediate; re-adding arms a placement on the next battlefield click at full HP); figure well steps the class record 0..38 without wrap; behaviour box steps DS:5644 0..11",
       hitboxes: [0x0a76, 0x0aaa, 0x0b42, 0x0bda].map((offset) => parseHitboxes(image, offset)),
+      layout: parseUnitEditorLayout(image),
       behaviourLabels: parseLabelTable(image, 0x0c7d, 11),
       knownDefects: [
         "both screens edit the side-2 behaviour table DS:5644",

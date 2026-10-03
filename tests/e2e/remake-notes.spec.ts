@@ -376,20 +376,23 @@ test("REMAKE-173 把「營地遭到偷襲 ２」魔術士不進木屋列入 Bug 
   await expect(page.getByTestId("remake-note-REMAKE-173")).toHaveCount(0);
 });
 
-test("REMAKE-174 把原版除錯模式與音樂盒列入功能增強，並在操作說明列出熱鍵", async ({ page }) => {
+test("REMAKE-174 把原版Debug模式與音樂盒列入功能增強，並在操作說明列出熱鍵", async ({ page }) => {
   await page.goto("/");
   await openNotes(page, "features");
   const debugMode = page.getByTestId("remake-note-REMAKE-174");
-  await expect(debugMode).toContainText("原版除錯模式與音樂盒");
+  await expect(debugMode).toContainText("原版Debug模式與音樂盒");
   await expect(debugMode).toContainText("按住數字鍵盤 1、3、5");
-  await expect(debugMode).toContainText("「原版除錯」開關");
+  await expect(debugMode).toContainText("「原版Debug」開關");
   await expect(debugMode).toContainText("音樂盒常駐「音樂開關」面板");
+  await expect(debugMode).toContainText("F2 我／敵 EDIT");
   await expect(debugMode.locator(".rn-note-id")).toHaveText("REMAKE-174");
 
   await page.getByTestId("remake-notes-tab-controls").click();
   const card = page.getByTestId("remake-controls-original-debug");
-  await expect(card).toContainText("原版除錯");
-  await expect(card.locator("kbd")).toContainText(["F3", "F4", "F10", "U", "D", "－", "S", "2", "J", "＊", "Shift＋8", "M"]);
+  await expect(card).toContainText("原版Debug");
+  await expect(card.locator("kbd")).toContainText([
+    "F1", "F2", "F3", "F4", "F5", "F6", "F10", "U", "D", "－", "S", "1", "2", "J", "＊", "Shift＋8", "M",
+  ]);
 });
 
 test("REMAKE-162 把「騎士城堡前」隔河攻擊娜米的漏洞列入 Bug 修復", async ({ page }) => {

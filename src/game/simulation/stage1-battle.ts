@@ -159,6 +159,8 @@ export class Stage1Battle extends Stage0Battle {
   override enemyAiIntentFor(id: string): EnemyAiIntent | undefined {
     const unit = this.unit(id);
     if (!unit || unit.side !== 2) return undefined;
+    // `REMAKE-174` 原版Debug的行為覆寫取代城堡守軍與娜米的劇情意圖。
+    if (unit.debugAiBehavior !== undefined) return unit.debugAiBehavior === 1 ? "sentry" : "pursuit";
     if (STAGE1_OPENING_PURSUIT_IDS.has(id)) return "pursuit";
     if (STAGE1_CASTLE_GUARD_IDS.has(id)) {
       return this.activeGroupIds.has(STAGE1_CASTLE_GUARD_GROUP_ID) ? "pursuit" : "alert";

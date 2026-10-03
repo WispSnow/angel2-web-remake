@@ -36,6 +36,14 @@ export function isFullCombatImageUrl(url: string): boolean {
     && url.endsWith(".png");
 }
 
+/**
+ * 全景戰鬥圖是否已在租約裡解好；從沒有任何租約時（開發與單元測試）一律視為可用。原版Debug的
+ * EDIT 據此只開放這場戰鬥已備妥全景圖的職業。
+ */
+export function fullCombatImageAvailable(url: string): boolean {
+  return decodedImages.has(url) || (decodedImages.size === 0 && pendingImages.size === 0);
+}
+
 export function fullCombatImageSource(url: string): string {
   return decodedImages.get(url)?.source ?? url;
 }

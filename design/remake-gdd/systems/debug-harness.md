@@ -4,7 +4,7 @@
 
 ## 目的
 
-本文件只管开发者调试中心（`/debug.html`）。玩家可用的原版除錯模式是另一个系统，
+本文件只管开发者调试中心（`/debug.html`）。玩家可用的原版Debug模式是另一个系统，
 由正式表面的宿主开关开启，见 [`original-debug-mode.md`](original-debug-mode.md)（`REMAKE-174`）；
 两者互不依赖。
 

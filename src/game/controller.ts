@@ -1,5 +1,33 @@
-import { STAGE0, completeCampaignRoster, initialEnemyExperience } from "./content/stage0";
-import { NATIVE_DEBUG_SIDE_LIFE_MENUS } from "./content/debug-mode.generated";
+import { ASSETS, STAGE0, completeCampaignRoster, initialEnemyExperience } from "./content/stage0";
+import {
+  NATIVE_DEBUG_BEHAVIOUR_EDITOR,
+  NATIVE_DEBUG_SIDE_LIFE_MENUS,
+  NATIVE_DEBUG_UNIT_EDITOR,
+} from "./content/debug-mode.generated";
+import { DEBUG_AI_BEHAVIOUR_VALUES } from "./content/debug-mode-rules";
+import { FULL_COMBAT_ATLASES } from "./content/full-combat-atlases.generated";
+import { allyMapUnitAsset, enemyMapUnitAsset } from "./content/map-unit-assets";
+import {
+  debugMenuItems,
+  debugTechniqueActionId,
+  steppedDebugMenuIndex,
+  withDebugMenuIndex,
+  type DebugMenuContext,
+  type DebugMenuItem,
+  type DebugMenuState,
+  type DebugTechniqueGroup,
+} from "./original-debug-menus";
+import {
+  DEBUG_EDITOR_PAGES,
+  DEBUG_EDITOR_SLOT_COUNT,
+  DEBUG_EDITOR_SLOTS_PER_PAGE,
+  debugEditorSlots,
+  steppedDebugBehaviour,
+  steppedDebugClass,
+  type DebugEditorSlot,
+} from "./original-debug-editor";
+import { stagedRenderAssetAvailable } from "./staged-render-asset-cache";
+import { fullCombatImageAvailable } from "./full-combat-image-cache";
 import { MUSIC_BOX_TRACKS, musicBoxProgram } from "./content/music-box";
 import type { MusicProgram } from "./music-transport";
 import { originalDebugModeEnabled, type OriginalDebugHotkey } from "./original-debug-mode";
@@ -20,6 +48,7 @@ import {
   actionPresentationCatalog,
   isIceActionId,
   isShootingActionId,
+  presentationActionIdsForClass,
   shootingActionIdFor,
   techniqueActionIdsFor,
   type IceActionId,
@@ -107,7 +136,7 @@ import {
   type EnemyPhaseTailPresentationStep,
 } from "./enemy-phase-tail-presentation";
 import { buildStompPresentationSteps } from "./stomp-presentation";
-import { techniqueEffectRange } from "./simulation/actions/range-map";
+import { NumericRangeMap, techniqueEffectRange } from "./simulation/actions/range-map";
 import type { DeploymentResult } from "./simulation/deployment";
 import { manhattan, positionKey } from "./simulation/grid";
 import { prepareScriptedLightning4 } from "./simulation/scripted-actions";
@@ -153,7 +182,7 @@ import {
   stageRuntimeSourceForDestination,
   type LoadedStageRuntime,
 } from "./stage-runtime";
-import type { ActionMode, AttackResult, BattleUnit, CampaignState, DialoguePage, Difficulty, GamePhase, PortraitRecord, Position, SaveData, StageId, UnitClassId, UnitStats } from "./types";
+import type { ActionMode, AttackResult, BattleSaveData, BattleUnit, CampaignState, DialoguePage, Difficulty, GamePhase, PortraitRecord, Position, SaveData, StageId, UnitClassId, UnitStats } from "./types";
 import {
   clearProgramTimeout,
   programDelay,
@@ -536,10 +565,22 @@ export class GameController {
   groupCommandOpen = false;
   groupCommandIndex = 0;
   groupCommandDialogueId?: SpokenGroupCommandId;
-  /** `REMAKE-174` 原版除錯 F3（敵方）／F4（我方）生命選單。 */
-  debugLifeMenu?: { side: 1 | 2; index: number };
-  /** `REMAKE-174` 原版除錯鍵 2 的格號讀數；游標或鏡頭一動就失效，與原版被下一次視口重畫蓋掉一致。 */
+  /** `REMAKE-174` 原版Debug的原版選單：F2 EDIT、F3／F4 全體生命、F5／F6 技術測試與其二級選單。 */
+  debugMenu?: DebugMenuState;
+  /** `REMAKE-174` 原版Debug F1 行為面板；`index` 是指標或鍵盤停留的列。 */
+  debugBehaviourEditor?: { unitId: string; index: number };
+  /** `REMAKE-174` 原版Debug我／敵 EDIT；`slotIndex` 是本頁 0..14 的焦點。 */
+  debugUnitEditor?: { side: 1 | 2; page: number; slotIndex: number };
+  /** EDIT 點了不在場的單位：下一次點格把它放回（原版 `0000:0C8C`）。 */
+  debugPlacement?: { unitId: string };
+  /** 技術測試的施法者；選格與提交走除錯入口，取消時直接回到戰場。 */
+  debugTechniqueCasterId?: string;
+  /** F1／EDIT 改動之後，關閉時要做一次轉職掃描、勝負判定與階段完成檢查。 */
+  private debugEditsPending = false;
+  /** `REMAKE-174` 原版Debug鍵 2 的格號讀數；游標或鏡頭一動就失效，與原版被下一次視口重畫蓋掉一致。 */
   debugCellReadout?: { cell: number; difficulty: number; cursor: Position; cameraOrigin: Position };
+  /** `REMAKE-174` 原版Debug Caps Lock+1 是否按住；宿主鍵盤層寫入。 */
+  debugRangeReadoutHeld = false;
   /** `REMAKE-174` 音樂盒。 */
   musicBoxOpen = false;
   musicBoxIndex = 0;
@@ -1178,14 +1219,18 @@ export class GameController {
       || this.aiTechniqueDialogueActive
       || this.contextualLineDialogueActive
       || this.groupCommandDialogueActive
-      || this.debugLifeMenu !== undefined
+      || this.debugMenu !== undefined
+      || this.debugBehaviourEditor !== undefined
+      || this.debugUnitEditor !== undefined
       || this.musicBoxOpen
       || this.promotionUnitIds.length > 0;
   }
 
   get groupLeader(): BattleUnit | undefined {
     const fixedCommander = this.battle.groupCommander;
-    if (fixedCommander) return fixedCommander;
+    // 原版Debug把本關主將改成自動行動之後，集體命令改由游標或焦點上仍歸玩家的單位發出。
+    if (fixedCommander && (fixedCommander.debugAiBehavior === undefined
+      || this.battle.isPlayerControllableAlly(fixedCommander.id))) return fixedCommander;
 
     const cursorUnit = this.battle.unitAt(this.cursor);
     if (cursorUnit && this.battle.isPlayerControllableAlly(cursorUnit.id)) return cursorUnit;
@@ -1969,6 +2014,11 @@ export class GameController {
       || this.hasBlockingOverlay
       || this.busy
     ) return;
+    if (this.debugPlacement) {
+      this.cursor = { ...position };
+      this.placeDebugUnit(position);
+      return;
+    }
     if (this.actionMode === "shotRoute") {
       const target = this.magicArcherRouteTarget;
       if (target && positionKey(position) === positionKey(target)) {
@@ -2480,6 +2530,14 @@ export class GameController {
   }
 
   cancelAction(): void {
+    // 原版技術測試在選格中取消（`CT`）就回到戰場，不回到技術選單（`0000:6C57`）。
+    if (this.debugTechniqueCasterId
+      && (this.actionMode === "specialTarget" || this.actionMode === "selfAreaConfirm")) {
+      this.resetAction();
+      this.statusMessage = "原版Debug：已取消技術測試。";
+      this.emit();
+      return;
+    }
     if (this.actionMode === "target") {
       this.actionMode = "actionMenu";
       this.targets = [];
@@ -2542,8 +2600,15 @@ export class GameController {
       return;
     }
     if (requiresTargetUnit && !target) return;
+    // 技術測試（`REMAKE-174`）走模擬層的除錯入口：不看職業、禁咒、已行動與冰封，目標按絕對陣營。
+    const debugCast = this.debugTechniqueCasterId === actor.id;
     try {
-      const prepared = this.battle.prepareSpecialAction({
+      const prepared = debugCast ? this.battle.prepareDebugTechnique({
+        actionId,
+        actorId: actor.id,
+        targetId: target?.id,
+        target: definition.target === "self-area" ? undefined : position,
+      }) : this.battle.prepareSpecialAction({
         actionId,
         actorId: actor.id,
         targetId: target?.id,
@@ -2591,7 +2656,9 @@ export class GameController {
 
       await this.presentSpecialAction(actorPresentation, targetPresentation, prepared.result);
       await this.presentShotDodgeLine(actionId, targetPresentation);
-      this.lastSpecialAction = this.battle.commitPreparedAction(prepared);
+      this.lastSpecialAction = debugCast
+        ? this.battle.commitPreparedDebugTechnique(prepared)
+        : this.battle.commitPreparedAction(prepared);
       const result = this.lastSpecialAction;
       for (const affected of result.affectedUnits.filter(({ died }) => died)) {
         const presentation = affectedPresentations.find(({ id }) => id === affected.unitId);
@@ -3364,6 +3431,7 @@ export class GameController {
   private resetAction(): void {
     this.actionMode = "idle";
     this.selectedId = undefined;
+    this.debugTechniqueCasterId = undefined;
     this.commandIndex = 0;
     this.pendingOrigin = undefined;
     this.pendingPath = undefined;
@@ -3392,7 +3460,7 @@ export class GameController {
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
     this.musicBoxOpen = false;
-    this.debugLifeMenu = undefined;
+    this.clearOriginalDebugSurfaces();
     this.minimapPreviewOrigin = undefined;
     this.terrainInspectionPosition = undefined;
     this.groupCommandIndex = 0;
@@ -4576,7 +4644,7 @@ export class GameController {
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
     this.musicBoxOpen = false;
-    this.debugLifeMenu = undefined;
+    this.clearOriginalDebugSurfaces();
     this.groupCommandOpen = false;
     this.minimapPreviewOrigin = undefined;
     this.terrainInspectionPosition = undefined;
@@ -4617,7 +4685,7 @@ export class GameController {
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
     this.musicBoxOpen = false;
-    this.debugLifeMenu = undefined;
+    this.clearOriginalDebugSurfaces();
     this.emit();
   }
 
@@ -4731,7 +4799,7 @@ export class GameController {
     this.emit();
   }
 
-  // ── REMAKE-174 原版除錯模式與音樂盒 ─────────────────────────────────────────
+  // ── REMAKE-174 原版Debug模式與音樂盒 ─────────────────────────────────────────
   // 原版（模組 29）的除錯分發器 `0000:30CE` 只在待機戰場按住 Caps Lock 時運行；這裡的
   // 每個入口都對應 `reverse/notes/developer-debug-mode.md` 的一個處理器。除錯操作不消耗
   // 戰鬥 PRNG，改動的單位狀態與一般狀態一樣保存。
@@ -4747,15 +4815,20 @@ export class GameController {
       && this.phase === "player"
       && !this.busy
       && this.actionMode === "idle"
-      && !this.hasBlockingOverlay;
+      && !this.hasBlockingOverlay
+      && !this.debugPlacement;
   }
 
   /** 回傳除錯是否消費了這個按鍵；沒有消費時按鍵照常走一般語義。 */
   runOriginalDebugHotkey(hotkey: OriginalDebugHotkey): boolean {
     if (!this.originalDebugHotkeysAvailable) return false;
     switch (hotkey) {
-      case "enemyLifeMenu": this.openDebugLifeMenu(2); break;
-      case "allyLifeMenu": this.openDebugLifeMenu(1); break;
+      case "behaviourEditor": this.openDebugBehaviourEditor(); break;
+      case "editMenu": this.openDebugMenu({ kind: "edit", index: 0 }, "原版Debug：編輯。"); break;
+      case "enemyLifeMenu": this.openDebugMenu({ kind: "life", side: 2, index: 0 }, "原版Debug：設定敵方全體生命。"); break;
+      case "allyLifeMenu": this.openDebugMenu({ kind: "life", side: 1, index: 0 }, "原版Debug：設定我方全體生命。"); break;
+      case "techniqueAttack": this.openDebugTechniqueMenu("attack"); break;
+      case "techniqueSupport": this.openDebugTechniqueMenu("support"); break;
       case "refreshAllies": this.debugRefreshAllies(); break;
       case "experienceUp": this.debugAdjustExperience(50); break;
       case "experienceDown": this.debugAdjustExperience(-50); break;
@@ -4765,70 +4838,461 @@ export class GameController {
       case "instantVictory": this.debugInstantVictory(); break;
       case "skipToEnding": this.debugSkipToEnding(); break;
       case "musicBox": this.openMusicBox("battle"); break;
-      case "pending":
-        this.statusMessage = "原版除錯：這個功能將在後續版本復刻。";
-        this.emit();
-        break;
+      // 範圍讀數由宿主鍵盤層追蹤按住與放開（`setDebugRangeReadoutHeld`），選格中同樣有效。
+      case "rangeReadout": return false;
     }
     return true;
   }
 
-  get debugLifeMenuItems(): typeof NATIVE_DEBUG_SIDE_LIFE_MENUS.enemy.items
-    | typeof NATIVE_DEBUG_SIDE_LIFE_MENUS.ally.items
-    | readonly [] {
-    const menu = this.debugLifeMenu;
-    if (!menu) return [];
-    return menu.side === 2 ? NATIVE_DEBUG_SIDE_LIFE_MENUS.enemy.items : NATIVE_DEBUG_SIDE_LIFE_MENUS.ally.items;
+  /** 關掉所有原版Debug的選單、面板與待放置狀態（系統選單、勝負與重開時一併收起）。 */
+  private clearOriginalDebugSurfaces(): void {
+    this.debugMenu = undefined;
+    this.debugBehaviourEditor = undefined;
+    this.debugUnitEditor = undefined;
+    this.debugPlacement = undefined;
   }
 
-  /** F3（敵方）／F4（我方），原版選單 DS:`4156`／`416C`。 */
-  openDebugLifeMenu(side: 1 | 2): void {
+  // ── 原版選單（F2–F6 與技術二級選單共用 `0000:5651`） ──
+
+  get debugMenuItems(): readonly DebugMenuItem[] {
+    return this.debugMenu ? debugMenuItems(this.debugMenu, this.debugMenuContext) : [];
+  }
+
+  private get debugMenuContext(): DebugMenuContext {
+    const preloaded = new Set<BattleActionId>(this.currentMapPresentationActionIds);
+    return { techniqueAvailable: (actionId) => preloaded.has(actionId) };
+  }
+
+  private openDebugMenu(menu: DebugMenuState, status: string): void {
     this.minimapPreviewOrigin = undefined;
     this.terrainInspectionPosition = undefined;
-    this.debugLifeMenu = { side, index: 0 };
-    this.statusMessage = side === 2 ? "原版除錯：設定敵方全體生命。" : "原版除錯：設定我方全體生命。";
+    const items = debugMenuItems(menu, this.debugMenuContext);
+    const firstEnabled = items.findIndex(({ enabled }) => enabled);
+    this.debugMenu = withDebugMenuIndex(menu, Math.max(0, firstEnabled));
+    this.statusMessage = status;
     this.emit();
   }
 
-  closeDebugLifeMenu(): void {
-    if (!this.debugLifeMenu) return;
-    this.debugLifeMenu = undefined;
+  closeDebugMenu(): void {
+    if (!this.debugMenu) return;
+    this.debugMenu = undefined;
     this.statusMessage = "已返回戰場。";
     this.emit();
   }
 
-  moveDebugLifeMenuSelection(delta: number): void {
-    const menu = this.debugLifeMenu;
-    const count = this.debugLifeMenuItems.length;
-    if (!menu || delta === 0 || count === 0) return;
-    this.debugLifeMenu = { ...menu, index: (menu.index + Math.sign(delta) + count) % count };
+  moveDebugMenuSelection(delta: number): void {
+    const menu = this.debugMenu;
+    if (!menu || delta === 0) return;
+    const index = steppedDebugMenuIndex(menu, delta, this.debugMenuContext);
+    if (index === menu.index) return;
+    this.debugMenu = withDebugMenuIndex(menu, index);
     this.emit();
   }
 
-  selectDebugLifeMenuItem(index: number): void {
-    const menu = this.debugLifeMenu;
-    if (!menu || index < 0 || index >= this.debugLifeMenuItems.length || index === menu.index) return;
-    this.debugLifeMenu = { ...menu, index };
+  selectDebugMenuItem(index: number): void {
+    const menu = this.debugMenu;
+    const item = this.debugMenuItems[index];
+    if (!menu || !item?.enabled || index === menu.index) return;
+    this.debugMenu = withDebugMenuIndex(menu, index);
     this.emit();
   }
 
-  activateDebugLifeMenuSelection(): void {
-    const menu = this.debugLifeMenu;
-    const item = menu ? this.debugLifeMenuItems[menu.index] : undefined;
+  activateDebugMenuSelection(): void {
+    const menu = this.debugMenu;
+    const item = this.debugMenuItems[menu?.index ?? -1];
     if (!menu || !item) return;
-    this.debugLifeMenu = undefined;
-    const count = this.battle.debugSetSideLife(menu.side, item.effect);
-    const sideName = menu.side === 2 ? "敵方" : "我方";
-    const effectText = item.effect === "full"
-      ? "生命全滿"
-      : item.effect === "remove" ? "全部移出戰場" : "生命設為 1";
-    this.finishOriginalDebugMutation(`原版除錯：${sideName} ${count} 人${effectText}。`);
+    if (!item.enabled) {
+      this.statusMessage = menu.kind === "edit"
+        ? "原版Debug：兵種／地型編輯將在第三批復刻。"
+        : item.code.endsWith("V") || item.code === "3?"
+          ? "原版Debug：VIRT 是原版的開發測試技術，複刻暫不提供。"
+          : "原版Debug：這場戰鬥沒有備妥這項技術的演出。";
+      this.emit();
+      return;
+    }
+    switch (menu.kind) {
+      case "life": {
+        this.debugMenu = undefined;
+        const effect = menu.side === 2
+          ? NATIVE_DEBUG_SIDE_LIFE_MENUS.enemy.items[menu.index]?.effect
+          : NATIVE_DEBUG_SIDE_LIFE_MENUS.ally.items[menu.index]?.effect;
+        if (!effect) return;
+        const count = this.battle.debugSetSideLife(menu.side, effect);
+        const sideName = menu.side === 2 ? "敵方" : "我方";
+        const effectText = effect === "full"
+          ? "生命全滿"
+          : effect === "remove" ? "全部移出戰場" : "生命設為 1";
+        this.finishOriginalDebugMutation(`原版Debug：${sideName} ${count} 人${effectText}。`);
+        return;
+      }
+      case "edit":
+        this.openDebugUnitEditor(item.code === "1D" ? 1 : 2);
+        return;
+      case "technique":
+        this.openDebugMenu(
+          { kind: "techniqueRank", group: menu.group, category: item.code, casterId: menu.casterId, index: 0 },
+          "原版Debug：選擇技術。",
+        );
+        return;
+      case "techniqueRank": {
+        const actionId = debugTechniqueActionId(item.code);
+        if (actionId) this.beginDebugTechnique(menu.casterId, actionId);
+        return;
+      }
+    }
+  }
+
+  // ── F1 行為編輯（`0000:2302`） ──
+
+  get debugBehaviourEditorUnit(): BattleUnit | undefined {
+    const editor = this.debugBehaviourEditor;
+    return editor ? this.battle.unit(editor.unitId) : undefined;
+  }
+
+  /** 游標下單位目前的有效行為值；F1 面板以紅字標出。 */
+  get debugBehaviourEditorValue(): number | undefined {
+    const unit = this.debugBehaviourEditorUnit;
+    if (!unit) return undefined;
+    return unit.side === 1 ? this.battle.alliedBehaviorFor(unit.id) : this.battle.enemyBehaviorFor(unit.id);
+  }
+
+  private debugLockMessage(unit: BattleUnit, lock: string): string {
+    return lock === "special-class"
+      ? `原版Debug：${unitDisplayName(unit)}依專屬腳本行動，不能修改。`
+      : lock === "split"
+        ? `原版Debug：${unitDisplayName(unit)}分身中，合體後才能改職業。`
+        : `原版Debug：${unitDisplayName(unit)}依劇情行動，不能修改。`;
+  }
+
+  openDebugBehaviourEditor(): void {
+    const unit = this.debugCursorUnit();
+    if (!unit) return;
+    const lock = this.battle.debugAiBehaviorLock(unit.id);
+    if (lock) {
+      this.statusMessage = this.debugLockMessage(unit, lock);
+      this.emit();
+      return;
+    }
+    this.minimapPreviewOrigin = undefined;
+    this.terrainInspectionPosition = undefined;
+    const current = unit.side === 1 ? this.battle.alliedBehaviorFor(unit.id) : this.battle.enemyBehaviorFor(unit.id);
+    const values = DEBUG_AI_BEHAVIOUR_VALUES;
+    this.debugBehaviourEditor = {
+      unitId: unit.id,
+      index: values.includes(current) ? current : values[values.length - 1] ?? 0,
+    };
+    this.statusMessage = `原版Debug：${unitDisplayName(unit)}的 AI 行為。`;
+    this.emit();
+  }
+
+  moveDebugBehaviourSelection(delta: number): void {
+    const editor = this.debugBehaviourEditor;
+    const count = DEBUG_AI_BEHAVIOUR_VALUES.length;
+    if (!editor || delta === 0 || count === 0) return;
+    this.debugBehaviourEditor = { ...editor, index: (editor.index + Math.sign(delta) + count) % count };
+    this.emit();
+  }
+
+  selectDebugBehaviourRow(index: number): void {
+    const editor = this.debugBehaviourEditor;
+    if (!editor || !DEBUG_AI_BEHAVIOUR_VALUES.includes(index) || index === editor.index) return;
+    this.debugBehaviourEditor = { ...editor, index };
+    this.emit();
+  }
+
+  /** 主鍵寫入停留的列（`0000:24AA`）；面板保持開著，次鍵才關閉。 */
+  applyDebugBehaviourSelection(): void {
+    const editor = this.debugBehaviourEditor;
+    const unit = this.debugBehaviourEditorUnit;
+    if (!editor || !unit) return;
+    if (!this.battle.debugSetAiBehavior(unit.id, editor.index)) return;
+    this.debugEditsPending = true;
+    const label = NATIVE_DEBUG_BEHAVIOUR_EDITOR.labels[editor.index]?.label ?? String(editor.index);
+    this.statusMessage = unit.side === 1
+      ? `原版Debug：${unitDisplayName(unit)}的行為改為「${label}」，${editor.index === 0 ? "由玩家指揮" : "交給我方自動行動"}。`
+      : `原版Debug：${unitDisplayName(unit)}的行為改為「${label}」。`;
+    this.emit();
+  }
+
+  closeDebugBehaviourEditor(): void {
+    if (!this.debugBehaviourEditor) return;
+    this.debugBehaviourEditor = undefined;
+    this.finishOriginalDebugControlChange("已返回戰場。");
+  }
+
+  // ── F5／F6 技術測試（`0000:6C16 → 75E4`） ──
+
+  private openDebugTechniqueMenu(group: DebugTechniqueGroup): void {
+    const unit = this.debugCursorUnit();
+    if (!unit) return;
+    this.openDebugMenu(
+      { kind: "technique", group, casterId: unit.id, index: 0 },
+      `原版Debug：${unitDisplayName(unit)}的技術測試。`,
+    );
+  }
+
+  get debugTechniqueCaster(): BattleUnit | undefined {
+    return this.debugTechniqueCasterId ? this.battle.unit(this.debugTechniqueCasterId) : undefined;
+  }
+
+  /**
+   * 原版選定技術後直接進入一般的玩家技術提交（`0000:75E4`）：原版選格種子、按絕對陣營篩目標、
+   * 完整表現與真實結算，施法者得經驗並寫已行動。冰雪與祈禱以施法者為中心，不選格。
+   */
+  private beginDebugTechnique(casterId: string, actionId: BattleActionId): void {
+    const caster = this.battle.unit(casterId);
+    this.debugMenu = undefined;
+    if (!caster) {
+      this.emit();
+      return;
+    }
+    const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+    this.selectedId = caster.id;
+    this.selectedActionId = actionId;
+    this.debugTechniqueCasterId = caster.id;
+    this.cursor = { x: caster.x, y: caster.y };
+    if (definition.target === "self-area") {
+      this.actionRange = [];
+      this.targets = [];
+      if (!isIceActionId(actionId)) {
+        void this.commitSpecialAction(this.cursor);
+        return;
+      }
+      this.actionMode = "selfAreaConfirm";
+      this.statusMessage = `原版Debug：「${definition.label}」以${unitDisplayName(caster)}為中心；確定施展或按右鍵取消。`;
+      this.emit();
+      return;
+    }
+    this.actionRange = this.battle.debugTechniqueRange(caster.id, actionId).cells();
+    this.targets = this.battle.debugTechniqueTargetCells(caster.id, actionId);
+    if (this.targets.length === 0) {
+      this.resetAction();
+      this.statusMessage = `原版Debug：「${definition.label}」範圍內沒有合法目標。`;
+      this.emit();
+      return;
+    }
+    this.actionMode = "specialTarget";
+    this.statusMessage = `原版Debug：選擇「${definition.label}」的${definition.target === "ally" ? "我方" : "敵方"}目標。`;
+    this.emit();
+  }
+
+  // ── 我／敵 EDIT（`0000:0ABE`） ──
+
+  private openDebugUnitEditor(side: 1 | 2): void {
+    this.debugMenu = undefined;
+    this.debugUnitEditor = { side, page: 0, slotIndex: 0 };
+    this.statusMessage = side === 1 ? "原版Debug：我方單位編輯。" : "原版Debug：敵方單位編輯。";
+    this.emit();
+  }
+
+  get debugUnitEditorSlots(): readonly DebugEditorSlot[] {
+    const editor = this.debugUnitEditor;
+    if (!editor) return [];
+    return debugEditorSlots({
+      battle: this.battle,
+      side: editor.side,
+      roster: this.battle.campaignSnapshot().roster,
+      save: this.stageRuntime.save,
+      nativeStage: this.battle.stage.nativeStage,
+    });
+  }
+
+  get debugUnitEditorFocusSlot(): number | undefined {
+    const editor = this.debugUnitEditor;
+    return editor ? editor.page * DEBUG_EDITOR_SLOTS_PER_PAGE + editor.slotIndex : undefined;
+  }
+
+  /** 方向鍵：上下在同一欄內走、跨欄時接到相鄰欄；左右換欄，越過邊緣就翻頁。 */
+  moveDebugUnitEditorFocus(delta: Position): void {
+    const editor = this.debugUnitEditor;
+    if (!editor) return;
+    const { rows, columns } = NATIVE_DEBUG_UNIT_EDITOR.layout.grid;
+    let page = editor.page;
+    let index = editor.slotIndex;
+    if (delta.y !== 0) {
+      index = (index + Math.sign(delta.y) + DEBUG_EDITOR_SLOTS_PER_PAGE) % DEBUG_EDITOR_SLOTS_PER_PAGE;
+    } else if (delta.x !== 0) {
+      const column = Math.floor(index / rows) + Math.sign(delta.x);
+      const row = index % rows;
+      if (column < 0 || column >= columns) {
+        page = (page + Math.sign(delta.x) + DEBUG_EDITOR_PAGES) % DEBUG_EDITOR_PAGES;
+        index = (column < 0 ? columns - 1 : 0) * rows + row;
+      } else {
+        index = column * rows + row;
+      }
+    } else return;
+    this.debugUnitEditor = { ...editor, page, slotIndex: index };
+    this.emit();
+  }
+
+  focusDebugUnitEditorSlot(slot: number): void {
+    const editor = this.debugUnitEditor;
+    if (!editor || slot < 0 || slot >= DEBUG_EDITOR_SLOT_COUNT) return;
+    const page = Math.floor(slot / DEBUG_EDITOR_SLOTS_PER_PAGE);
+    const slotIndex = slot % DEBUG_EDITOR_SLOTS_PER_PAGE;
+    if (page === editor.page && slotIndex === editor.slotIndex) return;
+    this.debugUnitEditor = { ...editor, page, slotIndex };
+    this.emit();
+  }
+
+  showDebugUnitEditorPage(page: number): void {
+    const editor = this.debugUnitEditor;
+    if (!editor || page < 0 || page >= DEBUG_EDITOR_PAGES || page === editor.page) return;
+    this.debugUnitEditor = { ...editor, page };
+    this.emit();
+  }
+
+  /**
+   * 名字框（`0000:0C10`）：在場的單位立即移出棋盤、畫面保持；本場離場的單位關閉編輯畫面，
+   * 下一次點格放回。其餘槽不能放置（受限版）。
+   */
+  toggleDebugUnitPresence(slot = this.debugUnitEditorFocusSlot): void {
+    const editor = this.debugUnitEditor;
+    const entry = slot === undefined ? undefined : this.debugUnitEditorSlots[slot];
+    if (!editor || !entry) return;
+    if (entry.state === "present") {
+      const unit = this.battle.unit(entry.unitId);
+      if (unit && this.battle.debugRemoveUnit(entry.unitId)) {
+        this.debugEditsPending = true;
+        this.statusMessage = `原版Debug：${unitDisplayName(unit)}已移出戰場。`;
+      }
+    } else if (entry.state === "departed") {
+      this.debugUnitEditor = undefined;
+      this.debugPlacement = { unitId: entry.unitId };
+      this.statusMessage = `原版Debug：點選空格放回${entry.name ?? ""}；右鍵取消。`;
+    } else {
+      this.statusMessage = entry.state === "absent"
+        ? `原版Debug：${entry.name ?? ""}不在這場戰鬥中，不能放置。`
+        : "原版Debug：這一槽沒有單位。";
+    }
+    this.emit();
+  }
+
+  /** 這場戰鬥的資源門已備妥棋子、全景戰鬥圖的職業，才能改成它（否則畫面會缺圖）。 */
+  debugClassAvailable(side: 1 | 2, classId: UnitClassId): boolean {
+    const figure = side === 1
+      ? allyMapUnitAsset(classId)
+      : this.enemyFigureUrl(classId);
+    const atlas = FULL_COMBAT_ATLASES.find(({ id }) => id === `${side === 1 ? "left" : "right"}-${classId}`);
+    const preloaded = new Set<BattleActionId>(this.currentMapPresentationActionIds);
+    return figure !== undefined
+      && atlas !== undefined
+      && stagedRenderAssetAvailable(figure)
+      && fullCombatImageAvailable(atlas.image)
+      && presentationActionIdsForClass(classId, side).every((actionId) => preloaded.has(actionId));
+  }
+
+  enemyFigureUrl(classId: UnitClassId): string {
+    if (classId === "soldier") return ASSETS.enemySoldier;
+    if (classId === "cavalry") return ASSETS.enemyCavalry;
+    return this.stageRuntime.assets?.unitSprites?.[`enemy-${classId}`] ?? enemyMapUnitAsset(classId);
+  }
+
+  /** 棋子框：主鍵（−1）／次鍵（+1）。 */
+  stepDebugUnitClass(delta: -1 | 1, slot = this.debugUnitEditorFocusSlot): void {
+    const editor = this.debugUnitEditor;
+    const entry = slot === undefined ? undefined : this.debugUnitEditorSlots[slot];
+    if (!editor || !entry || !entry.classId) return;
+    const unit = entry.state === "present" ? this.battle.unit(entry.unitId) : undefined;
+    if (!unit) {
+      this.statusMessage = "原版Debug：只能修改在場單位的職業。";
+      this.emit();
+      return;
+    }
+    const lock = this.battle.debugClassEditLock(unit.id);
+    if (lock) {
+      this.statusMessage = this.debugLockMessage(unit, lock);
+      this.emit();
+      return;
+    }
+    const next = steppedDebugClass(unit.classId, delta, (classId) => this.debugClassAvailable(editor.side, classId));
+    if (next === unit.classId) {
+      this.statusMessage = "原版Debug：這場戰鬥沒有更多可改的職業。";
+      this.emit();
+      return;
+    }
+    if (this.battle.debugSetUnitClass(unit.id, next)) {
+      this.debugEditsPending = true;
+      this.statusMessage = `原版Debug：${unitDisplayName(unit)}改為${className(next)}。`;
+    }
+    this.emit();
+  }
+
+  /** 行為框：主鍵（−1）／次鍵（+1），寫本方自己的行為（`[SR]` 原版兩邊都寫敵方表）。 */
+  stepDebugUnitBehaviour(delta: -1 | 1, slot = this.debugUnitEditorFocusSlot): void {
+    const editor = this.debugUnitEditor;
+    const entry = slot === undefined ? undefined : this.debugUnitEditorSlots[slot];
+    if (!editor || !entry) return;
+    const unit = entry.state === "present" ? this.battle.unit(entry.unitId) : undefined;
+    if (!unit || entry.behaviour === undefined) {
+      this.statusMessage = "原版Debug：只能修改在場單位的行為。";
+      this.emit();
+      return;
+    }
+    const lock = this.battle.debugAiBehaviorLock(unit.id);
+    if (lock) {
+      this.statusMessage = this.debugLockMessage(unit, lock);
+      this.emit();
+      return;
+    }
+    const next = steppedDebugBehaviour(entry.behaviour, delta);
+    if (next !== entry.behaviour && this.battle.debugSetAiBehavior(unit.id, next)) {
+      this.debugEditsPending = true;
+      const label = NATIVE_DEBUG_BEHAVIOUR_EDITOR.labels[next]?.label ?? String(next);
+      this.statusMessage = `原版Debug：${unitDisplayName(unit)}的行為改為「${label}」。`;
+    }
+    this.emit();
+  }
+
+  /** EXIT（`0000:0BE8`）。轉職掃描與勝負判定在關閉時做一次，不在每次點擊之後。 */
+  closeDebugUnitEditor(): void {
+    if (!this.debugUnitEditor) return;
+    this.debugUnitEditor = undefined;
+    this.finishOriginalDebugControlChange("已返回戰場。");
+  }
+
+  /** 放回一個離場單位：只放在空著、這個職業能站的格上。 */
+  placeDebugUnit(position: Position): void {
+    const placement = this.debugPlacement;
+    if (!placement) return;
+    const record = this.battle.debugDepartedUnit(placement.unitId);
+    if (!record || !this.battle.debugPlaceUnit(placement.unitId, position)) {
+      this.statusMessage = record
+        ? "原版Debug：這一格不能放置；請選空著、可以站立的格，或按右鍵取消。"
+        : "原版Debug：這個單位已經不能放回。";
+      if (!record) this.debugPlacement = undefined;
+      this.emit();
+      return;
+    }
+    this.debugPlacement = undefined;
+    this.debugEditsPending = true;
+    this.finishOriginalDebugControlChange(`原版Debug：${unitDisplayName(record)}已放回戰場。`);
+  }
+
+  cancelDebugPlacement(): void {
+    if (!this.debugPlacement) return;
+    this.debugPlacement = undefined;
+    this.finishOriginalDebugControlChange("原版Debug：已取消放置。");
+  }
+
+  /**
+   * 指揮權或棋盤改變之後：跑一次轉職掃描與勝負判定；若我方已沒有能指揮的未行動單位，照常
+   * 交給自動階段。
+   */
+  private finishOriginalDebugControlChange(message: string): void {
+    const changed = this.debugEditsPending;
+    this.debugEditsPending = false;
+    this.finishOriginalDebugMutation(message, () => {
+      if (changed && this.phase === "player" && !this.busy && this.battle.playerManualPhaseComplete()) {
+        void this.runTurnPhases("autonomous");
+      }
+    });
   }
 
   private debugCursorUnit(): BattleUnit | undefined {
     const unit = this.battle.unitAt(this.cursor);
     if (!unit) {
-      this.statusMessage = "原版除錯：游標下沒有單位。";
+      this.statusMessage = "原版Debug：游標下沒有單位。";
       this.emit();
     }
     return unit;
@@ -4839,13 +5303,13 @@ export class GameController {
     const unit = this.debugCursorUnit();
     if (!unit) return;
     if (!this.battle.debugAdjustExperience(unit.id, delta)) {
-      this.statusMessage = `原版除錯：${unitDisplayName(unit)}的經驗不能再減少。`;
+      this.statusMessage = `原版Debug：${unitDisplayName(unit)}的經驗不能再減少。`;
       this.emit();
       return;
     }
     this.battle.focusId = unit.id;
     this.finishOriginalDebugMutation(
-      `原版除錯：${unitDisplayName(unit)}經驗 ${delta > 0 ? "＋50" : "−50"}，現為 ${unit.experience}。`,
+      `原版Debug：${unitDisplayName(unit)}經驗 ${delta > 0 ? "＋50" : "−50"}，現為 ${unit.experience}。`,
     );
   }
 
@@ -4854,18 +5318,18 @@ export class GameController {
     const unit = this.debugCursorUnit();
     if (!unit) return;
     if (!this.battle.debugReduceLife(unit.id)) {
-      this.statusMessage = `原版除錯：${unitDisplayName(unit)}的生命不超過 10，不再減少。`;
+      this.statusMessage = `原版Debug：${unitDisplayName(unit)}的生命不超過 10，不再減少。`;
       this.emit();
       return;
     }
     this.battle.focusId = unit.id;
-    this.finishOriginalDebugMutation(`原版除錯：${unitDisplayName(unit)}生命 −10，現為 ${unit.life}。`);
+    this.finishOriginalDebugMutation(`原版Debug：${unitDisplayName(unit)}生命 −10，現為 ${unit.life}。`);
   }
 
   /** F10（`1000:147E`）：只清我方已行動狀態，不解除冰封。 */
   debugRefreshAllies(): void {
     this.battle.clearActionState(1);
-    this.statusMessage = "原版除錯：我方全員可再次行動。";
+    this.statusMessage = "原版Debug：我方全員可再次行動。";
     this.emit();
   }
 
@@ -4875,7 +5339,7 @@ export class GameController {
     if (!unit) return;
     this.busy = true;
     try {
-      await this.presentContextualLine(unit, "headache", "原版除錯：台詞預覽。");
+      await this.presentContextualLine(unit, "headache", "原版Debug：台詞預覽。");
     }
     finally {
       this.busy = false;
@@ -4891,7 +5355,7 @@ export class GameController {
       cursor: { ...this.cursor },
       cameraOrigin: { ...this.cameraOrigin },
     };
-    this.statusMessage = "原版除錯：左上為游標格號與難度值。";
+    this.statusMessage = "原版Debug：左上為游標格號與難度值。";
     this.emit();
   }
 
@@ -4906,10 +5370,65 @@ export class GameController {
     return { cell: readout.cell, difficulty: readout.difficulty };
   }
 
+  /**
+   * Caps Lock+1（`0000:8448`）：按住期間，視口每格疊上原版範圍圖 DS:`01A9` 的值。原版在每次
+   * 視口重畫時檢查兩鍵都按住，所以選格當中也有效；複刻同樣不限待機，但只在我方階段顯示——
+   * 敵方階段與演出時的範圍圖複刻沒有對應物。
+   */
+  setDebugRangeReadoutHeld(held: boolean): void {
+    if (this.debugRangeReadoutHeld === held) return;
+    this.debugRangeReadoutHeld = held;
+    this.emit();
+  }
+
+  get visibleDebugRangeReadout(): {
+    origin: Position;
+    columns: number;
+    rows: number;
+    values: readonly number[];
+  } | undefined {
+    if (!this.debugRangeReadoutHeld || !this.originalDebugActive || this.phase !== "player") return undefined;
+    const { width: columns, height: rows } = this.battle.stage.viewport;
+    const origin = { ...this.cameraOrigin };
+    const map = this.debugRangeMap();
+    const values: number[] = [];
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        // 待機與選單時原版範圍圖整張是 1（`1000:3A7C`），沒有選格就照這個中性狀態顯示。
+        values.push(map ? map.valueAt({ x: origin.x + column, y: origin.y + row }) : 1);
+      }
+    }
+    return { origin, columns, rows, values };
+  }
+
+  /** 當前選格步驟的範圍圖；沒有選格時回傳 `undefined`，即原版的全 1 中性狀態。 */
+  private debugRangeMap(): NumericRangeMap | undefined {
+    const unit = this.debugTechniqueCaster ?? this.selectedUnit;
+    if (!unit) return undefined;
+    switch (this.actionMode) {
+      case "move":
+        return this.battle.movementRangeValues(
+          unit.id,
+          this.pendingExtraMove || this.commandMenuKind === "extraMove",
+        );
+      case "target": {
+        // `3EF7/3F04`：先清成 0，再在每個可攻擊的鄰格寫 1。
+        const map = new NumericRangeMap(this.battle.stage.width, this.battle.stage.height);
+        for (const target of this.targets) map.set(target, 1);
+        return map;
+      }
+      case "specialTarget":
+      case "shotRoute":
+        return this.selectedActionId ? this.battle.actionRange(unit.id, this.selectedActionId) : undefined;
+      default:
+        return undefined;
+    }
+  }
+
   /** Caps Lock+J（`0000:4A6E`）：不看任何目標條件，直接走本關正常勝利流程。 */
   debugInstantVictory(): void {
     this.battle.debugForceVictory();
-    this.statusMessage = "原版除錯：即時勝利。";
+    this.statusMessage = "原版Debug：即時勝利。";
     this.resolveOutcome();
     this.emit();
   }
@@ -4930,22 +5449,23 @@ export class GameController {
     this.resetAction();
     this.campaignRoute = "stage-49";
     this.phase = "ending";
-    this.statusMessage = "原版除錯：直達主線結局。";
+    this.statusMessage = "原版Debug：直達主線結局。";
     this.emit();
   }
 
-  private finishOriginalDebugMutation(message: string): void {
+  private finishOriginalDebugMutation(message: string, afterOngoing?: () => void): void {
     this.statusMessage = message;
+    const settle = (): void => {
+      const ended = this.resolveOutcome();
+      this.emit();
+      if (!ended) afterOngoing?.();
+    };
     const promotionPause = this.pauseForPromotions();
     if (promotionPause) {
-      void promotionPause.then(() => {
-        this.resolveOutcome();
-        this.emit();
-      });
+      void promotionPause.then(settle);
       return;
     }
-    this.resolveOutcome();
-    this.emit();
+    settle();
   }
 
   get musicBoxTracks(): typeof MUSIC_BOX_TRACKS {
@@ -5011,7 +5531,10 @@ export class GameController {
     if (this.promotionUnitIds.length > 0 || this.groupCommandDialogueActive) return;
     if (this.dialogueSkipConfirmOpen) this.cancelDialogueSkip();
     else if (this.musicBoxOpen) this.closeMusicBox();
-    else if (this.debugLifeMenu) this.closeDebugLifeMenu();
+    else if (this.debugMenu) this.closeDebugMenu();
+    else if (this.debugBehaviourEditor) this.closeDebugBehaviourEditor();
+    else if (this.debugUnitEditor) this.closeDebugUnitEditor();
+    else if (this.debugPlacement) this.cancelDebugPlacement();
     else if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
     else if (this.soundSettingsOpen) this.closeSoundSettings();
@@ -5040,7 +5563,10 @@ export class GameController {
     if (this.groupCommandDialogueActive) return true;
     if (this.phase === "saveSlots") this.cancelPostSaveSlots();
     else if (this.musicBoxOpen) this.closeMusicBox();
-    else if (this.debugLifeMenu) this.closeDebugLifeMenu();
+    else if (this.debugMenu) this.closeDebugMenu();
+    else if (this.debugBehaviourEditor) this.closeDebugBehaviourEditor();
+    else if (this.debugUnitEditor) this.closeDebugUnitEditor();
+    else if (this.debugPlacement) this.cancelDebugPlacement();
     else if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
     else if (this.soundSettingsOpen) this.closeSoundSettings();
@@ -5180,7 +5706,7 @@ export class GameController {
       this.soundSettingsOpen = false;
       this.musicSettingsOpen = false;
       this.musicBoxOpen = false;
-      this.debugLifeMenu = undefined;
+      this.clearOriginalDebugSurfaces();
       this.recordMenuMode = undefined;
       this.dialogueSkipConfirmOpen = false;
       this.dialogueSkipConfirmIndex = 1;
@@ -5216,7 +5742,7 @@ export class GameController {
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
     this.musicBoxOpen = false;
-    this.debugLifeMenu = undefined;
+    this.clearOriginalDebugSurfaces();
     this.recordMenuMode = undefined;
     this.recordMenuIndex = 0;
     this.dialogueSkipConfirmOpen = false;
@@ -5451,9 +5977,23 @@ export class GameController {
   }
 
   private writeBattleSave(slot: number): void {
+    const save = this.createBattleSaveData();
+    // 成功时面板收起；失败时面板不收，操作结果本身就和成功不同，玩家也能当场看到
+    // 该槽仍是原有记录。
+    if (this.commitSaveRecord(slot, save)) {
+      this.recordMenuMode = undefined;
+      this.recordMenuReturn = undefined;
+      this.recordMenuIndex = 0;
+      this.statusMessage = `已儲存至記錄 ${slot}。`;
+    }
+    this.emit();
+  }
+
+  /** 我方階段的戰中記錄內容；寫入槽位與存檔校驗測試共用。 */
+  createBattleSaveData(): BattleSaveData {
     const campaign = this.battle.campaignSnapshot();
     const snapshot = this.battle.serializableSnapshot();
-    const save: SaveData = {
+    return {
       format: "ANGEL2-web-save",
       version: SAVE_VERSION,
       contentVersion: SAVE_CONTENT_VERSION,
@@ -5478,15 +6018,6 @@ export class GameController {
         cameraOrigin: { ...this.cameraOrigin },
       },
     };
-    // 成功时面板收起；失败时面板不收，操作结果本身就和成功不同，玩家也能当场看到
-    // 该槽仍是原有记录。
-    if (this.commitSaveRecord(slot, save)) {
-      this.recordMenuMode = undefined;
-      this.recordMenuReturn = undefined;
-      this.recordMenuIndex = 0;
-      this.statusMessage = `已儲存至記錄 ${slot}。`;
-    }
-    this.emit();
   }
 
   private async loadSave(slot: number): Promise<void> {
@@ -5608,7 +6139,7 @@ export class GameController {
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
     this.musicBoxOpen = false;
-    this.debugLifeMenu = undefined;
+    this.clearOriginalDebugSurfaces();
     this.dialogueSkipConfirmOpen = false;
     this.dialogueSkipConfirmIndex = 1;
     this.quitConfirmOpen = false;
@@ -5759,8 +6290,16 @@ export class GameController {
       if (delta.y !== 0) this.moveMusicBoxSelection(delta.y);
       return;
     }
-    if (this.debugLifeMenu) {
-      if (delta.y !== 0) this.moveDebugLifeMenuSelection(delta.y);
+    if (this.debugMenu) {
+      if (delta.y !== 0) this.moveDebugMenuSelection(delta.y);
+      return;
+    }
+    if (this.debugBehaviourEditor) {
+      if (delta.y !== 0) this.moveDebugBehaviourSelection(delta.y);
+      return;
+    }
+    if (this.debugUnitEditor) {
+      this.moveDebugUnitEditorFocus(delta);
       return;
     }
     if (this.recordMenuMode) {
@@ -5904,7 +6443,9 @@ export class GameController {
     }
     else if (this.phase === "saveSlots") this.selectSaveSlot(this.postSaveSlotIndex + 1);
     else if (this.musicBoxOpen) this.playMusicBoxSelection();
-    else if (this.debugLifeMenu) this.activateDebugLifeMenuSelection();
+    else if (this.debugMenu) this.activateDebugMenuSelection();
+    else if (this.debugBehaviourEditor) this.applyDebugBehaviourSelection();
+    else if (this.debugUnitEditor) this.toggleDebugUnitPresence();
     else if (this.recordMenuMode) this.activateRecordMenuSelection();
     else if (this.quitConfirmOpen) this.activateQuitSelection();
     else if (this.settingsOpen) this.activateSettingsMenuSelection();
@@ -6799,7 +7340,7 @@ export class GameController {
       this.musicSettingsOpen = false;
       this.musicSettingsReturn = undefined;
       this.musicBoxOpen = false;
-      this.debugLifeMenu = undefined;
+      this.clearOriginalDebugSurfaces();
       this.recordMenuMode = undefined;
       this.dialogueSkipConfirmOpen = false;
       this.dialogueSkipConfirmIndex = 1;
@@ -6827,7 +7368,7 @@ export class GameController {
       this.musicSettingsOpen = false;
       this.musicSettingsReturn = undefined;
       this.musicBoxOpen = false;
-      this.debugLifeMenu = undefined;
+      this.clearOriginalDebugSurfaces();
       this.recordMenuMode = undefined;
       this.dialogueSkipConfirmOpen = false;
       this.dialogueSkipConfirmIndex = 1;

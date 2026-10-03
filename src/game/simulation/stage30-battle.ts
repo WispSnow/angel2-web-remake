@@ -82,6 +82,11 @@ export class Stage30Battle extends Stage0Battle {
     return unit?.side === 2 ? "pursuit" : undefined;
   }
 
+  /** `REMAKE-174` 維絲塔的職業就是她的形態鏈位置，原版Debug EDIT 不能改。 */
+  protected override debugClassLocked(unit: BattleUnit): boolean {
+    return unit.id === "2:27";
+  }
+
   protected override replacementForDefeatedUnit(
     unit: BattleUnit,
   ): Omit<PendingUnitTransformation, "before" | "reason" | "retainsBeforeUntilCommit"> | undefined {

@@ -1084,13 +1084,67 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   color: #81766d;
   background: transparent;
 }
-/* `REMAKE-174` 原版除錯 F3／F4 生命選單：與集體命令同一個原版選單外框，三列。 */
-.debug-life-menu { left: 276px; top: 92px; width: 144px; height: 100px; }
-.debug-life-menu button { width: 136px; height: 24px; }
-/* 原版除錯鍵 2：`0000:326A` 先以色 0 填 48×16 的框，再畫五位數字，覆蓋在戰場視口上。 */
+/* `REMAKE-174` 原版Debug的原版選單（F2–F6 與技術二級選單）：原版五組都經 `0000:5651`，
+   共用選單位置，所以與集體命令同一個外框；每列 24 px，外框隨列數長高。 */
+.debug-menu { left: 276px; top: 92px; width: 144px; height: 100px; }
+.action-menu.native-command-menu.debug-menu[data-items="4"] { height: 124px; }
+.action-menu.native-command-menu.debug-menu[data-items="5"] { height: 148px; }
+.debug-menu button { width: 136px; height: 24px; }
+.debug-menu button[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
+/* F1 行為面板 `0000:2302`：白框灰底，13 列點陣字，紅字標出現值，紅框跟著指標。 */
+.debug-behaviour-editor { position: absolute; z-index: 15; overflow: hidden; }
+.debug-behaviour-editor[hidden] { display: none; }
+.debug-behaviour-editor > span,
+.debug-behaviour-row { position: absolute; display: block; }
+.debug-behaviour-figure { width: 40px; height: 44px; display: flex; align-items: flex-end; justify-content: center; }
+.debug-behaviour-figure img,
+.debug-edit-figure img { display: block; image-rendering: var(--image-rendering, pixelated); }
+.debug-behaviour-figure img[hidden],
+.debug-edit-figure img[hidden] { display: none; }
+.debug-behaviour-highlight { box-sizing: border-box; border: 1px solid; pointer-events: none; }
+.debug-behaviour-highlight[hidden] { display: none; }
+.debug-behaviour-row { padding: 0; border: 0; background: transparent; cursor: var(--native-cursor-hand, pointer); }
+.debug-behaviour-row[aria-disabled="true"] { cursor: default; }
+.debug-behaviour-label { position: absolute; display: block; }
+/* 我／敵 EDIT `0000:0ABE`：整屏深藍底、斜面框、四個頁籤與 EXIT；版面全部取自原版矩形描述。 */
+.debug-unit-editor { position: absolute; z-index: 16; inset: 0; overflow: hidden; }
+.debug-unit-editor[hidden] { display: none; }
+.debug-edit-slot,
+.debug-edit-box,
+.debug-edit-text,
+.debug-edit-number-backing,
+.debug-edit-tab,
+.debug-edit-tab-fill { position: absolute; display: block; box-sizing: border-box; }
+.debug-edit-box,
+.debug-edit-tab { padding: 0; margin: 0; }
+.debug-edit-figure,
+.debug-edit-behaviour,
+.debug-edit-name,
+.debug-edit-tab { cursor: var(--native-cursor-hand, pointer); }
+.debug-edit-figure { display: flex; align-items: flex-end; justify-content: center; padding-bottom: 1px; }
+.debug-edit-text { pointer-events: none; }
+.debug-edit-tab-fill { left: 0; top: 0; visibility: hidden; }
+.debug-edit-tab.is-active .debug-edit-tab-fill { visibility: visible; }
+.debug-edit-slot.is-focused > .debug-edit-box:first-child { outline: 1px dashed #ffdf10; outline-offset: 1px; }
+.debug-edit-slot[data-state="empty"] .debug-edit-name,
+.debug-edit-slot[data-state="absent"] .debug-edit-name { cursor: default; }
+.debug-edit-help {
+  position: absolute;
+  left: 8px;
+  top: 312px;
+  width: 560px;
+  margin: 0;
+  color: #c9d4ff;
+  font: 11px/1.45 system-ui, sans-serif;
+}
+/* 原版Debug鍵 2：`0000:326A` 先以色 0 填 48×16 的框，再畫五位數字，覆蓋在戰場視口上。 */
 .debug-cell-readout { position: absolute; z-index: 8; inset: 0; pointer-events: none; }
 .debug-cell-readout[hidden] { display: none; }
 .debug-cell-readout-field { position: absolute; display: block; background: #000; }
+/* 原版Debug Caps Lock+1：`0000:8448` 在每格畫完之後才寫數字，不清底，蓋在單位、生命數字與游標上。 */
+.debug-range-readout { position: absolute; z-index: 7; inset: 0; pointer-events: none; }
+.debug-range-readout[hidden] { display: none; }
+.debug-range-readout > span { position: absolute; display: block; }
 /* 音樂盒是複刻自己的清單介面（`REMAKE-174`）；原版那一行 `MUSIC-  NN-名稱.RIX` 用等寬字
    呈現，用途說明是複刻自撰文字。 */
 .music-box-panel {
@@ -2308,7 +2362,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   cursor: progress;
   opacity: .72;
 }
-/* `REMAKE-174`「原版除錯」：宿主開關，開啟時沿用畫面縮放的選中金色，讓玩家一眼看出
+/* `REMAKE-174`「原版Debug」：宿主開關，開啟時沿用畫面縮放的選中金色，讓玩家一眼看出
    這一局戰鬥的 Caps Lock 熱鍵是活的。 */
 .original-debug-trigger { display: flex; margin-right: 4px; }
 .original-debug-trigger > button {

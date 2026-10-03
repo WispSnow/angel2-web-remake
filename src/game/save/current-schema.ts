@@ -1,4 +1,5 @@
 import { classFallbackPortraitFor, className, isClassId } from "../content/classes";
+import { isDebugAiBehaviourValue, isDebugEditableClassId } from "../content/debug-mode-rules";
 import {
   STAGE0_ALLY_INITIAL_EXPERIENCE,
   initialEnemyExperience,
@@ -30,8 +31,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 127 as const;
-export const SAVE_CONTENT_VERSION = "approach-reach-keep-out-1" as const;
+export const SAVE_VERSION = 128 as const;
+export const SAVE_CONTENT_VERSION = "original-debug-edits-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;
@@ -162,6 +163,8 @@ function isBattleUnit(
       : value.actionDisabled !== undefined)
     || !isUnitStatuses(value.statuses)
     || !isPosition(value)
+    || (value.debugAiBehavior !== undefined && !isDebugAiBehaviourValue(value.debugAiBehavior))
+    || (value.debugClassEdit !== undefined && value.debugClassEdit !== true)
   ) return false;
 
   const rootId = waterWarriorRootId({
@@ -174,6 +177,8 @@ function isBattleUnit(
 
   const schema: StageSaveSchema = STAGE_RUNTIME_MANIFEST[stageId].save;
   const classId = value.classId;
+  // `REMAKE-174` 原版Debug EDIT 改過職業的單位不受本關職業表約束，但只能是可改的普通職業。
+  if (value.debugClassEdit === true) return isDebugEditableClassId(classId);
   if (value.side === 1) {
     return schema.alliedUnits.kind !== "allowed-classes"
       || schema.alliedUnits.classIds.includes(classId);
@@ -337,8 +342,10 @@ export function isSavedBattleState(
       );
       const maximumLife = namedUnitRuleFor(unit, saveSchema)?.maximumLifeByDifficulty?.[difficulty]
         ?? statsFor(unit, difficulty).maxLife;
+      // `REMAKE-174` EDIT 改職業保留原經驗（原版只改職業陣列），所以新職業的入場經驗不是它的下限。
       const minimumExperience = saveSchema.enemyExperienceFloor === "none"
         || (saveSchema.enemyExperienceFloor === "difficulty-unless-lawless" && difficulty === 3)
+        || unit.debugClassEdit === true
         ? 0
         : initialEnemyExperience(unit.classId, difficulty);
       return unit.life > maximumLife

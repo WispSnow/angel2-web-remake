@@ -30,6 +30,13 @@ export interface SpecialActionResolutionContext {
   battlefield: ActionBattlefield;
   statsFor: (unit: Pick<BattleUnit, "classId" | "experience" | "side">) => UnitStats;
   viewport?: ActionViewport;
+  /**
+   * `REMAKE-174` 原版Debug技術測試：以目標為中心的範圍技（落雷、回復）只作用於這一方。
+   * 原版的掃描比對 DS:`1EF6`，它記的是所選目標的陣營（`1000:4264`），而除錯選格按絕對
+   * 陣營篩目標，所以傷害技是 side 2、輔助技是 side 1，與施法者是哪一方無關。沒有設定時
+   * 照一般施法，以施法者為準。施法者自己一律不受自己的傷害技影響（`[SR]`）。
+   */
+  areaSide?: BattleUnit["side"];
 }
 
 const positionKey = ({ x, y }: Position): string => `${x},${y}`;
@@ -613,7 +620,9 @@ function prepareLightning(
   );
   const pool = sharedLifePool();
   const affectedUnits = context.units
-    .filter((unit) => unit.side !== actor.side && effect.valueAt(unit) > 0)
+    .filter((unit) => (context.areaSide === undefined
+      ? unit.side !== actor.side
+      : unit.side === context.areaSide && unit.id !== actor.id) && effect.valueAt(unit) > 0)
     .sort((left, right) => left.y * context.battlefield.width + left.x
       - (right.y * context.battlefield.width + right.x))
     .map((unit) => {
@@ -715,7 +724,7 @@ function prepareRecovery(
   );
   let totalActualHealing = 0;
   const affectedUnits = context.units
-    .filter((unit) => unit.side === actor.side && effect.valueAt(unit) > 0)
+    .filter((unit) => unit.side === (context.areaSide ?? actor.side) && effect.valueAt(unit) > 0)
     .sort((left, right) => left.y * context.battlefield.width + left.x
       - (right.y * context.battlefield.width + right.x))
     .map((unit) => {

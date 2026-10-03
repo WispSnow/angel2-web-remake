@@ -75,7 +75,7 @@ export function computeGameOffset(
 
 export interface GameScalingOptions {
   /**
-   * `REMAKE-174` 的「原版除錯」開關屬於正式遊戲表面；實驗室各有自己的內存場景，
+   * `REMAKE-174` 的「原版Debug」開關屬於正式遊戲表面；實驗室各有自己的內存場景，
    * 掛上去只會讓人以為那裡也吃這個開關。
    */
   readonly originalDebugToggle?: boolean;

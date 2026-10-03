@@ -177,8 +177,8 @@ export class Stage27Battle extends Stage0Battle {
   }
 
   /** REMAKE-067 keeps the city defenders stationary only during round 1. */
-  override alliedBehaviorFor(id: string): number {
-    const behavior = super.alliedBehaviorFor(id);
+  protected override stageAlliedBehaviorFor(id: string): number {
+    const behavior = super.stageAlliedBehaviorFor(id);
     const unit = this.unit(id);
     const control = STAGE27_EVENT_PROGRAM.alliedControl;
     if (control.firstRoundAutomaticPosture === "sentry"
@@ -191,12 +191,12 @@ export class Stage27Battle extends Stage0Battle {
     return behavior;
   }
 
-  override enemyBehaviorFor(id: string): number {
+  protected override stageEnemyBehaviorFor(id: string): number {
     const unit = this.unit(id);
     const candidate = unit?.side === 2
       ? STAGE27_SEMANTIC_REINFORCEMENTS.candidates.find(({ slot }) => slot === unit.slot)
       : undefined;
-    return candidate?.aiBehavior ?? super.enemyBehaviorFor(id);
+    return candidate?.aiBehavior ?? super.stageEnemyBehaviorFor(id);
   }
 
   override enemyAiIntentFor(id: string): EnemyAiIntent | undefined {

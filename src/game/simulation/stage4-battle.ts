@@ -143,14 +143,14 @@ export class Stage4Battle extends Stage0Battle {
     return super.beginEnemyPhase();
   }
 
-  override enemyBehaviorFor(id: string): number {
+  protected override stageEnemyBehaviorFor(id: string): number {
     const unit = this.unit(id);
     if (unit?.side === 2) {
       const candidate = STAGE4_SEMANTIC_REINFORCEMENTS.candidates
         .find(({ slot }) => slot === unit.slot);
       if (candidate) return candidate.aiBehavior;
     }
-    return super.enemyBehaviorFor(id);
+    return super.stageEnemyBehaviorFor(id);
   }
 
   protected override restoreDerivedForceMemberships(): void {

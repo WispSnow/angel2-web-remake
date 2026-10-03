@@ -30,7 +30,8 @@ import {
   shootingActionIdFor,
   techniqueActionIdsFor,
 } from "../content/actions";
-import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, activateStage0Content, completeCampaignRoster, createStage0Units, effectiveStatsFor, isStage0Exit, nextExperienceThresholdAt, statsFor, terrainSlotAt } from "../content/stage0";
+import { isDebugAiBehaviourValue, isDebugEditableClassId, isDebugTechniqueAction } from "../content/debug-mode-rules";
+import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_ALLY_INITIAL_EXPERIENCE, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, activateStage0Content, completeCampaignRoster, createStage0Units, effectiveStatsFor, isStage0Exit, nextExperienceThresholdAt, statsFor, terrainSlotAt } from "../content/stage0";
 import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
 import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, PortraitRecord, Position, SaveRosterEntry, SavedBattleState, Side, UnitClassId, UnitStats, UnitStatuses } from "../types";
 import { DeterministicRng } from "./rng";
@@ -549,6 +550,13 @@ export class Stage0Battle {
   private readonly pendingTransformations: PendingUnitTransformation[] = [];
   /** `REMAKE-174` Caps Lock+J 的即時勝利；與原版的 999 一樣只活在本場戰鬥的記憶體。 */
   private debugVictory = false;
+  /**
+   * `REMAKE-174` 原版Debug EDIT 可放回的單位：本次進入或讀取戰鬥之後陣亡或被除錯移出的
+   * 單位，以根單位 id 記住離場時的記錄。只存在記憶體，不入存檔。
+   */
+  private readonly debugDepartedUnits = new Map<string, BattleUnit>();
+  /** `REMAKE-174` 原版Debug技術測試準備的動作；只有這裡建立的物件能走除錯提交。 */
+  private readonly debugPreparedActions = new WeakSet<PreparedBattleAction>();
   private aiPlanningCache?: AiPlanningCache;
   private activeAiPlanningCache?: AiPlanningCache;
 
@@ -619,6 +627,8 @@ export class Stage0Battle {
       Number(unit.actionDisabled),
       this.alliedBehaviorFor(unit.id),
       this.enemyBehaviorFor(unit.id),
+      // 覆寫值與關卡值相同時，指揮權仍可能改變（例如對自動友軍寫 0），所以另記有沒有覆寫。
+      unit.debugAiBehavior === undefined ? "-" : "d",
       ...UNIT_STATUS_KEYS.map((key) => unit.statuses[key]),
     ].join(",")).join("|");
     return `${this.round}/${this.rng.state}/${this.rng.calls}/${terrain}/${units}`;
@@ -830,6 +840,7 @@ export class Stage0Battle {
     campaignRoster?: readonly SaveRosterEntry[],
   ): void {
     this.pendingTransformations.splice(0);
+    this.debugDepartedUnits.clear();
     this.round = snapshot.round;
     this.focusId = snapshot.focusId;
     this.units = snapshot.units.map((unit) => ({
@@ -912,6 +923,7 @@ export class Stage0Battle {
 
   private removeSharedUnit(unit: BattleUnit): void {
     const replacement = this.replacementForDefeatedUnit(unit);
+    this.recordDebugDeparture(unit);
     const ids = new Set(this.waterWarriorGroup(unit).map(({ id }) => id));
     this.units = this.units.filter((candidate) => !ids.has(candidate.id));
     if (replacement) {
@@ -1093,17 +1105,35 @@ export class Stage0Battle {
     };
   }
 
-  enemyBehaviorFor(id: string): number {
+  /**
+   * 這兩個查表是唯一入口：原版Debug（`REMAKE-174`）的行為覆寫先於關卡自己的行為值。它們
+   * 寫成箭頭屬性，子類別若再以方法覆寫會編譯失敗；關卡要改行為值請覆寫下面的
+   * `stageEnemyBehaviorFor`／`stageAlliedBehaviorFor`。
+   */
+  readonly enemyBehaviorFor = (id: string): number =>
+    this.debugAiBehaviorFor(id) ?? this.stageEnemyBehaviorFor(id);
+
+  readonly alliedBehaviorFor = (id: string): number =>
+    this.debugAiBehaviorFor(id) ?? this.stageAlliedBehaviorFor(id);
+
+  protected stageEnemyBehaviorFor(id: string): number {
     return this.scenario.enemyBehaviorById?.get(id) ?? 0;
   }
 
-  alliedBehaviorFor(id: string): number {
+  protected stageAlliedBehaviorFor(id: string): number {
     return this.scenario.alliedBehaviorById?.get(id) ?? 0;
+  }
+
+  /** `REMAKE-174` 原版Debug F1／EDIT 寫入的行為值；沒有覆寫時為 `undefined`。 */
+  debugAiBehaviorFor(id: string): number | undefined {
+    return this.unit(id)?.debugAiBehavior;
   }
 
   isPlayerControllableAlly(id: string): boolean {
     const unit = this.unit(id);
     if (unit?.side !== 1) return false;
+    // 用戶 2026-10-02 決定照原版：行為覆寫壓過關卡的部隊設定，0 歸玩家，非 0 交給自動階段。
+    if (unit.debugAiBehavior !== undefined) return unit.debugAiBehavior === 0;
     const forceControl = this.forces.controlForUnit(id);
     if (forceControl) return forceControl === "player";
     return !this.forces.hasExplicitDefinitions() && this.alliedBehaviorFor(id) === 0;
@@ -1273,6 +1303,22 @@ export class Stage0Battle {
     unit.y = destination.y;
     this.focusId = id;
     return true;
+  }
+
+  /**
+   * `REMAKE-174` 原版Debug Caps Lock+1：移動選格時的原版範圍值，與 `reachableCells`／
+   * `extraMovementRange` 同一次傳播；飛龍追加移動的預算同樣減半。
+   */
+  movementRangeValues(id: string, extraMove = false): NumericRangeMap | undefined {
+    const unit = this.unit(id);
+    if (!unit) return undefined;
+    const movement = this.statsFor(unit).movement;
+    const map = this.movementMapFor(unit, extraMove ? Math.floor(movement / 2) : movement);
+    const values = new NumericRangeMap(this.stage.width, this.stage.height);
+    for (let y = 0; y < this.stage.height; y += 1) {
+      for (let x = 0; x < this.stage.width; x += 1) values.set({ x, y }, map.rangeValueAt({ x, y }));
+    }
+    return values;
   }
 
   reachableCells(id: string, movementBudget?: number): Position[] {
@@ -1660,7 +1706,14 @@ export class Stage0Battle {
     ) {
       throw new Error("stale prepared special action");
     }
+    return this.applyPreparedSpecialAction(actor, prepared);
+  }
 
+  /** 提交與施法者資格無關的部分；一般提交與原版Debug技術測試共用。 */
+  private applyPreparedSpecialAction(
+    actor: BattleUnit,
+    prepared: PreparedBattleAction,
+  ): SpecialActionResult {
     for (const affected of prepared.affectedUnits) {
       const target = this.unit(affected.unitId);
       if (target && target.side !== actor.side) this.onHostileTargeted(actor, target);
@@ -1804,6 +1857,15 @@ export class Stage0Battle {
     return [...appendedIds];
   }
 
+  /** 原版Debug技術測試準備的祈禱不看施法者的職業、禁咒、已行動與冰封（`0000:6C16`）。 */
+  private prayerCasterStillEligible(actor: BattleUnit, prepared: PreparedBattleAction): boolean {
+    if (this.debugPreparedActions.has(prepared)) return true;
+    return !actor.acted
+      && !actor.actionDisabled
+      && actor.classId === "prayer-guide"
+      && actor.statuses.techniqueSeal === 0;
+  }
+
   commitPreparedPrayerOutcome(
     prepared: PreparedBattleAction,
     index: number,
@@ -1811,8 +1873,7 @@ export class Stage0Battle {
     if (prepared.intent.actionId !== "prayer") throw new Error("prepared action is not prayer");
     const affected = prepared.affectedUnits[index];
     const actor = this.unit(prepared.intent.actorId);
-    if (!affected || !actor || actor.acted || actor.actionDisabled
-      || actor.classId !== "prayer-guide" || actor.statuses.techniqueSeal > 0) {
+    if (!affected || !actor || !this.prayerCasterStillEligible(actor, prepared)) {
       throw new Error("stale prepared prayer action");
     }
     const expectedRngState = index === 0 ? prepared.rngBefore : prepared.rngAfter;
@@ -1851,8 +1912,7 @@ export class Stage0Battle {
     const rngAlreadyCommitted = prepared.affectedUnits.length > 0
       && this.rng.state === prepared.rngAfter
       && this.rng.calls === prepared.rngCallsAfter;
-    if (!actor || actor.acted || actor.actionDisabled || actor.classId !== "prayer-guide"
-      || actor.statuses.techniqueSeal > 0 || !allOutcomesCommitted
+    if (!actor || !this.prayerCasterStillEligible(actor, prepared) || !allOutcomesCommitted
       || (!rngStillUncommitted && !rngAlreadyCommitted)) {
       throw new Error("stale prepared prayer action");
     }
@@ -4143,7 +4203,7 @@ export class Stage0Battle {
   }
 
   /**
-   * `REMAKE-174` 原版除錯 F3／F4。模組 29 `540D` 逐槽裝入該方單位後呼叫 `5475`（生命 = 上限）、
+   * `REMAKE-174` 原版Debug F3／F4。模組 29 `540D` 逐槽裝入該方單位後呼叫 `5475`（生命 = 上限）、
    * `5461`（生命 = 1），或 `546B` 寫 0 再由 `5435` 清掉該方全部棋盤格。「全滅」只清棋盤：
    * 原版不走死亡表現，也不經過擊殺替補或形態轉換，所以這裡直接移除，不呼叫 `removeSharedUnit`。
    * 不消耗戰鬥 PRNG；回傳受影響的單位數。
@@ -4151,15 +4211,252 @@ export class Stage0Battle {
   debugSetSideLife(side: BattleUnit["side"], effect: "full" | "remove" | "one"): number {
     const targets = this.units.filter((unit) => unit.side === side);
     if (effect === "remove") {
+      for (const unit of targets) {
+        this.recordCampaignUnit(unit);
+        this.recordDebugDeparture(unit);
+      }
       this.units = this.units.filter((unit) => unit.side !== side);
+      this.repairFocusAfterRemoval();
       return targets.length;
     }
-    for (const unit of targets) unit.life = effect === "full" ? this.statsFor(unit).maxLife : 1;
+    for (const unit of targets) {
+      unit.life = effect === "full" ? this.statsFor(unit).maxLife : 1;
+      this.recordCampaignUnit(unit);
+    }
     return targets.length;
   }
 
+  private repairFocusAfterRemoval(): void {
+    if (!this.unit(this.focusId)) this.focusId = this.units[0]?.id ?? this.focusId;
+  }
+
+  /** 記住離場單位（以根單位為準），供 EDIT 放回；同一 id 以最後一次離場為準。 */
+  private recordDebugDeparture(unit: BattleUnit): void {
+    const rootId = waterWarriorRootId(unit) ?? unit.id;
+    if (rootId !== `${unit.side}:${unit.slot}`) return;
+    const root = this.units.find(({ id }) => id === rootId) ?? unit;
+    this.debugDepartedUnits.set(rootId, cloneBattleUnit({ ...root, id: rootId }));
+  }
+
+  // ── REMAKE-174 原版Debug第二批 ─────────────────────────────────────────────
+
   /**
-   * `REMAKE-174` 原版除錯 U／D（`0000:32DA/32FD`）：累計經驗 ±50，−50 只在結果大於 0 時寫入。
+   * F1／EDIT 不能改行為的單位與原因。依固定路線、護送或劇情台陣行動的角色，以及女帝、龍、頭、手
+   * 這些專用腳本職業都鎖定，避免改掉關卡目標本身。
+   */
+  debugAiBehaviorLock(id: string): "special-class" | "scripted" | undefined {
+    const unit = this.unit(id);
+    if (!unit) return undefined;
+    if (!isDebugEditableClassId(unit.classId)) return "special-class";
+    if (this.routePulseByActorId.has(unit.id)
+      || this.escortRouteByActorId.has(unit.id)
+      || (unit.side === 2 && this.scenario.routeEnemy !== undefined)
+      || this.debugScriptLocked(unit)) return "scripted";
+    return undefined;
+  }
+
+  /** 關卡自己的劇情鎖；第 42 關傳送門台陣等覆寫。 */
+  protected debugScriptLocked(_unit: BattleUnit): boolean {
+    return false;
+  }
+
+  /**
+   * F1（`0000:2302`）／EDIT 行為框：寫入光標下單位（整個水戰士分身組）的行為值。原版寫的是
+   * 該方逐槽行為字；複刻存在單位上，讀檔後保留。不消耗 PRNG。
+   */
+  debugSetAiBehavior(id: string, value: number): boolean {
+    const unit = this.unit(id);
+    if (!unit || !isDebugAiBehaviourValue(value) || this.debugAiBehaviorLock(id)) return false;
+    for (const member of this.waterWarriorGroup(unit)) member.debugAiBehavior = value;
+    return true;
+  }
+
+  /**
+   * F5／F6（`0000:6C16 → 75E4`）的選格範圍：原版選格種子，不看職業、禁咒、已行動與冰封。
+   */
+  debugTechniqueRange(casterId: string, actionId: BattleActionId): NumericRangeMap {
+    const caster = this.unit(casterId);
+    const empty = new NumericRangeMap(this.stage.width, this.stage.height);
+    if (!caster || !isDebugTechniqueAction(actionId)) return empty;
+    const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+    if (definition.target === "self-area") {
+      empty.set(caster, 1);
+      return empty;
+    }
+    if (!("selectionRadius" in definition.range)) return empty;
+    return techniqueSelectionRange(caster, this.dynamicBattlefield, definition.range.selectionRadius);
+  }
+
+  /**
+   * 技術測試的合法目標格。原版 `18B6:0234` 按絕對陣營篩：傷害類要 side 2、輔助類要 side 1，
+   * 與施法者是哪一方無關（用戶 2026-10-02 決定照原版）。`[SR]` 施法者不能拿傷害技打自己。
+   */
+  debugTechniqueTargetCells(casterId: string, actionId: BattleActionId): Position[] {
+    const caster = this.unit(casterId);
+    if (!caster || !isDebugTechniqueAction(actionId)) return [];
+    const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+    if (definition.target === "self-area") return [{ x: caster.x, y: caster.y }];
+    const range = this.debugTechniqueRange(casterId, actionId);
+    const targetSide = definition.target === "ally" ? 1 : 2;
+    return this.units
+      .filter((target) => range.valueAt(target) > 0
+        && target.side === targetSide
+        && (definition.target === "ally" || target.id !== caster.id)
+        && (canTargetFrozenUnit(actionId) || !target.actionDisabled))
+      .map(({ x, y }) => ({ x, y }));
+  }
+
+  prepareDebugTechnique(intent: BattleActionIntent): PreparedBattleAction {
+    const caster = this.unit(intent.actorId);
+    const target = intent.targetId ? this.unit(intent.targetId) : undefined;
+    const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
+    const selfCentered = definition.target === "self-area";
+    const center = selfCentered && caster
+      ? { x: caster.x, y: caster.y }
+      : intent.target ?? (target ? { x: target.x, y: target.y } : undefined);
+    const requiresTargetUnit = definition.target === "ally" || definition.target === "enemy";
+    if (
+      !caster
+      || !center
+      || !isDebugTechniqueAction(intent.actionId)
+      || (requiresTargetUnit && (!target || target.x !== center.x || target.y !== center.y))
+      || !this.debugTechniqueTargetCells(caster.id, intent.actionId)
+        .some(({ x, y }) => x === center.x && y === center.y)
+    ) {
+      throw new Error("illegal debug technique");
+    }
+    const prepared = resolveSpecialAction(
+      { actionId: intent.actionId, actorId: caster.id, ...(target ? { targetId: target.id } : {}) },
+      caster,
+      target,
+      this.rng,
+      {
+        units: this.units,
+        battlefield: this.dynamicBattlefield,
+        statsFor: (unit) => this.statsFor(unit),
+        // 以目標為中心的範圍技作用於所選目標那一方（DS:`1EF6`）；冰雪以施法者為中心，照一般規則。
+        ...(selfCentered ? {} : { areaSide: definition.target === "ally" ? 1 as const : 2 as const }),
+      },
+      center,
+    );
+    this.debugPreparedActions.add(prepared);
+    return prepared;
+  }
+
+  /** 提交 `prepareDebugTechnique` 的結果；照一般提交扣血、給經驗並寫已行動（`0000:7680`）。 */
+  commitPreparedDebugTechnique(prepared: PreparedBattleAction): SpecialActionResult {
+    const actor = this.unit(prepared.intent.actorId);
+    if (
+      !actor
+      || !this.debugPreparedActions.has(prepared)
+      || prepared.intent.actionId === "prayer"
+      || this.rng.state !== prepared.rngBefore
+      || this.rng.calls !== prepared.rngCallsBefore
+      || actor.experience !== prepared.actorExperienceBefore
+    ) {
+      throw new Error("stale prepared debug technique");
+    }
+    return this.applyPreparedSpecialAction(actor, prepared);
+  }
+
+  /** EDIT 可放回的單位（已離場、id 目前不在棋盤上）。 */
+  debugDepartedUnit(id: string): BattleUnit | undefined {
+    const record = this.debugDepartedUnits.get(id);
+    return record && !this.unit(id) ? cloneBattleUnit(record) : undefined;
+  }
+
+  get debugDepartedUnitIds(): readonly string[] {
+    return [...this.debugDepartedUnits.keys()].filter((id) => !this.unit(id));
+  }
+
+  /**
+   * EDIT 名字框（在場）：整組從棋盤移除。原版只清棋盤（`0000:0B86`），不走死亡表現、擊殺替補或
+   * 形態轉換，也不算擊殺。
+   */
+  debugRemoveUnit(id: string): boolean {
+    const unit = this.unit(id);
+    if (!unit || this.pendingTransformations.length > 0) return false;
+    const group = this.waterWarriorGroup(unit);
+    for (const member of group) this.recordCampaignUnit(member);
+    this.recordDebugDeparture(unit);
+    const ids = new Set(group.map(({ id: memberId }) => memberId));
+    this.units = this.units.filter((candidate) => !ids.has(candidate.id));
+    this.repairFocusAfterRemoval();
+    return true;
+  }
+
+  /**
+   * EDIT 名字框（不在場）之後的點格：把離場記錄放回。原版生命回滿、其餘沿用記錄，且不檢查
+   * 佔用、地形或重複；`[SR]` 只放在空著、這個職業能站的格上，冰封與已行動清除。
+   */
+  debugPlaceUnit(id: string, position: Position): boolean {
+    const record = this.debugDepartedUnit(id);
+    if (
+      !record
+      || this.pendingTransformations.length > 0
+      || position.x < 0
+      || position.y < 0
+      || position.x >= this.stage.width
+      || position.y >= this.stage.height
+      || this.unitAt(position)
+      || movementBlocked(record.classId, position, this.dynamicBattlefield)
+    ) return false;
+    const unit: BattleUnit = {
+      ...record,
+      x: position.x,
+      y: position.y,
+      life: this.statsFor(record).maxLife,
+      acted: false,
+      actionDisabled: false,
+      statuses: { ...record.statuses },
+    };
+    this.units.push(unit);
+    this.debugDepartedUnits.delete(id);
+    this.recordCampaignUnit(unit);
+    this.focusId = unit.id;
+    return true;
+  }
+
+  /** EDIT 棋子框不能改職業的單位與原因。 */
+  debugClassEditLock(id: string): "special-class" | "split" | "scripted" | undefined {
+    const unit = this.unit(id);
+    if (!unit) return undefined;
+    if (!isDebugEditableClassId(unit.classId)) return "special-class";
+    if (this.waterWarriorGroup(unit).length > 1) return "split";
+    if (this.debugScriptLocked(unit) || this.debugClassLocked(unit)) return "scripted";
+    return undefined;
+  }
+
+  /** 職業屬於關卡腳本的單位（第 30 關維絲塔的形態鏈等）。 */
+  protected debugClassLocked(_unit: BattleUnit): boolean {
+    return false;
+  }
+
+  /**
+   * EDIT 棋子框（`0000:0CE3/0D18`）：原版直接改職業陣列，經驗照舊、不壓生命。`[SR]` 生命壓到
+   * 新上限；通用單位的名字與肖像跟著職業走；第 0／1 槽的我方士兵經驗補到入場下限 299。
+   */
+  debugSetUnitClass(id: string, classId: ClassId): boolean {
+    const unit = this.unit(id);
+    if (!unit || !isDebugEditableClassId(classId) || this.debugClassEditLock(id)) return false;
+    if (unit.classId === classId) return true;
+    const followsClassIdentity = usesClassIdentity(unit);
+    const followsClassPortrait = followsClassIdentity || unit.displayIdentity === "named-class-portrait";
+    unit.classId = classId;
+    unit.className = className(classId);
+    if (followsClassIdentity && unit.side === 1) unit.name = genericUnitName(unit);
+    if (followsClassPortrait) unit.portrait = classFallbackPortraitFor(classId, unit.side) ?? unit.portrait;
+    if (unit.side === 1 && classId === "soldier") {
+      unit.experience = Math.max(unit.experience, STAGE0_ALLY_INITIAL_EXPERIENCE[unit.slot] ?? 0);
+    }
+    unit.life = Math.max(1, Math.min(unit.life, this.statsFor(unit).maxLife));
+    unit.debugClassEdit = true;
+    this.recordCampaignUnit(unit);
+    return true;
+  }
+
+  /**
+   * `REMAKE-174` 原版Debug U／D（`0000:32DA/32FD`）：累計經驗 ±50，−50 只在結果大於 0 時寫入。
    * 原版不壓生命；`[SR]` 生命高於新上限時壓到上限，避免右欄出現「生命 200／180」。
    */
   debugAdjustExperience(id: string, delta: 50 | -50): boolean {
@@ -4174,7 +4471,7 @@ export class Stage0Battle {
   }
 
   /**
-   * `REMAKE-174` 原版除錯數字鍵盤 `-`（`0000:551A`）：生命不小於 10 時減 10，可能留下 0 生命
+   * `REMAKE-174` 原版Debug數字鍵盤 `-`（`0000:551A`）：生命不小於 10 時減 10，可能留下 0 生命
    * 仍在場的單位。`[SR]` 只在生命大於 10 時扣，結果至少為 1。
    */
   debugReduceLife(id: string): boolean {
@@ -4186,7 +4483,7 @@ export class Stage0Battle {
   }
 
   /**
-   * `REMAKE-174` 原版除錯 Caps Lock+J（`0000:4A6E`）：主循環把戰鬥結果直接寫成 999，再走
+   * `REMAKE-174` 原版Debug Caps Lock+J（`0000:4A6E`）：主循環把戰鬥結果直接寫成 999，再走
    * 正常勝利分發。這是本場戰鬥的記憶體狀態，不入存檔；勝利流程隨後交給完成記錄。
    */
   debugForceVictory(): void {

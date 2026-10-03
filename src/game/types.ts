@@ -129,6 +129,13 @@ export interface BattleUnit extends Position {
   /** v9 save field backing the stableRemake “冰封” state; it does not stack. */
   actionDisabled: boolean;
   statuses: UnitStatuses;
+  /**
+   * `REMAKE-174` 原版Debug F1／EDIT 寫入的 AI 行為值（0..11）。有值時取代關卡給這個單位的
+   * 行為，我方單位並以它決定指揮權：0 歸玩家，非 0 交給自動階段。
+   */
+  debugAiBehavior?: number;
+  /** `REMAKE-174` 原版Debug EDIT 改過職業；存檔校驗不再要求它符合本關的職業表。 */
+  debugClassEdit?: true;
 }
 
 export type BattleOutcome = "ongoing" | "victory" | "defeat";
@@ -302,8 +309,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 127;
-  contentVersion: "approach-reach-keep-out-1";
+  version: 128;
+  contentVersion: "original-debug-edits-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

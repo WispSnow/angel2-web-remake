@@ -91,10 +91,10 @@ export class Stage19Battle extends Stage0Battle {
     this.focusId = "1:0";
   }
 
-  override enemyBehaviorFor(id: string): number {
+  protected override stageEnemyBehaviorFor(id: string): number {
     return this.round >= STAGE19_EVENT_PROGRAM.nativeDelayedAiReset.firstRound
       ? STAGE19_EVENT_PROGRAM.nativeDelayedAiReset.value
-      : super.enemyBehaviorFor(id);
+      : super.stageEnemyBehaviorFor(id);
   }
 
   override enemyAiIntentFor(id: string): EnemyAiIntent | undefined {

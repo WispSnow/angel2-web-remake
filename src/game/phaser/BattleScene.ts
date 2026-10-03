@@ -30,15 +30,21 @@ import {
   addBattleSpriteImageFromSource,
   preloadBattleSpriteAtlases,
 } from "./battle-sprite-atlas";
-import { stagedRenderAssetSource } from "../staged-render-asset-cache";
+import { stagedRenderAssetAvailable, stagedRenderAssetSource } from "../staged-render-asset-cache";
 import {
   NATIVE_POINTER_FRAMES,
   battlePointerCursorFor,
   type BattlePointerCursor,
 } from "../edge-scroll-cursors";
+import {
+  BATTLE_TILE_HEIGHT,
+  BATTLE_TILE_WIDTH,
+  BATTLE_VIEWPORT_LEFT,
+  BATTLE_VIEWPORT_TOP,
+} from "../scaling-constants";
 
-const TILE_WIDTH = 40;
-const TILE_HEIGHT = 44;
+const TILE_WIDTH = BATTLE_TILE_WIDTH;
+const TILE_HEIGHT = BATTLE_TILE_HEIGHT;
 const BATTLE_SURFACE_RIGHT = 480;
 const BATTLE_SURFACE_BOTTOM = 350;
 const BATTLE_INPUT_LEFT = 40;
@@ -359,7 +365,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     }
 
     create(): void {
-      this.cameras.main.setViewport(40, 23, 400, 308);
+      this.cameras.main.setViewport(BATTLE_VIEWPORT_LEFT, BATTLE_VIEWPORT_TOP, 400, 308);
       this.cameras.main.setBackgroundColor("#050405");
       const { originBounds, width, height } = controller.battle.stage.viewport;
       this.cameras.main.setBounds(
@@ -565,6 +571,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       // Phaser has released the camera during a battle/deployment swap.
       if (!this.sys.isActive() || !this.cameras.main) return;
       this.scheduleAllyFiguresForBoard();
+      this.scheduleDebugEditedFigures();
       if (!controller.edgeScrollEnabled && !this.primaryPointerHeld && this.edgePan) this.clearEdgePan();
       this.syncCamera();
       this.drawTerrainOverrides();
@@ -578,6 +585,36 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     }
 
     /** 我方棋子图键到来源：在场 ∪ 剧情增援 ∪ 形态转换的职业，连同各自的转职闭包。 */
+    /** 已按它補排過原版Debug改職業棋子的職業組合；見 `scheduleDebugEditedFigures`。 */
+    private debugEditedFigureSignature = "";
+
+    /**
+     * `REMAKE-174` 原版Debug EDIT 在同一個棋盤上改職業。只有被它改過職業的單位才會走到這裡：
+     * EDIT 只開放這場戰鬥資源租約裡有棋子的職業，所以補排的是租約內的圖，不另發原始請求。
+     */
+    private scheduleDebugEditedFigures(): void {
+      const edited = controller.battle.units.filter(({ debugClassEdit }) => debugClassEdit === true);
+      const signature = [...new Set(edited.map(({ side, classId }) => `${side}:${classId}`))].sort().join(",");
+      if (signature === this.debugEditedFigureSignature) return;
+      this.debugEditedFigureSignature = signature;
+      let queued = false;
+      for (const unit of edited) {
+        const key = unit.side === 1 ? `ally-${unit.classId}` : `enemy-${unit.classId}`;
+        if (this.textures.exists(key) || this.pendingAllyFigureKeys.has(key)) continue;
+        const source = unit.side === 1 ? allyMapUnitAsset(unit.classId) : controller.enemyFigureUrl(unit.classId);
+        if (!source || !stagedRenderAssetAvailable(source)) continue;
+        this.pendingAllyFigureKeys.add(key);
+        this.load.image(key, stagedRenderAssetSource(source));
+        queued = true;
+      }
+      if (!queued) return;
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+        this.pendingAllyFigureKeys.clear();
+        this.sync();
+      });
+      this.load.start();
+    }
+
     private allyFigureSources(): ReadonlyMap<string, string> {
       const sources = new Map<string, string>();
       for (const [classId, source] of allyMapUnitAssetsForClasses(controller.currentAllyMapClassIds)) {
@@ -986,7 +1023,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         return "ally-soldier";
       }
       const stageKey = `enemy-${unit.classId}`;
-      if (this.textures.exists(stageKey)) return stageKey;
+      if (this.textures.exists(stageKey) || this.pendingAllyFigureKeys.has(stageKey)) return stageKey;
       return "enemy-soldier";
     }
 
@@ -1033,7 +1070,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private drawLifeDigits(view: UnitView, unit: BattleUnit): boolean {
       const graphics = view.lifeDigits;
       graphics.clear();
-      // 模組 29 `0000:8168 → 81A2`：第 37 關 side 2 的地圖生命數字不畫，只有原版除錯模式
+      // 模組 29 `0000:8168 → 81A2`：第 37 關 side 2 的地圖生命數字不畫，只有原版Debug模式
       // （DS:`132F` = `Y`）才補上；與右欄的 `?????` 是同一個門（`REMAKE-174`）。
       if (unit.side === 2 && controller.battle.stage.id === "stage-37" && !controller.originalDebugActive) {
         return false;

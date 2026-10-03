@@ -770,6 +770,23 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-174 adds two optional unit fields that only the original debug mode
+ * writes (`debugAiBehavior`, `debugClassEdit`). A v127 save never holds them, so
+ * it only moves to the current identity.
+ */
+function migrateVersion127Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 127
+    || value.contentVersion !== "approach-reach-keep-out-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-173 only changes where automatic ranged units plan to stand: approach
  * rings follow the real range propagation, and stage 8's raiding magician keeps
  * out of the wooden houses. Plans are rebuilt from the public board every action
@@ -3573,6 +3590,8 @@ function migratePreviousSaveData(raw: unknown): SaveData | undefined {
   const value = restoreStage11PursuerIdentity(
     rescaleLinearEnemyExperience(restoreOriginalStageTitle(addStage3CounterattackCompletion(raw))),
   );
+  const migratedVersion127 = migrateVersion127Save(value);
+  if (migratedVersion127) return migratedVersion127;
   const migratedVersion126 = migrateVersion126Save(value);
   if (migratedVersion126) return migratedVersion126;
   const migratedVersion125 = migrateVersion125Save(value);

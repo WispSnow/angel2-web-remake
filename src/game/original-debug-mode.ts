@@ -5,7 +5,7 @@ import {
 } from "./preferences";
 
 /**
- * `REMAKE-174` 原版除錯模式的宿主開關與熱鍵對照。
+ * `REMAKE-174` 原版Debug模式的宿主開關與熱鍵對照。
  *
  * 原版（模組 29）要在戰鬥中按住數字鍵盤 1+3+5、依序按 S、W、F 才打開 DS:`132F`，而且只到
  * 本場戰鬥結束；用戶決定複刻只用工具列開關開啟，並按瀏覽器保存。開關和畫面縮放同屬宿主
@@ -66,8 +66,12 @@ export type OriginalDebugHotkey =
   | "instantVictory"
   | "skipToEnding"
   | "musicBox"
-  /** 第二批才復刻的原版熱鍵：F1 行為、F2 EDIT、F5／F6 技術測試、Caps Lock+1 範圍讀數。 */
-  | "pending";
+  /** Caps Lock+1：按住期間顯示範圍讀數；選格中同樣有效，由宿主鍵盤層追蹤按住與放開。 */
+  | "rangeReadout"
+  | "behaviourEditor"
+  | "editMenu"
+  | "techniqueAttack"
+  | "techniqueSupport";
 
 export interface DebugKeyEvent {
   readonly key: string;
@@ -91,11 +95,11 @@ const BY_CODE: Readonly<Record<string, OriginalDebugHotkey>> = {
   KeyJ: "instantVictory",
   NumpadMultiply: "skipToEnding",
   KeyM: "musicBox",
-  F1: "pending",
-  F2: "pending",
-  F5: "pending",
-  F6: "pending",
-  Digit1: "pending",
+  F1: "behaviourEditor",
+  F2: "editMenu",
+  F5: "techniqueAttack",
+  F6: "techniqueSupport",
+  Digit1: "rangeReadout",
 };
 
 let capsLockHeld = false;
@@ -116,27 +120,33 @@ export function installCapsLockTracker(signal: AbortSignal): void {
   signal.addEventListener("abort", () => { capsLockHeld = false; }, { once: true });
 }
 
+/** Caps Lock 開啟或被按住。 */
+export function capsLockEngaged(event: Pick<DebugKeyEvent, "getModifierState">): boolean {
+  return capsLockHeld || event.getModifierState("CapsLock");
+}
+
 /**
  * 原版在待機戰場按住 Caps Lock 才把按鍵交給除錯分發器 `0000:30CE`（`0000:B78C`）。
  * 沒有數字鍵盤的鍵盤可用 `Shift+8`（`*`）代替數字鍵盤 `*`。
  */
 export function originalDebugHotkey(event: DebugKeyEvent): OriginalDebugHotkey | undefined {
   if (event.altKey || event.ctrlKey || event.metaKey) return undefined;
-  if (!capsLockHeld && !event.getModifierState("CapsLock")) return undefined;
+  if (!capsLockEngaged(event)) return undefined;
   if (event.key === "*") return "skipToEnding";
   return BY_CODE[event.code];
 }
 
 export const ORIGINAL_DEBUG_HOTKEY_SUMMARY =
-  "開啟後在戰場打開 Caps Lock 使用：F3 敵方生命、F4 我方生命、F10 全員再行動、U／D 經驗 ±50、"
-  + "－ 生命 −10、S 台詞、2 格號、J 即時勝利、＊ 直達結局、M 音樂盒";
+  "開啟後在戰場打開 Caps Lock 使用：F1 行為、F2 單位編輯、F3 敵方生命、F4 我方生命、"
+  + "F5／F6 技術測試、F10 全員再行動、U／D 經驗 ±50、－ 生命 −10、S 台詞、1 範圍讀數（按住）、"
+  + "2 格號、J 即時勝利、＊ 直達結局、M 音樂盒";
 
-/** 宿主工具列上的「原版除錯」開關；按鍵一律停在這裡，不得漏到戰場。 */
+/** 宿主工具列上的「原版Debug」開關；按鍵一律停在這裡，不得漏到戰場。 */
 export function mountOriginalDebugModeToggle(host: HTMLElement): () => void {
   const group = document.createElement("div");
   group.className = "original-debug-trigger";
   group.innerHTML = `<button type="button" data-testid="original-debug-toggle"
-    title="原版除錯模式。${ORIGINAL_DEBUG_HOTKEY_SUMMARY}">原版除錯</button>`;
+    title="原版Debug模式。${ORIGINAL_DEBUG_HOTKEY_SUMMARY}">原版Debug</button>`;
   const button = group.querySelector<HTMLButtonElement>("button");
   if (!button) return () => undefined;
   const render = (enabled: boolean) => {

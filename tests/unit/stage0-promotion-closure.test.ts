@@ -60,8 +60,8 @@ function battleSave(battle: Stage0Battle): BattleSaveData {
   if (!ximi) throw new Error("stage 0 lost 希蜜");
   return {
     format: "ANGEL2-web-save",
-    version: 127,
-    contentVersion: "approach-reach-keep-out-1",
+    version: 128,
+    contentVersion: "original-debug-edits-1",
     kind: "battle",
     savedAt: "2026-10-01T12:00:00.000Z",
     saveCount: 1,

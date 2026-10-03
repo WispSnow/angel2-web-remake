@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * 原版除錯模式的运行时内容：F3/F4 原版选单与效果绑定、格号读数几何、音乐盒名单与播放规则。
+ * 原版Debug模式的运行时内容：F3/F4 原版选单与效果绑定、格号读数几何、音乐盒名单与播放规则。
  * 来源只有 `reverse/parsed/native/debug-mode.json`（`reverse/tools/angel2-debug-mode.mjs` 导出）；
  * 选单原文、名单顺序与单曲集合都从那里读，不在 TypeScript 里手抄。
  */
@@ -27,6 +27,8 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
+const pickRect = ({ x, y, width, height, colour }) => ({ x, y, width, height, colour });
+
 assert(evidence.format === "ANGEL2 module 29 developer debug mode", "unexpected debug-mode evidence format");
 assert(evidence.gate?.address === "DS:132F" && evidence.gate.enabledValue === "Y", "debug gate evidence missing");
 
@@ -49,6 +51,68 @@ const sideLifeMenus = {
   ally: sideLifeMenu("F4", evidence.menus.f4, evidence.sideLifeMenus.f4),
 };
 assert(sideLifeMenus.enemy.side === 2 && sideLifeMenus.ally.side === 1, "F3/F4 side binding changed");
+
+// F2：四项结果码与入口都来自 `0000:3113` 的分支，兵種／地型属第三批，这里只登记目标。
+const editTargets = ["allyUnitEditor", "enemyUnitEditor", "classDataEditor", "terrainDataEditor"];
+const editMenu = {
+  key: "F2",
+  descriptor: evidence.menus.f2.descriptor,
+  items: evidence.menus.f2.items.map(({ code, label }, index) => {
+    const binding = evidence.editMenu.results[code];
+    assert(binding?.target === editTargets[index], `F2 ${code} target drifted`);
+    return { code, label, target: binding.target };
+  }),
+};
+
+// F5／F6 一级选单与 `0000:6C66` 的二级选单；`治 療`／`生命全 ` 两个标题打开的二级选单对调是原文。
+const techniqueCategory = (key, menu) => ({
+  key,
+  descriptor: menu.descriptor,
+  items: menu.items.map(({ code, label }) => {
+    const ranks = evidence.menus.techniqueRanks[code];
+    assert(ranks && evidence.techniqueTest.rankMenuByCategory[code] === ranks.descriptor,
+      `${key} ${code} has no verified rank menu`);
+    return {
+      code,
+      label,
+      ranks: ranks.items.map((item) => ({ code: item.code, label: item.label })),
+    };
+  }),
+});
+const techniqueMenus = {
+  attack: techniqueCategory("F5", evidence.menus.f5),
+  support: techniqueCategory("F6", evidence.menus.f6),
+};
+const techniqueCodes = [...techniqueMenus.attack.items, ...techniqueMenus.support.items]
+  .flatMap(({ ranks }) => ranks.map(({ code }) => code));
+assert(techniqueCodes.length === 31 && new Set(techniqueCodes).size === 31, "technique test must offer 31 distinct codes");
+assert(techniqueMenus.support.items[0].ranks[0].code === "1I", "the 治療 header must still open the 回復 ranks");
+
+const behaviourEvidence = evidence.aiBehaviourEditor;
+assert(behaviourEvidence.labels.length === 13 && behaviourEvidence.labels.every(({ label }) => label),
+  "F1 must name 13 behaviour values");
+const behaviourEditor = {
+  labels: behaviourEvidence.labels.map(({ value, label }) => ({ value, label })),
+  selectableValues: behaviourEvidence.layout.selectableValues,
+  layout: {
+    panel: pickRect(behaviourEvidence.layout.panel),
+    inner: pickRect(behaviourEvidence.layout.inner),
+    figure: { x: behaviourEvidence.layout.figure.x, y: behaviourEvidence.layout.figure.y },
+    labels: behaviourEvidence.layout.labels,
+    highlight: behaviourEvidence.layout.highlight,
+  },
+};
+
+// 我／敵 EDIT 的整屏版面（`0000:0ABE`）；行為框的標籤改用 F1 那張 13 項表（原版 EDIT 的表第 9 項
+// 指回表本身、第 11 項讀到偽指標，見 `unitEditor.knownDefects`）。
+const unitEditorEvidence = evidence.unitEditor;
+assert(unitEditorEvidence?.layout?.grid?.columns === 3 && unitEditorEvidence.layout.grid.rows === 5,
+  "unit editor grid evidence missing");
+assert(unitEditorEvidence.layout.pageTabs.count === 4, "unit editor must have four pages");
+const unitEditor = {
+  layout: unitEditorEvidence.layout,
+  exitLabel: unitEditorEvidence.layout.exit.text.label,
+};
 
 const readout = evidence.cellReadout;
 assert(readout?.digits === 5 && readout.fields.length === 2, "cell readout evidence missing");
@@ -106,6 +170,18 @@ export const ORIGINAL_DEBUG_MODE_SOURCES = ${json([
 
 /** F3（敌方）／F4（我方）原版选单：原文、结果码与 \`536B..53DD\` 已核验的效果。 */
 export const NATIVE_DEBUG_SIDE_LIFE_MENUS = ${json(sideLifeMenus)} as const;
+
+/** F2 原版选单 DS:\`413C\`：我／敵 EDIT 与第三批的兵種／地型编辑器。 */
+export const NATIVE_DEBUG_EDIT_MENU = ${json(editMenu)} as const;
+
+/** F5／F6 技术测试的一级与二级原版选单（\`0000:6C16\`、\`0000:6C66\`），二级项是原版技术代码。 */
+export const NATIVE_DEBUG_TECHNIQUE_MENUS = ${json(techniqueMenus)} as const;
+
+/** F1 行为编辑器 \`0000:2302\`：13 个原版行为名、指针可选的值与原生 640×350 版面。 */
+export const NATIVE_DEBUG_BEHAVIOUR_EDITOR = ${json(behaviourEditor)} as const;
+
+/** 我／敵 EDIT（\`0000:0ABE\`）：每方 60 槽、4 页 × 15 项列优先，原生 640×350 版面与配色。 */
+export const NATIVE_DEBUG_UNIT_EDITOR = ${json(unitEditor)} as const;
 
 /** 调试键 2 的两个五位数字段（\`0000:326A\`），原生 640×350 座标。 */
 export const NATIVE_DEBUG_CELL_READOUT = ${json(cellReadout)} as const;

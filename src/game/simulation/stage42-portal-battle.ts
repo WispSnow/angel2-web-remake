@@ -54,4 +54,9 @@ export class Stage42PortalBattle extends Stage0Battle {
     });
     this.focusId = "1:0";
   }
+
+  /** `REMAKE-174` 傳送門台陣是純劇情演出，原版Debug不改它的行為與職業。 */
+  protected override debugScriptLocked(): boolean {
+    return true;
+  }
 }

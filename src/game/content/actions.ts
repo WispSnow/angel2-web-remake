@@ -121,6 +121,16 @@ const TECHNIQUE_ACTION_BY_NATIVE_CODE = {
 } as const satisfies Readonly<Record<string, BattleActionId>>;
 
 /**
+ * `REMAKE-174` 原版Debug F5／F6 技術測試：原版技術代碼對應的複刻動作。原版的
+ * `VIRT A/B/C`（`1V/2V/3V`）沒有複刻動作，這裡回傳 `undefined`。
+ */
+export function techniqueActionIdForNativeCode(code: string): BattleActionId | undefined {
+  return Object.hasOwn(TECHNIQUE_ACTION_BY_NATIVE_CODE, code)
+    ? TECHNIQUE_ACTION_BY_NATIVE_CODE[code as keyof typeof TECHNIQUE_ACTION_BY_NATIVE_CODE]
+    : undefined;
+}
+
+/**
  * The single place that decides which shot a class fires. Every shooting site
  * — the player menu, allied planning, expert enemy planning and resolution —
  * reads this instead of restating the class list, so adding a shooting career
