@@ -131,6 +131,89 @@ function nearCallSites(image, target) {
   return sites;
 }
 
+/**
+ * VIRT 的機器事實：分發表的種子、三個處理器的傷害輸入，以及路徑回溯 `17DE:0029` 的平局規則。
+ * 回溯每一步從目前格看四個鄰格，取值不小於目前最大值的最後一個；四鄰的檢查順序由 PIT 位元組
+ * 累加後取模決定。
+ */
+function parseVirt(image) {
+  const farAddress = (segment, linear) => `${hex(segment)}:${hex(linear - segment * 16)}`;
+  const dispatch = [];
+  for (let cursor = 0x52a2; word(image, cursor) !== 0xffff; cursor += 6) {
+    const code = image.subarray(dataOffset(cursor), dataOffset(cursor + 2)).toString("latin1");
+    if (/^[123]V$/u.test(code)) {
+      dispatch.push({ code, handler: segmentAddress(word(image, cursor + 2)), seed: word(image, cursor + 4) });
+    }
+    assert(dispatch.length <= 3 && cursor < 0x52a2 + 6 * 64, "dispatch table 52A2 is not terminated");
+  }
+  assert(dispatch.map(({ code }) => code).join() === "1V,2V,3V", "VIRT dispatch rows changed");
+  const walkSegment = 0x17de;
+  const directionAt = (linear) => {
+    // `mov dh,<ascii>; mov word [77A7],<delta>`：方向碼與格號位移。
+    const code = String.fromCharCode(immediate(image, linear, "b6", 8));
+    const delta = immediate(image, linear + 2, "c7 06 a7 77");
+    const signed = delta >= 0x8000 ? delta - 0x10000 : delta;
+    return { 0x38: "up", 0x32: "down", 0x34: "left", 0x36: "right" }[code.charCodeAt(0)]
+      ?? assert(false, `unknown walk direction ${code}`) ?? `${code}${signed}`;
+  };
+  const orderAt = (linear) => Array.from({ length: 4 }, (_, index) => {
+    const at = linear + index * 3;
+    assert(image[at] === 0xe8, `walk order call expected at ${hex(at)}`);
+    return directionAt((at + 3 + image.readInt16LE(at + 1)) & 0xfffff);
+  });
+  const modulus = immediate(image, 0x17e69, "bb");
+  const orders = [0x17e95, 0x17ea2, 0x17eaf, 0x17ebc].map((linear, remainder) => ({
+    remainder,
+    reachable: remainder < modulus,
+    order: orderAt(linear),
+  }));
+  const farCallers = (linearTarget) => {
+    const sites = [];
+    for (let offset = 0; offset + 5 <= image.length; offset += 1) {
+      if (image[offset] === 0x9a
+        && image.readUInt16LE(offset + 3) * 16 + image.readUInt16LE(offset + 1) === linearTarget) sites.push(offset);
+    }
+    return sites;
+  };
+  const lineCallers = farCallers(0x164a6);
+  assert(lineCallers.join() === [0xcc69, 0xcc93, 0xccc1].join(), "line damage 164A:0006 gained a caller");
+  const walkCallers = farCallers(0x17e09);
+  assert(walkCallers.length === 16, `path walk caller count changed: ${walkCallers.length}`);
+  // 三個處理器同形：`mov dx,5 / call D00A`（0..4）後 `add cx,0Dh`；調試路徑上 `3V` 的 CX 來自 `54BC` 的 `mov cx,9`。
+  const experienceBase = immediate(image, 0xcc76, "83 c1", 8);
+  const experienceRandomCount = immediate(image, 0xcc6e, "ba");
+  assert(experienceBase === immediate(image, 0xcca0, "83 c1", 8)
+    && experienceBase === immediate(image, 0xccce, "83 c1", 8), "VIRT experience bases differ");
+  return {
+    dispatch,
+    damageInputs: {
+      "1V": immediate(image, 0xcc5d, "b9"),
+      "2V": immediate(image, 0xcc87, "b9"),
+      "3V": immediate(image, 0x54ca, "b9"),
+    },
+    experienceRule: { base: experienceBase, randomMinimum: 0, randomMaximum: experienceRandomCount - 1, addKillReward: true },
+    damageInput: {
+      "1V": immediate(image, 0xcc5d, "b9"),
+      "2V": immediate(image, 0xcc87, "b9"),
+      "3V": "the caller's CX (push cx at CCA4); on the debug path the last 54BC step leaves 9, the magic bow passes its 50..69",
+      halving: "164A:0055 shr DS:5230 once: every path cell takes floor(CX/2) single points, then the target (index 0) takes it again",
+      side: "644D hits a cell only on the side DS:1EF4 names, written by 1000:4264 from the selected target: same side as the target, the caster included",
+      magicGuard: "783D blocks a point and consumes the guard; 1000:6532 clears the guard of every occupied path cell regardless of side",
+    },
+    experience: "CX from the death scan 63CF + 13 + D00A(5) = kills + 13 + 0..4, paid once through 72FF to DS:77BF",
+    walk: {
+      entry: farAddress(walkSegment, 0x17e09),
+      table: "CS:028B, 100 words, index 0 = target, last = caster",
+      rule: "from the target, step to the 4-neighbour whose range value is >= the running maximum (start: current cell); the last such neighbour in the check order wins, so among equal highest values the later direction wins; stop when no neighbour reaches the current value",
+      pit: `CS:00E9 += in al,40h; CS:00E9 = CS:00E9 mod ${modulus}; the remainder picks the check order for that step`,
+      orders,
+      sameCell: "caster = target: DS:77AF = 'N' and the table is neither cleared nor rebuilt, so the line damage and its animation replay the previous walk",
+      callers: walkCallers.map(segmentAddress),
+    },
+    lineDamageCallers: lineCallers.map(segmentAddress),
+  };
+}
+
 function verifyDispatcherHosts(image) {
   const dispatcherSites = nearCallSites(image, 0x30ce);
   assert(
@@ -182,6 +265,17 @@ function verifySignatures(image) {
     expectRoutine(image, 0x0744, 0x076b, "c9581592c4c96a2677e9f582ce27c46a2c60860fcd805baf16671b42653172ce",
       "promotion class-choice loop 0744: redraw, choice step C8A9, dispatcher while no class is chosen, no cancel"),
     expectBytes(image, 0x0766, "e8 65 29", "promotion class-choice loop calls the dispatcher"),
+    // VIRT（`1V/2V/3V`）：三個處理器、共用的路徑回溯、只有它們呼叫的線形傷害，以及逐點扣血的陣營篩選。
+    expectRoutine(image, 0xcc50, 0xccd2, "eae1a131ef8390f006cac9d2069131259cb01a0212dc0a173de2c2475fdca992",
+      "VIRT handlers CC50/CC7A/CCA4: walk, damage input CX (40, 40, caller's), line damage, EXP = kills + 13 + 0..4"),
+    expectRoutine(image, 0x17e09, 0x17f22, "1e8926002540b9dc4d5067b13f60e6be95577223d821425b8e275f27e4d7620a",
+      "path walk 17DE:0029: target back to caster up the range gradient, PIT-mod-3 neighbour order, skipped when caster = target"),
+    expectRoutine(image, 0x164a6, 0x16532, "98dbb0a4bd1219e284e5edbccaee7592d598e5644b2859498fdf996d6a0daf53",
+      "line damage 164A:0006: half of CX on every path cell from the caster end, then the other half on the target"),
+    expectRoutine(image, 0x6438, 0x6477, "96749a686b64e3077c146b423c38870c85592ccfc967d590068b07b29ab97792",
+      "per-cell damage 6438/644D: CX single points through 783D, only on the side DS:1EF4 names"),
+    expectRoutine(image, 0x14264, 0x1428f, "550a7023974b2ae2c72f2defd438f966d750a6392328ae75d3eeb701e4a22a07",
+      "1000:4264 writes DS:1EF4/1EF6 from the selected target's side"),
     // EDIT 名字框與之後的放置：不在場的任一槽都能放，原版不分部署候選、模板或劇情。
     expectBytes(image, 0x0c55, `
       c6 06 90 f5 00 33 d2 a1 9a 08 bb 0f 00 f7 e3 03 06 0a f7 a3 9a 45 8b d8 03 db 8b 87 3c 09 3d 00 00 74 14
@@ -867,6 +961,7 @@ async function extract(modulePath, outputPath) {
       excludedDispatchCodes: ["1D", "2D", "3D", "1K", "2K"],
       labelSwap: "the 治療 header opens 初級..高級回復 (1I..3I) and 生命全 opens 初級..高級治療 (1H..3H)",
       virt: "VIRT A/B/C are the developer names of the 1V/2V/3V line effects; 1V/2V are only reachable here",
+      virtRules: parseVirt(image),
     },
     stage37Reveal: [
       { site: "0000:8BD6", effect: "skip the nine-field ????? HUD concealment" },

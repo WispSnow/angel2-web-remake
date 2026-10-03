@@ -80,6 +80,7 @@ import {
   actionPresentationCatalog,
   isIceActionId,
   isShootingActionId,
+  isVirtActionId,
   presentationActionIdsForClass,
   shootingActionIdFor,
   techniqueActionIdsFor,
@@ -2151,7 +2152,7 @@ export class GameController {
         this.selectedActionId
         && this.targets.some((target) => positionKey(target) === positionKey(position))
       ) {
-        if (this.selectedActionId === "magic-archer-shot" && unit) {
+        if ((this.selectedActionId === "magic-archer-shot" || isVirtActionId(this.selectedActionId)) && unit) {
           this.beginMagicArcherRouteSelection(unit.id);
         } else {
           void this.commitSpecialAction(position);
@@ -2589,8 +2590,12 @@ export class GameController {
   private beginMagicArcherRouteSelection(targetId: string): void {
     const actor = this.selectedUnit;
     const target = this.battle.unit(targetId);
-    if (!actor || !target || this.selectedActionId !== "magic-archer-shot") return;
-    const routes = this.battle.magicArcherLineOptions(actor.id, target.id);
+    const actionId = this.selectedActionId;
+    if (!actor || !target || (actionId !== "magic-archer-shot" && !isVirtActionId(actionId))) return;
+    // VIRT 與魔弓共用直線效果，路線同樣由玩家指定（`REMAKE-035`）。
+    const routes = isVirtActionId(actionId)
+      ? this.battle.debugVirtLineOptions(actor.id, target.id, actionId)
+      : this.battle.magicArcherLineOptions(actor.id, target.id);
     if (routes.length === 0) {
       this.statusMessage = "目前沒有可連接主目標的合法箭道。";
       this.emit();
@@ -2634,7 +2639,9 @@ export class GameController {
     const target = this.magicArcherRouteTarget;
     if (!route || !target) return;
     const collateralCount = route.affectedUnitIds.filter((id) => id !== target.id).length;
-    this.statusMessage = `箭道 ${this.selectedMagicArcherRouteIndex + 1}/${this.magicArcherRoutes.length}：主目標 1，沿線敵軍 ${collateralCount}；切換後確認發射。`;
+    this.statusMessage = isVirtActionId(this.selectedActionId)
+      ? `原版Debug：路線 ${this.selectedMagicArcherRouteIndex + 1}/${this.magicArcherRoutes.length}：主目標 1，沿線同一方 ${collateralCount}；切換後確認施放。`
+      : `箭道 ${this.selectedMagicArcherRouteIndex + 1}/${this.magicArcherRoutes.length}：主目標 1，沿線敵軍 ${collateralCount}；切換後確認發射。`;
   }
 
   private clearMagicArcherRoutes(): void {
@@ -2730,6 +2737,7 @@ export class GameController {
         actorId: actor.id,
         targetId: target?.id,
         target: definition.target === "self-area" ? undefined : position,
+        ...(linePath ? { linePath: linePath.map((cell) => ({ ...cell })) } : {}),
       }) : this.battle.prepareSpecialAction({
         actionId,
         actorId: actor.id,
@@ -2833,6 +2841,8 @@ export class GameController {
         : actionId === "lightning-1" || actionId === "lightning-2" || actionId === "lightning-3"
           || actionId === "lightning-4"
           ? `落雷對 ${result.affectedUnits.filter(({ blockReason }) => blockReason !== "frozen").length} 名敵人造成共 ${result.damage} 點傷害。`
+          : isVirtActionId(actionId)
+            ? `${definition.label}對 ${result.affectedUnits.filter(({ damage }) => damage > 0).length} 名單位造成共 ${result.damage} 點傷害。`
           : actionId === "stomp-1" || actionId === "stomp-2" || actionId === "stomp-3"
             ? `${definition.label}對 ${result.affectedUnits.filter(({ blocked }) => !blocked).length} 名敵人造成共 ${result.damage} 點傷害。`
           : actionId === "recovery-1" || actionId === "recovery-2" || actionId === "recovery-3"
@@ -2947,7 +2957,8 @@ export class GameController {
         await present("shootHit", frame, 6);
       }
       await present("shootBlank", -1, 6);
-    } else if (result.actionId === "magic-archer-shot") {
+    } else if (result.actionId === "magic-archer-shot" || isVirtActionId(result.actionId)) {
+      // VIRT 與魔弓共用 `3V` 的直線表現：`UN/60` + `MAGIC/83`，每段 20 tick。
       this.queueAudioCue(83, "magic-archer-shot-start", "magic");
       for (let index = 0; index < result.effectCells.length; index += 1) {
         await present("shootLineGrow", index, 20);
@@ -5055,7 +5066,8 @@ export class GameController {
 
   private get debugMenuContext(): DebugMenuContext {
     const preloaded = new Set<BattleActionId>(this.currentMapPresentationActionIds);
-    return { techniqueAvailable: (actionId) => preloaded.has(actionId) };
+    // VIRT 的直線表現在每一關都隨射擊表現備妥，不看本關的技術清單。
+    return { techniqueAvailable: (actionId) => isVirtActionId(actionId) || preloaded.has(actionId) };
   }
 
   private openDebugMenu(menu: DebugMenuState, status: string): void {
@@ -5103,9 +5115,7 @@ export class GameController {
     const item = this.debugMenuItems[menu?.index ?? -1];
     if (!menu || !item) return;
     if (!item.enabled) {
-      this.statusMessage = item.code.endsWith("V") || item.code === "3?"
-          ? "原版Debug：VIRT 是原版的開發測試技術，複刻暫不提供。"
-          : "原版Debug：這場戰鬥沒有備妥這項技術的演出。";
+      this.statusMessage = "原版Debug：這場戰鬥沒有備妥這項技術的演出。";
       this.emit();
       return;
     }
@@ -5279,7 +5289,9 @@ export class GameController {
       return;
     }
     this.actionMode = "specialTarget";
-    this.statusMessage = `原版Debug：選擇「${definition.label}」的${definition.target === "ally" ? "我方" : "敵方"}目標。`;
+    this.statusMessage = isVirtActionId(actionId)
+      ? `原版Debug：選擇「${definition.label}」的目標（任一方，施法者除外）。`
+      : `原版Debug：選擇「${definition.label}」的${definition.target === "ally" ? "我方" : "敵方"}目標。`;
     this.emit();
   }
 

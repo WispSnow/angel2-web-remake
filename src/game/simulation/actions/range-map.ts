@@ -300,10 +300,27 @@ export function shootingLinePaths(
 }
 
 /**
- * Returns the probability that the native uniformly selected predecessor walk
- * visits each line cell. This evaluates every legal line without reading the
- * gameplay PRNG. It remains as executable evidence for the original random
- * walk and for a future legacyStrict ruleset; REMAKE-035 does not use it.
+ * The native walk `17DE:0029` re-picks its neighbour check order at every step:
+ * it adds the PIT byte to a private accumulator and takes it modulo 3. Each
+ * order lists up / left / down / right offsets; the walk keeps the last
+ * neighbour that is at least as high as the best so far, so among tied
+ * predecessors the later direction in the order wins. Remainder 3 (up, right,
+ * down, left) is unreachable.
+ */
+const NATIVE_WALK_ORDERS: readonly (readonly Position[])[] = [
+  [{ x: 0, y: -1 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 0 }],
+  [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }],
+  [{ x: -1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 0 }, { x: 0, y: -1 }],
+];
+
+/**
+ * Returns the probability that the native PIT-ordered predecessor walk visits
+ * each line cell, treating the three check orders as equally likely (a PIT byte
+ * sampled at an arbitrary moment). Two tied predecessors therefore split 2:1,
+ * not evenly: up beats left, down and right; down beats left; right beats left
+ * and down. This evaluates every legal line without reading the gameplay PRNG.
+ * It remains as executable evidence for the original random walk and for a
+ * future legacyStrict ruleset; REMAKE-035 does not use it.
  */
 export function shootingLineVisitProbabilities(
   actor: Pick<BattleUnit, "x" | "y" | "classId">,
@@ -326,12 +343,14 @@ export function shootingLineVisitProbabilities(
     for (const { position, probability } of frontier.values()) {
       if (position.x === actor.x && position.y === actor.y) continue;
       const nextValue = gradient.valueAt(position) + 1;
-      const predecessors = OFFSETS
-        .map((offset) => ({ x: position.x + offset.x, y: position.y + offset.y }))
-        .filter((candidate) => gradient.valueAt(candidate) === nextValue);
-      if (predecessors.length === 0) return new Map();
-      const branchProbability = probability / predecessors.length;
-      for (const predecessor of predecessors) {
+      const isPredecessor = (offset: Position) =>
+        gradient.valueAt({ x: position.x + offset.x, y: position.y + offset.y }) === nextValue;
+      if (!OFFSETS.some(isPredecessor)) return new Map();
+      for (const order of NATIVE_WALK_ORDERS) {
+        const offset = order.filter(isPredecessor).at(-1);
+        if (!offset) continue;
+        const predecessor = { x: position.x + offset.x, y: position.y + offset.y };
+        const branchProbability = probability / NATIVE_WALK_ORDERS.length;
         const key = `${predecessor.x},${predecessor.y}`;
         probabilities.set(key, (probabilities.get(key) ?? 0) + branchProbability);
         const pending = nextFrontier.get(key);
@@ -398,6 +417,41 @@ export function techniqueSelectionPath(
     path.push(copyPosition(current));
   }
   return path;
+}
+
+/**
+ * Every native-valid predecessor walk on a technique selection map, actor
+ * first. VIRT (`1V/2V/3V`) walks `17DE:0029` on this map; like REMAKE-035's
+ * magic arrow, the remake lets the player pick the whole line instead of the
+ * native PIT-ordered tie break, so enumeration never reads gameplay PRNG.
+ */
+export function techniqueSelectionPaths(
+  actor: Pick<BattleUnit, "x" | "y" | "classId">,
+  target: Position,
+  battlefield: ActionBattlefield,
+  selectionSeed: number,
+): Position[][] {
+  const gradient = buildUniformRange(actor, battlefield, selectionSeed, techniqueGate(actor.classId));
+  if (gradient.valueAt(target) === 0 || (target.x === actor.x && target.y === actor.y)) return [];
+
+  const paths: Position[][] = [];
+  const reversed = [copyPosition(target)];
+  const visit = (current: Position): void => {
+    if (current.x === actor.x && current.y === actor.y) {
+      paths.push([...reversed].reverse().map(copyPosition));
+      return;
+    }
+    const nextValue = gradient.valueAt(current) + 1;
+    for (const offset of OFFSETS) {
+      const predecessor = { x: current.x + offset.x, y: current.y + offset.y };
+      if (gradient.valueAt(predecessor) !== nextValue) continue;
+      reversed.push(predecessor);
+      visit(predecessor);
+      reversed.pop();
+    }
+  };
+  visit(copyPosition(target));
+  return paths;
 }
 
 export function techniqueEffectRange(

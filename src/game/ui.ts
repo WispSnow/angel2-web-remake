@@ -6,7 +6,7 @@ import {
   PORTRAIT_CATALOG,
   portraitSourceFor,
 } from "./content/portrait-catalog.generated";
-import { BATTLE_ACTION_DEFINITIONS } from "./content/actions";
+import { BATTLE_ACTION_DEFINITIONS, isVirtActionId } from "./content/actions";
 import {
   STAGE0_FULL_COMBAT_ASSETS,
   STAGE0_FULL_COMBAT_COMMON_EFFECTS,
@@ -1327,10 +1327,20 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       status.dataset.routeIndex = String(controller.magicArcherRouteIndex);
       status.dataset.routeCount = String(controller.magicArcherRouteOptions.length);
       status.innerHTML = skillCastHint("shot-route-summary", [
-        `箭道 ${controller.magicArcherRouteIndex + 1}/${controller.magicArcherRouteOptions.length}`,
-        `副目標 ${collateralCount}`,
-        "滾輪切換",
-        "點目標發射",
+        // 原版Debug的 VIRT 共用魔弓的路線選擇；它的線上受傷者是目標那一方，不一定是敵軍。
+        ...(isVirtActionId(controller.selectedActionId)
+          ? [
+            `路線 ${controller.magicArcherRouteIndex + 1}/${controller.magicArcherRouteOptions.length}`,
+            `沿線同一方 ${collateralCount}`,
+            "滾輪切換",
+            "點目標施放",
+          ]
+          : [
+            `箭道 ${controller.magicArcherRouteIndex + 1}/${controller.magicArcherRouteOptions.length}`,
+            `副目標 ${collateralCount}`,
+            "滾輪切換",
+            "點目標發射",
+          ]),
       ]);
     } else if (iceCastPreview) {
       delete status.dataset.routeIndex;

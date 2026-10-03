@@ -28,8 +28,8 @@ export function isDebugEditableClassId(classId: ClassId): boolean {
 }
 
 /**
- * F5／F6 二級選單裡有複刻動作的技術代碼。`VIRT A/B/C`（`1V/2V/3V`）的路徑平局、對自己施放與
- * 殘留路徑仍未閉合（`developer-debug-mode.md`），複刻列出但不可選。
+ * F5／F6 二級選單的 31 個技術代碼都有複刻動作；`VIRT A/B/C`（`1V/2V/3V`）自 2026-10-03 起
+ * 照 `developer-debug-mode.md` 的靜態證據開放（`content/actions.ts` 的 VIRT 定義）。
  */
 export const DEBUG_TECHNIQUE_ACTION_IDS: readonly BattleActionId[] = [
   ...NATIVE_DEBUG_TECHNIQUE_MENUS.attack.items,

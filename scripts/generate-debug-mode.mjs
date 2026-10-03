@@ -89,6 +89,24 @@ const techniqueCodes = [...techniqueMenus.attack.items, ...techniqueMenus.suppor
 assert(techniqueCodes.length === 31 && new Set(techniqueCodes).size === 31, "technique test must offer 31 distinct codes");
 assert(techniqueMenus.support.items[0].ranks[0].code === "1I", "the 治療 header must still open the 回復 ranks");
 
+// VIRT（`1V/2V/3V`）：分發表的種子、調試路徑上的傷害輸入與經驗規則，複刻的 F5 動作直接讀這份。
+const virtEvidence = evidence.techniqueTest.virtRules;
+const virtRanks = techniqueMenus.attack.items.find(({ code }) => code === "3?")?.ranks ?? [];
+const virt = {
+  actions: virtEvidence.dispatch.map(({ code, handler, seed }) => ({
+    code,
+    handler,
+    selectionSeed: seed,
+    damageInput: virtEvidence.damageInputs[code],
+    label: virtRanks.find((rank) => rank.code === code)?.label.trim(),
+  })),
+  experience: virtEvidence.experienceRule,
+};
+assert(virt.actions.map(({ code }) => code).join() === "1V,2V,3V"
+  && virt.actions.every(({ selectionSeed, damageInput, label }) =>
+    Number.isInteger(selectionSeed) && Number.isInteger(damageInput) && label),
+  "VIRT evidence is incomplete");
+
 const behaviourEvidence = evidence.aiBehaviourEditor;
 assert(behaviourEvidence.labels.length === 13 && behaviourEvidence.labels.every(({ label }) => label),
   "F1 must name 13 behaviour values");
@@ -218,6 +236,12 @@ export const NATIVE_DEBUG_EDIT_MENU = ${json(editMenu)} as const;
 
 /** F5／F6 技术测试的一级与二级原版选单（\`0000:6C16\`、\`0000:6C66\`），二级项是原版技术代码。 */
 export const NATIVE_DEBUG_TECHNIQUE_MENUS = ${json(techniqueMenus)} as const;
+
+/**
+ * VIRT（\`CC50/CC7A/CCA4\`）：选格种子、调试路径上的伤害输入（目标受两次减半、线上其他受一次）与经验规则
+ * （双方击倒 + 基础 + 随机）。\`3V\` 的 9 是选格步进 \`54BC\` 留下的 \`CX\`。
+ */
+export const NATIVE_DEBUG_VIRT = ${json(virt)} as const;
 
 /** F1 行为编辑器 \`0000:2302\`：13 个原版行为名、指针可选的值与原生 640×350 版面。 */
 export const NATIVE_DEBUG_BEHAVIOUR_EDITOR = ${json(behaviourEditor)} as const;

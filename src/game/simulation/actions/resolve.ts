@@ -2,6 +2,8 @@ import {
   BATTLE_ACTION_DEFINITIONS,
   HALF_DRAGON_TELEPORT_ACTION_ID,
   WATER_WARRIOR_SHOT_ACTION_ID,
+  isVirtActionId,
+  type VirtActionId,
 } from "../../content/actions";
 import { immuneToPhysicalShootingFor, killRewardFor } from "../../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../../types";
@@ -556,6 +558,58 @@ function prepareMagicArcher(
   };
 }
 
+/**
+ * `REMAKE-174` VIRT（`1V/2V/3V`，只由原版Debug技術測試施放）：`164A:0006` 把傷害輸入減半，從施法者
+ * 那一端起對路線上每一格扣一次，再對目標補一次。只扣與目標同一方的單位（DS:`1EF4`）；防魔擋下一次
+ * 並用掉。`[SR]` 施法者不受自己的傷害（原版目標與施法者同一方時施法者也挨打，倒下後經驗落到別的
+ * 單位記錄上）；與魔弓的 `REMAKE-178` 一樣，只有挨打那一方消耗防魔。經驗為雙方擊倒 + 13 + 0..4。
+ */
+function prepareVirt(
+  actionId: VirtActionId,
+  actor: BattleUnit,
+  target: BattleUnit,
+  linePath: readonly Position[] | undefined,
+  trial: DeterministicRng,
+  context: SpecialActionResolutionContext,
+): { affectedUnits: SpecialActionAffectedUnit[]; experienceGained: number; effectCells: PreparedBattleAction["result"]["effectCells"] } {
+  const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+  if (!linePath) throw new Error("VIRT requires an explicit line path");
+  const path = linePath.map(copyPosition);
+  const halfDamage = Math.floor(definition.damage.input / 2);
+  const lineUnits = path
+    .slice(1)
+    .map((position) => context.units.find((unit) => unit.x === position.x && unit.y === position.y
+      && unit.id !== actor.id && unit.side === target.side && !unit.actionDisabled))
+    .filter((unit): unit is BattleUnit => Boolean(unit));
+  const pool = sharedLifePool();
+  const affectedUnits = lineUnits.map((unit) => {
+    const statusesAfter = cloneUnitStatuses(unit.statuses);
+    const guarded = unit.statuses.magicGuard > 0;
+    statusesAfter.magicGuard = 0;
+    const requested = unit.id === target.id
+      ? (guarded ? halfDamage : halfDamage * 2)
+      : (guarded ? 0 : halfDamage);
+    const { damage, died } = pool.drain(unit, requested);
+    return affectedUnit(unit, {
+      lifeAfter: unit.life - damage,
+      damage,
+      died,
+      blocked: guarded && requested === 0,
+      blockReason: guarded && requested === 0 ? "magicGuard" : undefined,
+      statusesAfter,
+    });
+  });
+  const experienceGained = definition.experience.base + trial.between(
+    definition.experience.randomMinimum,
+    definition.experience.randomMaximum,
+  ) + killRewardTotalFor(context.units, defeatedUnitsIn(context.units, affectedUnits));
+  return {
+    affectedUnits,
+    experienceGained,
+    effectCells: path.map((position) => ({ position, value: 1 })),
+  };
+}
+
 function prepareWd(
   actor: BattleUnit,
   target: BattleUnit,
@@ -844,6 +898,16 @@ export function prepareSpecialAction(
   } else if (intent.actionId === "magic-archer-shot") {
     if (!target) throw new Error("magic archer action requires a target unit");
     ({ affectedUnits, experienceGained, effectCells } = prepareMagicArcher(
+      actor,
+      target,
+      intent.linePath,
+      trial,
+      context,
+    ));
+  } else if (isVirtActionId(intent.actionId)) {
+    if (!target) throw new Error("VIRT requires a target unit");
+    ({ affectedUnits, experienceGained, effectCells } = prepareVirt(
+      intent.actionId,
       actor,
       target,
       intent.linePath,

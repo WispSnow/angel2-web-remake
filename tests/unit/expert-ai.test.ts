@@ -1578,10 +1578,14 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
       6,
     );
 
+    // `17DE:0029` 每步以 PIT 取模 3 選三種四鄰檢查順序之一，平局時順序靠後的勝出：上對左 2 比 1。
     expect(probabilities.get("2,2")).toBe(1);
-    expect(probabilities.get("2,1")).toBeCloseTo(.5);
-    expect(probabilities.get("1,1")).toBeCloseTo(.5);
-    expect(probabilities.get("0,1")).toBeCloseTo(.5);
+    expect(probabilities.get("2,1")).toBeCloseTo(2 / 3);
+    expect(probabilities.get("1,2")).toBeCloseTo(1 / 3);
+    // (1,1) 由 (2,1) 往左或由 (1,2) 往上到達：2/3 × 1/3 + 1/3 × 2/3。
+    expect(probabilities.get("1,1")).toBeCloseTo(4 / 9);
+    // (0,1) 由 (1,1) 往左（1/3），或由只剩向上一條路的 (0,2)（1/3 × 1/3）到達。
+    expect(probabilities.get("0,1")).toBeCloseTo(4 / 9 * 1 / 3 + 1 / 9);
     expect(probabilities.has("0,0")).toBe(false);
   });
 

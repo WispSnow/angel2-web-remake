@@ -5,6 +5,7 @@ import {
   STAGE0_REST_PRESENTATION,
 } from "./stage0-actions.generated";
 import { classDefinition, classTierFor, type ClassId } from "./classes";
+import { NATIVE_DEBUG_VIRT } from "./debug-mode.generated";
 import { SIDE1_ONLY_SHOOTING_CLASSES } from "./class-balance-overrides";
 import type { BattleUnit } from "../types";
 
@@ -69,10 +70,47 @@ const REMAKE_SHOOTING_ACTION_DEFINITIONS = {
   },
 } as const;
 
+export const VIRT_ACTION_IDS = ["virt-a", "virt-b", "virt-c"] as const;
+export type VirtActionId = typeof VIRT_ACTION_IDS[number];
+
+const virtDefinition = (id: VirtActionId, index: number) => {
+  const native = NATIVE_DEBUG_VIRT.actions[index];
+  if (!native) throw new Error(`missing native VIRT record ${index}`);
+  return {
+    id,
+    nativeCode: native.code,
+    label: native.label.replace(/\s+/gu, " "),
+    kind: "technique",
+    target: "enemy",
+    range: { mode: 0, selectionRadius: native.selectionSeed },
+    damage: { type: "virt-line", input: native.damageInput },
+    damagePresentation: { mode: "line-effect-half-drain", waitPerPointNativeTicks: 1, fixedWaitNativeTicks: 20 },
+    experience: { ...NATIVE_DEBUG_VIRT.experience },
+    presentationId: "shoot-line",
+  } as const;
+};
+
+/**
+ * `REMAKE-174` 原版Debug F5 的 `VIRT A/B/C`（`1V/2V/3V`）：只有技術測試到得了的直線效果。
+ * 數字全取自模組 29（`debug-mode.json` 的 `virtRules`）：選格種子、傷害輸入（`3V` 在調試路徑上
+ * 是選格步進留下的 9）、經驗規則；表現與魔弓相同。`target` 寫成 `enemy` 只是「要選一個單位」，
+ * 實際的可選對象由 `Stage0Battle.debugTechniqueTargetCells` 決定：任一方、施法者除外。
+ */
+const DEBUG_VIRT_ACTION_DEFINITIONS = {
+  "virt-a": virtDefinition("virt-a", 0),
+  "virt-b": virtDefinition("virt-b", 1),
+  "virt-c": virtDefinition("virt-c", 2),
+} as const;
+
+export function isVirtActionId(actionId: string | undefined): actionId is VirtActionId {
+  return actionId !== undefined && (VIRT_ACTION_IDS as readonly string[]).includes(actionId);
+}
+
 type BattleActionDefinitions = typeof STAGE0_ACTION_DEFINITIONS
   & ExtendedActionContent["STAGE1_ACTION_DEFINITIONS"]
   & typeof DIRECT_TECHNIQUE_ACTION_DEFINITIONS
-  & typeof REMAKE_SHOOTING_ACTION_DEFINITIONS;
+  & typeof REMAKE_SHOOTING_ACTION_DEFINITIONS
+  & typeof DEBUG_VIRT_ACTION_DEFINITIONS;
 type BattleActionAudioAssets = typeof STAGE0_ACTION_AUDIO_ASSETS
   & ExtendedActionContent["STAGE1_ACTION_AUDIO_ASSETS"];
 
@@ -80,6 +118,7 @@ export const BATTLE_ACTION_DEFINITIONS = {
   ...STAGE0_ACTION_DEFINITIONS,
   ...DIRECT_TECHNIQUE_ACTION_DEFINITIONS,
   ...REMAKE_SHOOTING_ACTION_DEFINITIONS,
+  ...DEBUG_VIRT_ACTION_DEFINITIONS,
 } as unknown as BattleActionDefinitions;
 
 export type BattleActionId = keyof typeof BATTLE_ACTION_DEFINITIONS;
@@ -118,12 +157,12 @@ const TECHNIQUE_ACTION_BY_NATIVE_CODE = {
   "3D": "stomp-3",
   "1K": "iron-plate",
   "2K": "obstacle",
+  "1V": "virt-a",
+  "2V": "virt-b",
+  "3V": "virt-c",
 } as const satisfies Readonly<Record<string, BattleActionId>>;
 
-/**
- * `REMAKE-174` 原版Debug F5／F6 技術測試：原版技術代碼對應的複刻動作。原版的
- * `VIRT A/B/C`（`1V/2V/3V`）沒有複刻動作，這裡回傳 `undefined`。
- */
+/** `REMAKE-174` 原版Debug F5／F6 技術測試：原版技術代碼對應的複刻動作。 */
 export function techniqueActionIdForNativeCode(code: string): BattleActionId | undefined {
   return Object.hasOwn(TECHNIQUE_ACTION_BY_NATIVE_CODE, code)
     ? TECHNIQUE_ACTION_BY_NATIVE_CODE[code as keyof typeof TECHNIQUE_ACTION_BY_NATIVE_CODE]

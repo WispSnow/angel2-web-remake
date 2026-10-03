@@ -27,6 +27,7 @@ import {
   hasIceTechnique,
   isIceActionId,
   isShootingActionId,
+  isVirtActionId,
   shootingActionIdFor,
   techniqueActionIdsFor,
 } from "../content/actions";
@@ -56,6 +57,7 @@ import {
   shootingStepsToTarget,
   NumericRangeMap,
   techniqueSelectionPath,
+  techniqueSelectionPaths,
   techniqueSelectionRange,
   techniqueStepsToTarget,
   type RangeSteps,
@@ -345,6 +347,10 @@ const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
   "crossbow-shot": ["crossbow"],
   "magic-archer-shot": ["magic-archer"],
   [WATER_WARRIOR_SHOT_ACTION_ID]: ["water-warrior"],
+  // VIRT 只有原版Debug的技術測試到得了，沒有職業會用。
+  "virt-a": [],
+  "virt-b": [],
+  "virt-c": [],
   "fire-1": ["sister", "magician", "magic-priest", "priest"],
   "fire-2": ["magic-priest", "evil-mage"],
   "fire-3": ["evil-mage"],
@@ -4368,6 +4374,7 @@ export class Stage0Battle {
   /**
    * 技術測試的合法目標格。原版 `18B6:0234` 按絕對陣營篩：傷害類要 side 2、輔助類要 side 1，
    * 與施法者是哪一方無關（用戶 2026-10-02 決定照原版）。`[SR]` 施法者不能拿傷害技打自己。
+   * VIRT 不在篩選表裡，任一方都能選；`[SR]` 施法者自己除外（原版選自己會重放上一次回溯的路徑）。
    */
   debugTechniqueTargetCells(casterId: string, actionId: BattleActionId): Position[] {
     const caster = this.unit(casterId);
@@ -4378,10 +4385,36 @@ export class Stage0Battle {
     const targetSide = definition.target === "ally" ? 1 : 2;
     return this.units
       .filter((target) => range.valueAt(target) > 0
-        && target.side === targetSide
+        && (isVirtActionId(actionId) || target.side === targetSide)
         && (definition.target === "ally" || target.id !== caster.id)
         && (canTargetFrozenUnit(actionId) || !target.actionDisabled))
       .map(({ x, y }) => ({ x, y }));
+  }
+
+  /**
+   * VIRT 的完整路線：在技術選格範圍上從目標回溯施法者的每一條原版合法走法（`17DE:0029`）。
+   * 原版平局按 PIT 選方向；複刻照 `REMAKE-035` 的魔弓箭道由玩家指定，列舉不讀 PRNG。
+   * `affectedUnitIds` 是會受傷的單位：路線上（施法者除外）與目標同一方、沒有冰封的。
+   */
+  debugVirtLineOptions(casterId: string, targetId: string, actionId: BattleActionId): MagicArcherLineOption[] {
+    const caster = this.unit(casterId);
+    const target = this.unit(targetId);
+    if (!caster || !target || !isVirtActionId(actionId)
+      || !this.debugTechniqueTargetCells(caster.id, actionId)
+        .some(({ x, y }) => x === target.x && y === target.y)) return [];
+    const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+    return techniqueSelectionPaths(caster, target, this.dynamicBattlefield, definition.range.selectionRadius)
+      .map((path) => ({
+        path,
+        affectedUnitIds: path.slice(1).flatMap((position) => {
+          const unit = this.unitAt(position);
+          return unit && unit.side === target.side && !unit.actionDisabled ? [unit.id] : [];
+        }),
+        guaranteedKills: 0,
+        expectedDamage: 0,
+        targetThreat: 0,
+      }))
+      .sort((left, right) => linePathKey(left.path).localeCompare(linePathKey(right.path)));
   }
 
   prepareDebugTechnique(intent: BattleActionIntent): PreparedBattleAction {
@@ -4403,8 +4436,19 @@ export class Stage0Battle {
     ) {
       throw new Error("illegal debug technique");
     }
+    // VIRT：路線必須是列舉出來的其中一條；沒指定時取第一條。
+    const virtLine = isVirtActionId(intent.actionId) && target
+      ? this.debugVirtLineOptions(caster.id, target.id, intent.actionId)
+        .find((option) => !intent.linePath || sameLinePath(option.path, intent.linePath))
+      : undefined;
+    if (isVirtActionId(intent.actionId) && !virtLine) throw new Error("illegal VIRT line path");
     const prepared = resolveSpecialAction(
-      { actionId: intent.actionId, actorId: caster.id, ...(target ? { targetId: target.id } : {}) },
+      {
+        actionId: intent.actionId,
+        actorId: caster.id,
+        ...(target ? { targetId: target.id } : {}),
+        ...(virtLine ? { linePath: virtLine.path.map((position) => ({ ...position })) } : {}),
+      },
       caster,
       target,
       this.rng,
@@ -4413,7 +4457,12 @@ export class Stage0Battle {
         battlefield: this.dynamicBattlefield,
         statsFor: (unit) => this.statsFor(unit),
         // 以目標為中心的範圍技作用於所選目標那一方（DS:`1EF6`）；冰雪以施法者為中心，照一般規則。
-        ...(selfCentered ? {} : { areaSide: definition.target === "ally" ? 1 as const : 2 as const }),
+        // VIRT 的目標可以是任一方，作用方就是目標那一方（DS:`1EF4`）。
+        ...(selfCentered ? {} : {
+          areaSide: isVirtActionId(intent.actionId) && target
+            ? target.side
+            : definition.target === "ally" ? 1 as const : 2 as const,
+        }),
       },
       center,
     );

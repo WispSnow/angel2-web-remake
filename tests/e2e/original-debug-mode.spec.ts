@@ -25,6 +25,7 @@ interface DebugStateUnit {
   classId: string;
   x: number;
   y: number;
+  life: number;
   acted: boolean;
 }
 
@@ -425,6 +426,46 @@ test("with the switch on at stage entry, stage 0 casts 究級落雷 although its
     timeout: 30_000,
   }).toBe(true);
   await expect.poll(async () => (await testState(page)).actionMode, { timeout: 30_000 }).toBe("idle");
+  expect(errors).toEqual([]);
+});
+
+test("F5 VIRT A lets 妮雅 hit an ally along a route she picks", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  await openDebugBattle(page, "stage-05-player");
+  const menu = page.getByTestId("debug-menu");
+  const status = page.getByTestId("status-strip");
+  const lifeOf = async (id: string) => (await testState(page)).units.find((unit) => unit.id === id)?.life ?? -1;
+  const before = await lifeOf("1:20");
+  await withCapsLock(page, "F5");
+  await expectMenuOpen(menu);
+  await expect(menu.locator("button[aria-disabled=true]")).toHaveCount(0);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(menu.locator("button")).toHaveText(["VIRT A", "VIRT B", "VIRT C"]);
+  await page.keyboard.press("Enter");
+  await expect(status).toContainText("選擇「VIRT A」的目標（任一方，施法者除外）");
+  // 妮雅在 (25,33)；我方 1:20 在 (27,34)，往右兩格、往下一格有三條等長路線。
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await testState(page)).actionMode).toBe("shotRoute");
+  await expect(status).toContainText("路線 1/3");
+  await page.keyboard.press("e");
+  await expect(status).toContainText("路線 2/3");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "test-results/visual-audit/original-debug-virt-route.png",
+  });
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await testState(page)).units.find(({ id }) => id === "1:0")?.acted, {
+    timeout: 30_000,
+  }).toBe(true);
+  await expect.poll(() => lifeOf("1:20"), { timeout: 30_000 }).toBe(before - 40);
   expect(errors).toEqual([]);
 });
 

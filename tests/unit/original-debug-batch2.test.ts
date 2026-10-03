@@ -82,7 +82,7 @@ describe("REMAKE-174 batch 2 content", () => {
     expect(NATIVE_DEBUG_BEHAVIOUR_EDITOR.layout.labels).toEqual({ x: 137, y: 57, pitch: 20, ink: 15, currentInk: 11 });
   });
 
-  it("keeps the F2/F5/F6 menus, the 治療／生命全 swap and the unreachable VIRT entries", () => {
+  it("keeps the F2/F5/F6 menus and the 治療／生命全 swap, and opens all 31 technique codes", () => {
     expect(NATIVE_DEBUG_EDIT_MENU.items.map(({ code, label, target }) => [code, label, target])).toEqual([
       ["1D", "我  EDIT", "allyUnitEditor"],
       ["2D", "敵  EDIT", "enemyUnitEditor"],
@@ -94,11 +94,12 @@ describe("REMAKE-174 batch 2 content", () => {
     expect(NATIVE_DEBUG_TECHNIQUE_MENUS.support.items[0]).toMatchObject({ code: "5?", label: "治 療" });
     expect(NATIVE_DEBUG_TECHNIQUE_MENUS.support.items[0].ranks.map(({ code }) => code)).toEqual(["1I", "2I", "3I"]);
     expect(NATIVE_DEBUG_TECHNIQUE_MENUS.support.items[1].ranks.map(({ code }) => code)).toEqual(["1H", "2H", "3H"]);
-    expect(DEBUG_TECHNIQUE_ACTION_IDS).toHaveLength(28);
+    // VIRT（`1V/2V/3V`）自 2026-10-03 起也有複刻動作（`original-debug-virt.test.ts`）。
+    expect(DEBUG_TECHNIQUE_ACTION_IDS).toHaveLength(31);
     expect(debugMenuItems({ kind: "technique", group: "attack", casterId: "x", index: 0 })
-      .map(({ enabled }) => enabled)).toEqual([true, true, false, true]);
+      .map(({ enabled }) => enabled)).toEqual([true, true, true, true]);
     expect(debugMenuItems({ kind: "techniqueRank", group: "attack", category: "3?", casterId: "x", index: 0 })
-      .map(({ code, enabled }) => [code, enabled])).toEqual([["1V", false], ["2V", false], ["3V", false]]);
+      .map(({ code, enabled }) => [code, enabled])).toEqual([["1V", true], ["2V", true], ["3V", true]]);
     // 第三批起兵種／地型也開放（`original-debug-batch3.test.ts`）。
     expect(debugMenuItems({ kind: "edit", index: 0 }).map(({ enabled }) => enabled))
       .toEqual([true, true, true, true]);
