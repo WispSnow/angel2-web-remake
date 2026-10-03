@@ -1344,7 +1344,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     } else {
       delete status.dataset.routeIndex;
       delete status.dataset.routeCount;
-      if (selectedUnitContext) status.innerHTML = selectedUnitContext;
+      if (selectedUnitContext && !controller.originalDebugNoticeShown) status.innerHTML = selectedUnitContext;
       else status.textContent = controller.statusMessage;
     }
     const actionMenuVisible = controller.phase === "player"

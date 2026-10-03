@@ -606,6 +606,8 @@ export class GameController {
   debugPlacement?: { unitId: string };
   /** 技術測試的施法者；選格與提交走除錯入口，取消時直接回到戰場。 */
   debugTechniqueCasterId?: string;
+  /** `noteOriginalDebugHotkeyUnavailable` 最近一次的提示。 */
+  private originalDebugNotice?: string;
   /** F1／EDIT 改動之後，關閉時要做一次轉職掃描、勝負判定與階段完成檢查。 */
   private debugEditsPending = false;
   /** `REMAKE-174` 原版Debug鍵 2 的格號讀數；游標或鏡頭一動就失效，與原版被下一次視口重畫蓋掉一致。 */
@@ -4900,7 +4902,15 @@ export class GameController {
     this.statusMessage = this.debugDataEditorOpen || this.debugUnitEditor || this.debugBehaviourEditor || this.debugMenu
       ? "原版Debug：先關閉目前的除錯畫面，再按其他除錯熱鍵。"
       : "原版Debug：熱鍵只在我方待機時有效；請先關閉選單或取消選格。";
+    this.originalDebugNotice = this.statusMessage;
     this.emit();
+  }
+
+  /**
+   * 選了單位時信息欄平常顯示該單位的摘要；上面這則提示要蓋過它，直到信息欄換成別的訊息。
+   */
+  get originalDebugNoticeShown(): boolean {
+    return this.originalDebugNotice !== undefined && this.originalDebugNotice === this.statusMessage;
   }
 
   /** 關掉所有原版Debug的選單、面板與待放置狀態（系統選單、勝負與重開時一併收起）。 */
