@@ -140,7 +140,8 @@ export function capsLockEngaged(event: Pick<DebugKeyEvent, "getModifierState">):
 }
 
 /**
- * 原版在待機戰場按住 Caps Lock 才把按鍵交給除錯分發器 `0000:30CE`（`0000:B78C`）。
+ * 原版在待機戰場按住 Caps Lock 才把按鍵交給除錯分發器 `0000:30CE`（`0000:B78C`）；選格與轉職選擇中
+ * 原版不必按 Caps Lock，複刻仍要求開著（那裡的 S、D 會移動游標）。生效狀態見 `original-debug-hosts.ts`。
  * 沒有數字鍵盤的鍵盤可用 `Shift+8`（`*`）代替數字鍵盤 `*`。
  */
 export function originalDebugHotkey(event: DebugKeyEvent): OriginalDebugHotkey | undefined {
@@ -151,9 +152,9 @@ export function originalDebugHotkey(event: DebugKeyEvent): OriginalDebugHotkey |
 }
 
 /**
- * Caps Lock 開著時 F1–F6、F10 屬於原版Debug。待機戰場以外它們只提示、不執行：否則會落回
- * F1–F4 的集體命令（全軍休息、跟隨、自由行動、撤退），F5 甚至是瀏覽器的重新整理。字母與數字鍵
- * 在選格、選單中照常走平常的意思（例如 S、D 移動游標）。
+ * Caps Lock 開著時 F1–F6、F10 屬於原版Debug。熱鍵不生效的狀態（選單、除錯畫面、授職對白）裡它們
+ * 只提示、不執行：否則會落回 F1–F4 的集體命令（全軍休息、跟隨、自由行動、撤退），F5 甚至是瀏覽器的
+ * 重新整理。字母與數字鍵在那些狀態照常走平常的意思。
  */
 export function isOriginalDebugFunctionKey(event: Pick<DebugKeyEvent, "code">): boolean {
   return /^F\d+$/u.test(event.code) && BY_CODE[event.code] !== undefined;
@@ -167,7 +168,7 @@ function capsLockAfter(event: KeyboardEvent | PointerEvent): boolean {
   return capsLockEngaged(event);
 }
 
-const CAPS_LOCK_ON_TITLE = "Caps Lock 已開啟：在我方待機戰場按熱鍵即可使用原版Debug。";
+const CAPS_LOCK_ON_TITLE = "Caps Lock 已開啟：在我方待機、選格或轉職選擇時按熱鍵即可使用原版Debug。";
 const CAPS_LOCK_OFF_TITLE = "Caps Lock 未開啟：熱鍵會照平常的意思執行。"
   + "macOS 的拼音輸入法短按 Caps Lock 只切換中英文，不會開啟 Caps Lock："
   + "請長按到指示燈亮起，或先切換到 ABC 輸入法。";

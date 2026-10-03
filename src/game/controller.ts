@@ -52,6 +52,11 @@ import { stagedRenderAssetAvailable } from "./staged-render-asset-cache";
 import { fullCombatImageAvailable } from "./full-combat-image-cache";
 import { MUSIC_BOX_TRACKS, musicBoxProgram } from "./content/music-box";
 import type { MusicProgram } from "./music-transport";
+import {
+  originalDebugHotkeyRefusal,
+  refreshedPromotionQueue,
+  type OriginalDebugHost,
+} from "./original-debug-hosts";
 import { originalDebugModeEnabled, type OriginalDebugHotkey } from "./original-debug-mode";
 import {
   cameraContains,
@@ -525,6 +530,22 @@ const RANGE_SELECTION_MODES: ReadonlySet<ActionMode> = new Set<ActionMode>([
   "target",
   "specialTarget",
 ]);
+
+/** 被技術測試打斷的選格；範圍與目標在還原時按當時的狀態重算，所以不必保存。 */
+interface SuspendedSelection {
+  readonly actionMode: ActionMode;
+  readonly selectedId: string;
+  readonly selectedActionId: BattleActionId | undefined;
+  readonly commandIndex: number;
+  readonly techniqueIndex: number;
+  readonly pendingOrigin: Position | undefined;
+  readonly pendingPath: readonly Position[] | undefined;
+  readonly pendingExtraMove: boolean;
+  readonly awaitingMoveConfirmation: boolean;
+  readonly cursor: Position;
+  /** 打斷時行動者的位置；技術測試把它推走就不能接著選。 */
+  readonly anchor: Position;
+}
 const pause = programDelay;
 const atomicObjectiveConditions = (
   condition: StageObjectiveCondition,
@@ -610,6 +631,16 @@ export class GameController {
   private originalDebugNotice?: string;
   /** F1／EDIT 改動之後，關閉時要做一次轉職掃描、勝負判定與階段完成檢查。 */
   private debugEditsPending = false;
+  /**
+   * 選格中按 F5／F6 時被打斷的選格。技術測試結束（施放完畢或取消）就還原它，與原版 `75E4`
+   * 返回外層選格循環一致。
+   */
+  private debugSuspendedSelection?: SuspendedSelection;
+  /**
+   * 選格中的除錯操作可能讓單位達到轉職條件；原版只在待機循環掃描，所以留到這次行動結束或退回
+   * 待機時再掃描。
+   */
+  private debugPromotionScanDeferred = false;
   /** `REMAKE-174` 原版Debug鍵 2 的格號讀數；游標或鏡頭一動就失效，與原版被下一次視口重畫蓋掉一致。 */
   debugCellReadout?: { cell: number; difficulty: number; cursor: Position; cameraOrigin: Position };
   /** `REMAKE-174` 原版Debug Caps Lock+1 是否按住；宿主鍵盤層寫入。 */
@@ -1240,6 +1271,11 @@ export class GameController {
   }
 
   get hasBlockingOverlay(): boolean {
+    return this.hasOverlayOtherThanPromotion || this.promotionUnitIds.length > 0;
+  }
+
+  /** 轉職等待之外的覆蓋層；原版Debug在轉職選擇上疊開的畫面也算在內。 */
+  private get hasOverlayOtherThanPromotion(): boolean {
     return this.systemMenuOpen
       || this.settingsOpen
       || this.soundSettingsOpen
@@ -1259,8 +1295,7 @@ export class GameController {
       || this.debugUnitEditor !== undefined
       || this.debugClassEditor !== undefined
       || this.debugTerrainEditor !== undefined
-      || this.musicBoxOpen
-      || this.promotionUnitIds.length > 0;
+      || this.musicBoxOpen;
   }
 
   get groupLeader(): BattleUnit | undefined {
@@ -2470,8 +2505,9 @@ export class GameController {
     else if (command.id === "cancel") this.cancelMove();
   }
 
+  // 轉職選擇中按原版Debug S 說台詞時 `busy`：台詞窗開著不收選擇。
   movePromotionSelection(delta: number): void {
-    if (this.promotionDialogueActive) return;
+    if (this.promotionDialogueActive || this.busy) return;
     const targets = this.promotionTargets;
     if (targets.length === 0 || delta === 0) return;
     this.promotionSelectionIndex = (
@@ -2484,6 +2520,7 @@ export class GameController {
     if (
       this.promotionUnitIds.length === 0
       || this.promotionDialogueActive
+      || this.busy
       || index < 0
       || index >= this.promotionTargets.length
       || index === this.promotionSelectionIndex
@@ -2493,7 +2530,7 @@ export class GameController {
   }
 
   confirmPromotion(): void {
-    if (this.promotionDialogueActive) return;
+    if (this.promotionDialogueActive || this.busy) return;
     const unit = this.promotionUnit;
     const target = this.selectedPromotionTarget;
     if (!unit || !target) return;
@@ -2583,6 +2620,7 @@ export class GameController {
     if (this.debugTechniqueCasterId
       && (this.actionMode === "specialTarget" || this.actionMode === "selfAreaConfirm")) {
       this.resetAction();
+      if (this.resumeSuspendedSelection("原版Debug：已取消技術測試。")) return;
       this.statusMessage = "原版Debug：已取消技術測試。";
       this.emit();
       return;
@@ -2623,6 +2661,11 @@ export class GameController {
         return;
       }
       this.resetAction();
+      // 選格中的除錯操作讓轉職掃描延到這裡（原版退回待機循環就會掃描）。
+      if (this.debugPromotionScanDeferred) {
+        this.finishOriginalDebugMutation("已返回上一層。");
+        return;
+      }
     } else if (this.actionMode === "move") {
       this.reachable = [];
       this.commandIndex = 0;
@@ -2651,6 +2694,8 @@ export class GameController {
     if (requiresTargetUnit && !target) return;
     // 技術測試（`REMAKE-174`）走模擬層的除錯入口：不看職業、禁咒、已行動與冰封，目標按絕對陣營。
     const debugCast = this.debugTechniqueCasterId === actor.id;
+    // 選格中打開的技術測試：結束後回到原來的選格，轉職掃描與自動階段都留給那個選格收尾。
+    const resumesSelection = debugCast && this.debugSuspendedSelection !== undefined;
     try {
       const prepared = debugCast ? this.battle.prepareDebugTechnique({
         actionId,
@@ -2692,6 +2737,11 @@ export class GameController {
         this.statusMessage = prepared.affectedUnits.length === 0
           ? "祈禱沒有回應。"
           : `祈禱回應 ${prepared.affectedUnits.length} 名我方：生命 ${counts.healing}、經驗 ${counts.experience}、攻擊 ${counts.attackUp}、防禦 ${counts.defenseUp}。`;
+        if (resumesSelection) {
+          this.busy = false;
+          this.resumeSuspendedSelection(this.statusMessage);
+          return;
+        }
         const promotionPause = this.pauseForPromotions();
         if (promotionPause) await promotionPause;
         this.busy = false;
@@ -2767,6 +2817,11 @@ export class GameController {
                 ? `${targetPresentation.name}受到 ${result.damage} 點傷害。`
                 : `${definition.label}完成。`;
 
+      if (resumesSelection) {
+        this.busy = false;
+        this.resumeSuspendedSelection(this.statusMessage);
+        return;
+      }
       const promotionPause = this.pauseForPromotions();
       if (promotionPause) await promotionPause;
       this.busy = false;
@@ -2779,6 +2834,7 @@ export class GameController {
       this.busy = false;
       this.specialActionPresentation = undefined;
       this.statusMessage = error instanceof Error ? error.message : "特殊行動無效。";
+      if (resumesSelection && this.resumeSuspendedSelection(this.statusMessage)) return;
       this.emit();
     }
   }
@@ -3450,6 +3506,7 @@ export class GameController {
   }
 
   private pauseForPromotions(): Promise<void> | undefined {
+    this.debugPromotionScanDeferred = false;
     const unitIds = this.battle.promotionQueue();
     if (unitIds.length === 0) return undefined;
     this.promotionUnitIds = unitIds;
@@ -4849,28 +4906,58 @@ export class GameController {
   }
 
   // ── REMAKE-174 原版Debug模式與音樂盒 ─────────────────────────────────────────
-  // 原版（模組 29）的除錯分發器 `0000:30CE` 只在待機戰場按住 Caps Lock 時運行；這裡的
-  // 每個入口都對應 `reverse/notes/developer-debug-mode.md` 的一個處理器。除錯操作不消耗
-  // 戰鬥 PRNG，改動的單位狀態與一般狀態一樣保存。
+  // 原版（模組 29）的除錯分發器 `0000:30CE` 在待機戰場（按住 Caps Lock）、選格與轉職選擇中
+  // 運行（`original-debug-hosts.ts`）；這裡的每個入口都對應 `reverse/notes/developer-debug-mode.md`
+  // 的一個處理器。除錯操作不消耗戰鬥 PRNG，改動的單位狀態與一般狀態一樣保存。
 
   /** 開關只在正式戰役生效；實驗室的記憶體戰鬥不接受除錯。 */
   get originalDebugActive(): boolean {
     return this.campaignPersistenceEnabled && originalDebugModeEnabled();
   }
 
-  /** 待機戰場才接受除錯熱鍵：選格、選單、對白、演出與轉職等待中一律不收。 */
-  get originalDebugHotkeysAvailable(): boolean {
-    return this.originalDebugActive
-      && this.phase === "player"
-      && !this.busy
-      && this.actionMode === "idle"
-      && !this.hasBlockingOverlay
-      && !this.debugPlacement;
+  /**
+   * 熱鍵在哪個戰場狀態生效：我方待機（查看敵方或友軍自動單位範圍的預覽也算）、移動／攻擊／射擊／
+   * 傳送／技術／建造的選格，或轉職的職業選擇。選單、對白、演出、除錯畫面、放回單位等待、授職對白
+   * 與敵方階段一律不收；原版通用選單只在拖曳把手上接收，複刻不做。
+   */
+  get originalDebugHost(): OriginalDebugHost | undefined {
+    if (!this.originalDebugActive || this.phase !== "player" || this.busy || this.debugPlacement) return undefined;
+    if (this.promotionUnitIds.length > 0) {
+      return this.promotionChoiceVisible && !this.hasOverlayOtherThanPromotion ? "promotion" : undefined;
+    }
+    if (this.hasBlockingOverlay) return undefined;
+    if (this.actionMode === "idle" || this.actionMode === "enemyPreview" || this.actionMode === "allyPreview") {
+      return "idle";
+    }
+    return this.debugSelectionActive ? "selection" : undefined;
+  }
+
+  /** 我方正在某個選格裡（原版 `54BC` 的七個調用循環之一）。 */
+  private get debugSelectionActive(): boolean {
+    return RANGE_SELECTION_MODES.has(this.actionMode) && this.selectedId !== undefined;
+  }
+
+  /** 除錯畫面底下是哪個狀態：畫面關閉時按它收尾。 */
+  private get originalDebugHostBeneath(): OriginalDebugHost {
+    if (this.promotionUnitIds.length > 0) return "promotion";
+    return this.debugSelectionActive ? "selection" : "idle";
   }
 
   /** 回傳除錯是否消費了這個按鍵；沒有消費時按鍵照常走一般語義。 */
   runOriginalDebugHotkey(hotkey: OriginalDebugHotkey): boolean {
-    if (!this.originalDebugHotkeysAvailable) return false;
+    const host = this.originalDebugHost;
+    // 範圍讀數由宿主鍵盤層追蹤按住與放開（`setDebugRangeReadoutHeld`），選格中同樣有效。
+    if (!host || hotkey === "rangeReadout") return false;
+    const refusal = originalDebugHotkeyRefusal(hotkey, {
+      host,
+      inTechniqueTest: this.debugTechniqueCasterId !== undefined,
+    });
+    if (refusal) {
+      this.showOriginalDebugNotice(refusal);
+      return true;
+    }
+    // 預覽只是顯示範圍：先收起，再照待機執行。
+    if (this.actionMode === "enemyPreview" || this.actionMode === "allyPreview") this.resetAction();
     switch (hotkey) {
       case "behaviourEditor": this.openDebugBehaviourEditor(); break;
       case "editMenu": this.openDebugMenu({ kind: "edit", index: 0 }, "原版Debug：編輯。"); break;
@@ -4887,22 +4974,26 @@ export class GameController {
       case "instantVictory": this.debugInstantVictory(); break;
       case "skipToEnding": this.debugSkipToEnding(); break;
       case "musicBox": this.openMusicBox("battle"); break;
-      // 範圍讀數由宿主鍵盤層追蹤按住與放開（`setDebugRangeReadoutHeld`），選格中同樣有效。
-      case "rangeReadout": return false;
     }
     return true;
   }
 
   /**
-   * Caps Lock 開著、按了 F1–F6／F10，但不在待機戰場（選了單位、開著選單或選格中）：只提示，
-   * 不落回集體命令。演出與敵方階段不改信息欄。
+   * Caps Lock 開著、按了 F1–F6／F10，但不在熱鍵生效的狀態（開著選單、除錯畫面或授職對白）：
+   * 只提示，不落回集體命令。演出與敵方階段不改信息欄。
    */
   noteOriginalDebugHotkeyUnavailable(): void {
     if (this.phase !== "player" || this.busy) return;
-    this.statusMessage = this.debugDataEditorOpen || this.debugUnitEditor || this.debugBehaviourEditor || this.debugMenu
-      ? "原版Debug：先關閉目前的除錯畫面，再按其他除錯熱鍵。"
-      : "原版Debug：熱鍵只在我方待機時有效；請先關閉選單或取消選格。";
-    this.originalDebugNotice = this.statusMessage;
+    this.showOriginalDebugNotice(
+      this.debugDataEditorOpen || this.debugUnitEditor || this.debugBehaviourEditor || this.debugMenu
+        ? "原版Debug：先關閉目前的除錯畫面，再按其他除錯熱鍵。"
+        : "原版Debug：熱鍵在我方待機、選格與轉職選擇時有效；請先關閉選單。",
+    );
+  }
+
+  private showOriginalDebugNotice(message: string): void {
+    this.statusMessage = message;
+    this.originalDebugNotice = message;
     this.emit();
   }
 
@@ -4915,6 +5006,7 @@ export class GameController {
 
   /** 關掉所有原版Debug的選單、面板與待放置狀態（系統選單、勝負與重開時一併收起）。 */
   private clearOriginalDebugSurfaces(): void {
+    this.debugSuspendedSelection = undefined;
     this.debugMenu = undefined;
     this.debugBehaviourEditor = undefined;
     this.debugUnitEditor = undefined;
@@ -4950,8 +5042,14 @@ export class GameController {
   closeDebugMenu(): void {
     if (!this.debugMenu) return;
     this.debugMenu = undefined;
-    this.statusMessage = "已返回戰場。";
+    this.statusMessage = this.originalDebugReturnMessage;
     this.emit();
+  }
+
+  /** 關掉沒有改動任何東西的除錯畫面時的提示：回到底下的狀態。 */
+  private get originalDebugReturnMessage(): string {
+    const host = this.originalDebugHostBeneath;
+    return host === "promotion" ? "已返回轉職選擇。" : host === "selection" ? "已返回選格。" : "已返回戰場。";
   }
 
   moveDebugMenuSelection(delta: number): void {
@@ -5091,7 +5189,7 @@ export class GameController {
   closeDebugBehaviourEditor(): void {
     if (!this.debugBehaviourEditor) return;
     this.debugBehaviourEditor = undefined;
-    this.finishOriginalDebugControlChange("已返回戰場。");
+    this.finishOriginalDebugControlChange(this.originalDebugReturnMessage);
   }
 
   // ── F5／F6 技術測試（`0000:6C16 → 75E4`） ──
@@ -5120,6 +5218,10 @@ export class GameController {
       this.emit();
       return;
     }
+    // 選格中按 F5／F6：記住原來的選格，技術測試結束後回到它（原版 `75E4` 返回外層選格循環）。
+    if (this.debugSelectionActive && !this.debugTechniqueCasterId) {
+      this.debugSuspendedSelection = this.suspendedSelection();
+    }
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
     this.selectedId = caster.id;
     this.selectedActionId = actionId;
@@ -5141,13 +5243,61 @@ export class GameController {
     this.targets = this.battle.debugTechniqueTargetCells(caster.id, actionId);
     if (this.targets.length === 0) {
       this.resetAction();
-      this.statusMessage = `原版Debug：「${definition.label}」範圍內沒有合法目標。`;
+      const message = `原版Debug：「${definition.label}」範圍內沒有合法目標。`;
+      if (this.resumeSuspendedSelection(message)) return;
+      this.statusMessage = message;
       this.emit();
       return;
     }
     this.actionMode = "specialTarget";
     this.statusMessage = `原版Debug：選擇「${definition.label}」的${definition.target === "ally" ? "我方" : "敵方"}目標。`;
     this.emit();
+  }
+
+  private suspendedSelection(): SuspendedSelection | undefined {
+    const actor = this.selectedUnit;
+    if (!actor) return undefined;
+    return {
+      actionMode: this.actionMode,
+      selectedId: actor.id,
+      selectedActionId: this.selectedActionId,
+      commandIndex: this.commandIndex,
+      techniqueIndex: this.techniqueIndex,
+      pendingOrigin: this.pendingOrigin && { ...this.pendingOrigin },
+      pendingPath: this.pendingPath?.map((step) => ({ ...step })),
+      pendingExtraMove: this.pendingExtraMove,
+      awaitingMoveConfirmation: this.awaitingMoveConfirmation,
+      cursor: { ...this.cursor },
+      anchor: { x: actor.x, y: actor.y },
+    };
+  }
+
+  /**
+   * 技術測試結束（施放完畢、取消或沒有目標）：回到被它打斷的選格，再照選格中除錯操作的規則
+   * 檢查。沒有被打斷的選格時回傳 `false`。
+   */
+  private resumeSuspendedSelection(message: string): boolean {
+    const suspended = this.debugSuspendedSelection;
+    if (!suspended) return false;
+    this.debugSuspendedSelection = undefined;
+    this.statusMessage = message;
+    if (this.resolveOutcome()) {
+      this.emit();
+      return true;
+    }
+    this.resetAction();
+    this.actionMode = suspended.actionMode;
+    this.selectedId = suspended.selectedId;
+    this.selectedActionId = suspended.selectedActionId;
+    this.commandIndex = suspended.commandIndex;
+    this.techniqueIndex = suspended.techniqueIndex;
+    this.pendingOrigin = suspended.pendingOrigin && { ...suspended.pendingOrigin };
+    this.pendingPath = suspended.pendingPath?.map((step) => ({ ...step }));
+    this.pendingExtraMove = suspended.pendingExtraMove;
+    this.awaitingMoveConfirmation = suspended.awaitingMoveConfirmation;
+    this.cursor = { ...suspended.cursor };
+    this.finishOriginalDebugMutation(message, undefined, suspended.anchor);
+    return true;
   }
 
   // ── 我／敵 EDIT（`0000:0ABE`） ──
@@ -5230,6 +5380,9 @@ export class GameController {
         this.debugEditsPending = true;
         this.statusMessage = `原版Debug：${unitDisplayName(unit)}已移出戰場。`;
       }
+    } else if (entry.state === "departed" && this.originalDebugHostBeneath !== "idle") {
+      // `[DD]` 原版要到下一次待機點格才放回；複刻只從待機開始放置，不讓它插進選格或轉職選擇。
+      this.statusMessage = "原版Debug：放回單位要在我方待機時進行。";
     } else if (entry.state === "departed") {
       this.debugUnitEditor = undefined;
       this.debugPlacement = { unitId: entry.unitId };
@@ -5322,7 +5475,7 @@ export class GameController {
   closeDebugUnitEditor(): void {
     if (!this.debugUnitEditor) return;
     this.debugUnitEditor = undefined;
-    this.finishOriginalDebugControlChange("已返回戰場。");
+    this.finishOriginalDebugControlChange(this.originalDebugReturnMessage);
   }
 
   // ── 兵種（`0000:1294`）與地型（`0000:1B3A`）：只在本場戰鬥生效 ──
@@ -5638,8 +5791,33 @@ export class GameController {
     this.emit();
   }
 
-  private finishOriginalDebugMutation(message: string, afterOngoing?: () => void): void {
+  /**
+   * 一次除錯操作之後的收尾，依操作底下的狀態而定：
+   * - 待機：照原版待機循環做一次轉職掃描與勝負判定；
+   * - 選格：勝負照常立即判定，轉職掃描留到行動結束或退回待機，選格按目前狀態繼續；
+   * - 轉職選擇：重整轉職佇列，勝負留給暫停中的流程在轉職全部結束後判定。
+   *
+   * `anchor` 是技術測試打斷選格時行動者的位置。
+   */
+  private finishOriginalDebugMutation(message: string, afterOngoing?: () => void, anchor?: Position): void {
     this.statusMessage = message;
+    if (this.promotionUnitIds.length > 0) {
+      this.refreshPromotionsAfterDebug();
+      return;
+    }
+    if (this.debugSelectionActive) {
+      if (this.resolveOutcome()) {
+        this.emit();
+        return;
+      }
+      this.debugPromotionScanDeferred = true;
+      const resumed = this.resumeSelectionAfterDebug(anchor);
+      if (resumed === "finished") return;
+      if (resumed === "continue") {
+        this.emit();
+        return;
+      }
+    }
     const settle = (): void => {
       const ended = this.resolveOutcome();
       this.emit();
@@ -5653,13 +5831,127 @@ export class GameController {
     settle();
   }
 
+  /**
+   * `[SR]` 選格中做了除錯操作之後。原版回到同一個選格循環、沿用進入時的範圍圖與行動者格
+   * （`54BC` 的七個調用點）；複刻按目前的狀態重算範圍與目標，行動做不成了才退出：
+   * - 行動者離場：取消，回到待機；
+   * - 不能再由玩家指揮（改成自動行為、被冰封、已行動）或被推離原格：取消；已經移動的話保留
+   *   落點、照「結束」收尾；
+   * - 職業不再有這項行動，或範圍內沒有合法目標：回到行動選單。
+   * 技術測試自己的選格不看指揮權，施法者離場或沒有目標就結束技術測試。
+   */
+  private resumeSelectionAfterDebug(anchor?: Position): "continue" | "idle" | "finished" {
+    const actor = this.selectedUnit;
+    const debugCast = this.debugTechniqueCasterId !== undefined;
+    if (!actor) {
+      this.resetAction();
+      this.statusMessage += debugCast ? "施法者已不在戰場，技術測試結束。" : "行動的單位已不在戰場，這次行動取消。";
+      return "idle";
+    }
+    if (debugCast) {
+      if (this.reloadSelectionRange(actor)) return "continue";
+      this.resetAction();
+      this.statusMessage += "範圍內已沒有合法目標，技術測試結束。";
+      return "idle";
+    }
+    const commandable = this.battle.isPlayerControllableAlly(actor.id) && !actor.acted && !actor.actionDisabled;
+    const displaced = anchor !== undefined && (anchor.x !== actor.x || anchor.y !== actor.y);
+    if (!commandable || displaced) {
+      const reason = displaced ? "被推離原位" : "不能再由玩家指揮";
+      if (this.pendingPath || this.pendingExtraMove) {
+        if (!this.pendingExtraMove) this.battle.wait(actor.id);
+        this.finishUnitAction(
+          `${this.statusMessage}${unitDisplayName(actor)}${reason}，停在目前位置結束行動。`,
+          true,
+        );
+        return "finished";
+      }
+      this.resetAction();
+      this.statusMessage += `${unitDisplayName(actor)}${reason}，這次行動取消。`;
+      return "idle";
+    }
+    if (this.reloadSelectionRange(actor)) return "continue";
+    this.actionMode = "actionMenu";
+    this.commandIndex = 0;
+    this.reachable = [];
+    this.moveRangeDisplay = [];
+    this.targets = [];
+    this.actionRange = [];
+    this.selectedActionId = undefined;
+    this.statusMessage += "這項行動已沒有合法目標，回到行動選單。";
+    return "continue";
+  }
+
+  /** 按目前狀態重算選格的範圍與目標；行動已不可用或沒有合法目標時回傳 `false`。 */
+  private reloadSelectionRange(actor: BattleUnit): boolean {
+    switch (this.actionMode) {
+      case "move":
+        this.loadMoveRange(actor.id, this.pendingExtraMove);
+        return this.reachable.length > 0;
+      case "target":
+        this.targets = this.attackTargetCells(actor);
+        return this.targets.length > 0;
+      case "specialTarget": {
+        const actionId = this.selectedActionId;
+        if (!actionId) return false;
+        const debugCast = this.debugTechniqueCasterId === actor.id;
+        if (!debugCast) {
+          const available = isShootingActionId(actionId)
+            ? shootingActionIdFor(actor.classId, actor.side) === actionId
+            : actor.statuses.techniqueSeal === 0 && techniqueActionIdsFor(actor).includes(actionId);
+          if (!available) return false;
+        }
+        this.actionRange = debugCast
+          ? this.battle.debugTechniqueRange(actor.id, actionId).cells()
+          : this.battle.actionRange(actor.id, actionId).cells();
+        this.targets = debugCast
+          ? this.battle.debugTechniqueTargetCells(actor.id, actionId)
+          : this.battle.actionTargetCells(actor.id, actionId);
+        return this.targets.length > 0;
+      }
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * 轉職選擇中做了除錯操作（原版 `0744` 循環照樣等選擇）：重整佇列。正在選的單位被移出時換下一位、
+   * 重新開始授職對白；佇列空了就讓暫停中的流程繼續，勝負由那個流程判定，與一般行動結束的順序相同。
+   */
+  private refreshPromotionsAfterDebug(): void {
+    const head = this.promotionUnitIds[0];
+    this.promotionUnitIds = refreshedPromotionQueue(this.promotionUnitIds, this.battle.promotionQueue());
+    const next = this.promotionUnit;
+    if (!next) {
+      this.promotionUnitIds = [];
+      this.promotionDialogueIndex = undefined;
+      this.promotionSelectionIndex = 0;
+      const resume = this.promotionResume;
+      this.promotionResume = undefined;
+      this.emit();
+      resume?.();
+      return;
+    }
+    if (next.id !== head) {
+      this.promotionDialogueIndex = 0;
+      this.promotionSelectionIndex = 0;
+      this.battle.focusId = next.id;
+      this.cursor = { x: next.x, y: next.y };
+      this.centerCamera(next);
+      this.statusMessage += `${unitDisplayName(next)}達到轉職條件；必須選擇下一職業。`;
+    } else {
+      this.promotionSelectionIndex = Math.min(this.promotionSelectionIndex, Math.max(0, this.promotionTargets.length - 1));
+    }
+    this.emit();
+  }
+
   get musicBoxTracks(): typeof MUSIC_BOX_TRACKS {
     return MUSIC_BOX_TRACKS;
   }
 
   /** 「音樂開關」面板常駐的入口，或除錯模式下的 Caps Lock+M。 */
   openMusicBox(from: "battle" | "musicSettings"): void {
-    if (from === "musicSettings" ? !this.musicSettingsOpen : !this.originalDebugHotkeysAvailable) return;
+    if (from === "musicSettings" ? !this.musicSettingsOpen : this.originalDebugHost === undefined) return;
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
     this.minimapPreviewOrigin = undefined;
@@ -5712,14 +6004,64 @@ export class GameController {
     this.emit();
   }
 
-  systemAction(): void {
-    if (this.promotionUnitIds.length > 0 || this.groupCommandDialogueActive) return;
-    if (this.dialogueSkipConfirmOpen) this.cancelDialogueSkip();
-    else if (this.musicBoxOpen) this.closeMusicBox();
+  /**
+   * 原版Debug的畫面或台詞疊在轉職選擇上：轉職選單要退到它們下面（原版先畫除錯畫面，返回
+   * `0744` 循環才重畫轉職選擇）。
+   */
+  get originalDebugAbovePromotion(): boolean {
+    return this.promotionChoiceVisible && (this.originalDebugSurfaceOpen || this.contextualLineDialogueActive);
+  }
+
+  /** 轉職選擇上可以疊開原版Debug畫面；按鍵先給它們（見 `originalDebugHost`）。 */
+  private get originalDebugSurfaceOpen(): boolean {
+    return this.musicBoxOpen
+      || this.debugMenu !== undefined
+      || this.debugBehaviourEditor !== undefined
+      || this.debugUnitEditor !== undefined
+      || this.debugDataEditorOpen;
+  }
+
+  private closeOriginalDebugSurface(): boolean {
+    if (this.musicBoxOpen) this.closeMusicBox();
     else if (this.debugMenu) this.closeDebugMenu();
     else if (this.debugBehaviourEditor) this.closeDebugBehaviourEditor();
     else if (this.debugUnitEditor) this.closeDebugUnitEditor();
     else if (this.debugDataEditorOpen) this.closeDebugDataEditor();
+    else return false;
+    return true;
+  }
+
+  private moveOriginalDebugSurface(delta: Position): boolean {
+    if (this.musicBoxOpen) {
+      if (delta.y !== 0) this.moveMusicBoxSelection(delta.y);
+    } else if (this.debugMenu) {
+      if (delta.y !== 0) this.moveDebugMenuSelection(delta.y);
+    } else if (this.debugBehaviourEditor) {
+      if (delta.y !== 0) this.moveDebugBehaviourSelection(delta.y);
+    } else if (this.debugUnitEditor) {
+      this.moveDebugUnitEditorFocus(delta);
+    } else if (this.debugDataEditorOpen) {
+      this.moveDebugDataEditor(delta);
+    } else return false;
+    return true;
+  }
+
+  private activateOriginalDebugSurface(): void {
+    if (this.musicBoxOpen) this.playMusicBoxSelection();
+    else if (this.debugMenu) this.activateDebugMenuSelection();
+    else if (this.debugBehaviourEditor) this.applyDebugBehaviourSelection();
+    else if (this.debugUnitEditor) this.toggleDebugUnitPresence();
+    else if (this.debugDataEditorOpen) this.activateDebugDataEditor();
+  }
+
+  systemAction(): void {
+    if (this.promotionUnitIds.length > 0) {
+      this.closeOriginalDebugSurface();
+      return;
+    }
+    if (this.groupCommandDialogueActive) return;
+    if (this.dialogueSkipConfirmOpen) this.cancelDialogueSkip();
+    else if (this.closeOriginalDebugSurface()) return;
     else if (this.debugPlacement) this.cancelDebugPlacement();
     else if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
@@ -5745,14 +6087,13 @@ export class GameController {
       this.requestDialogueSkip();
       return true;
     }
-    if (this.promotionUnitIds.length > 0) return true;
+    if (this.promotionUnitIds.length > 0) {
+      this.closeOriginalDebugSurface();
+      return true;
+    }
     if (this.groupCommandDialogueActive) return true;
     if (this.phase === "saveSlots") this.cancelPostSaveSlots();
-    else if (this.musicBoxOpen) this.closeMusicBox();
-    else if (this.debugMenu) this.closeDebugMenu();
-    else if (this.debugBehaviourEditor) this.closeDebugBehaviourEditor();
-    else if (this.debugUnitEditor) this.closeDebugUnitEditor();
-    else if (this.debugDataEditorOpen) this.closeDebugDataEditor();
+    else if (this.closeOriginalDebugSurface()) return true;
     else if (this.debugPlacement) this.cancelDebugPlacement();
     else if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
@@ -6475,7 +6816,7 @@ export class GameController {
       return;
     }
     if (this.promotionUnitIds.length > 0) {
-      if (this.promotionDialogueActive) return;
+      if (this.moveOriginalDebugSurface(delta) || this.promotionDialogueActive) return;
       if (delta.x !== 0 || delta.y !== 0) {
         this.movePromotionSelection(delta.x !== 0 ? delta.x : delta.y);
       }
@@ -6500,26 +6841,7 @@ export class GameController {
       return;
     }
     if (this.phase !== "player" || this.objectiveOpen || this.busy) return;
-    if (this.musicBoxOpen) {
-      if (delta.y !== 0) this.moveMusicBoxSelection(delta.y);
-      return;
-    }
-    if (this.debugMenu) {
-      if (delta.y !== 0) this.moveDebugMenuSelection(delta.y);
-      return;
-    }
-    if (this.debugBehaviourEditor) {
-      if (delta.y !== 0) this.moveDebugBehaviourSelection(delta.y);
-      return;
-    }
-    if (this.debugUnitEditor) {
-      this.moveDebugUnitEditorFocus(delta);
-      return;
-    }
-    if (this.debugDataEditorOpen) {
-      this.moveDebugDataEditor(delta);
-      return;
-    }
+    if (this.moveOriginalDebugSurface(delta)) return;
     if (this.recordMenuMode) {
       if (delta.y !== 0) this.moveRecordMenuSelection(delta.y);
       else if (delta.x !== 0) this.moveRecordMenuPage(delta.x);
@@ -6647,7 +6969,8 @@ export class GameController {
   }
 
   primaryAtCursor(): void {
-    if (this.prayerHoldSkip) this.prayerHoldSkip();
+    if (this.promotionUnitIds.length > 0 && this.originalDebugSurfaceOpen) this.activateOriginalDebugSurface();
+    else if (this.prayerHoldSkip) this.prayerHoldSkip();
     else if (this.dialogueSkipConfirmOpen) this.activateDialogueSkipSelection();
     else if (this.groupCommandDialogueActive) this.advanceDialogue();
     else if (this.promotionDialogueActive) this.advanceDialogue();
@@ -6660,11 +6983,7 @@ export class GameController {
       else this.skipSave();
     }
     else if (this.phase === "saveSlots") this.selectSaveSlot(this.postSaveSlotIndex + 1);
-    else if (this.musicBoxOpen) this.playMusicBoxSelection();
-    else if (this.debugMenu) this.activateDebugMenuSelection();
-    else if (this.debugBehaviourEditor) this.applyDebugBehaviourSelection();
-    else if (this.debugUnitEditor) this.toggleDebugUnitPresence();
-    else if (this.debugDataEditorOpen) this.activateDebugDataEditor();
+    else if (this.originalDebugSurfaceOpen) this.activateOriginalDebugSurface();
     else if (this.recordMenuMode) this.activateRecordMenuSelection();
     else if (this.quitConfirmOpen) this.activateQuitSelection();
     else if (this.settingsOpen) this.activateSettingsMenuSelection();

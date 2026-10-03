@@ -1189,8 +1189,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     lastInputSource = "keyboard-or-gamepad";
     settleMenuPointerGlide();
     if (recordBackupUi.handleKeyDown(event)) return;
-    // `REMAKE-174`：開關開啟且 Caps Lock 開著時，原版Debug熱鍵先於一般鍵位。待機戰場以外
-    // 字母與數字鍵照常走平常的意思（S／D 移動游標等），F 鍵只提示（`isOriginalDebugFunctionKey`）。
+    // `REMAKE-174`：開關開啟且 Caps Lock 開著時，原版Debug熱鍵先於一般鍵位（待機、選格與轉職選擇，
+    // 見 `original-debug-hosts.ts`）。其他狀態字母與數字鍵照常走平常的意思，F 鍵只提示
+    // （`isOriginalDebugFunctionKey`）。
     const debugKey = controller.originalDebugActive ? originalDebugHotkey(event) : undefined;
     // 按住不放的自動重複不再觸發一次除錯，但 F 鍵仍不能落回集體命令或瀏覽器的 F5。
     if (debugKey && event.repeat && isOriginalDebugFunctionKey(event)) {
@@ -1399,6 +1400,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     const promotionUnit = controller.promotionChoiceVisible ? controller.promotionUnit : undefined;
     promotionLayer.hidden = !promotionUnit;
+    promotionLayer.dataset.debugAbove = String(controller.originalDebugAbovePromotion);
     if (promotionUnit) {
       const currentStats = controller.battle.statsFor(promotionUnit);
       const promotionDisplayName = unitDisplayName(promotionUnit);

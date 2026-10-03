@@ -100,6 +100,53 @@ const SCAN_CODES = {
   m: 0x32, keypadStar: 0x37, capsLock: 0x3a, f1: 0x3b, f2: 0x3c, f3: 0x3d, f4: 0x3e, f5: 0x3f, f6: 0x40, f10: 0x44,
   keypadMinus: 0x4a, keypad4: 0x4b, keypad5: 0x4c, keypad6: 0x4d, keypad1: 0x4f, keypad2: 0x50, keypad3: 0x51,
 };
+/**
+ * 调用 `0000:54BC` 的七个选格循环。`7576` 没有任何直接、间接或数据引用，是死码。
+ * `site` 是循环里的 `call 54BC`；`entry..end` 是从入口到第一个点击判定之后的整段字节。
+ */
+const TARGET_CURSOR_LOOPS = [
+  { site: 0x7120, entry: 0x7113, end: 0x7148, state: "attack", caller: "0000:70C4",
+    sha256: "3f6d25bc02cd1e4218c038a4397942430865b6cec0629d42e001c6a1dba76323" },
+  { site: 0x71f8, entry: 0x71e8, end: 0x722b, state: "shoot", caller: "0000:71B4",
+    sha256: "bc3f18cf546e403cf534487e8e69a7b6b33cd347ef3b1b8510041d18a791667b" },
+  { site: 0x735c, entry: 0x734c, end: 0x7387, state: "move (including the half-dragon extra move)",
+    caller: "0000:6A32 / 0000:732D / 0000:7410",
+    sha256: "eabec9ac56ecb07623983cdf99d4afab47bc77770081796e59e454d6b979a315" },
+  { site: 0x74af, entry: 0x749f, end: 0x74d7, state: "teleport", caller: "0000:7496",
+    sha256: "f96cc93262e04905327c6b46e6d38f6c5f62ffc4113a5486aec56d5fce3144b4" },
+  { site: 0x7583, entry: 0x7576, end: 0x75b4, state: "unreferenced", caller: "none",
+    sha256: "6a39ff935b2a703d922c7387e2ddb5ec90d14ba820a554c149dd1d67b645566c" },
+  { site: 0x76e9, entry: 0x76dc, end: 0x7720, state: "technique (including the F5/F6 test)", caller: "0000:764D",
+    sha256: "e077dbce0f2eb3965b1f400b6c679cb2ce025c9060f463d274b3e59582329973" },
+  { site: 0x773a, entry: 0x772d, end: 0x7762, state: "construction", caller: "0000:76D1",
+    sha256: "384cc4a610c38239a4ad0aabeddce8a9ffb30821bd49903caa3ffd14cb59dc23" },
+];
+
+/** 段 0 内全部 `E8 rel16` 近调用中落到 `target` 的指令地址（本映像逐字节扫描无误报）。 */
+function nearCallSites(image, target) {
+  const sites = [];
+  for (let offset = 0; offset + 3 <= 0x10000; offset += 1) {
+    if (image[offset] === 0xe8 && ((offset + 3 + image.readInt16LE(offset + 1)) & 0xffff) === target) sites.push(offset);
+  }
+  return sites;
+}
+
+function verifyDispatcherHosts(image) {
+  const dispatcherSites = nearCallSites(image, 0x30ce);
+  assert(
+    dispatcherSites.join() === [0x0766, 0x54bc, 0x5960, 0x5cb9, 0xb793].join(),
+    `dispatcher 30CE call sites changed: ${dispatcherSites.map((site) => hex(site)).join(" ")}`,
+  );
+  const cursorStepSites = nearCallSites(image, 0x54bc);
+  assert(
+    cursorStepSites.join() === TARGET_CURSOR_LOOPS.map(({ site }) => site).join(),
+    `target cursor step 54BC call sites changed: ${cursorStepSites.map((site) => hex(site)).join(" ")}`,
+  );
+  assert(nearCallSites(image, 0x7576).length === 0, "the 7576 loop gained a caller");
+  assert(nearCallSites(image, 0x54d1).join() === [0x54b2].join(), "keypad - step 54D1 is called outside the idle step");
+  assert(nearCallSites(image, 0x0744).join() === [0x0483].join(), "promotion choice 0744 gained another caller");
+}
+
 const rawKey = (scanCode) => ds(RAW_KEY_BASE + scanCode);
 const key = (name, label) => ({ key: label, scanCode: `${hex(SCAN_CODES[name], 2)}h`, rawAddress: rawKey(SCAN_CODES[name]) });
 
@@ -124,7 +171,16 @@ function verifySignatures(image) {
     "debug key dispatcher (F2, F3, F4, F5/F6, W, F10, F1, U/D, S, 2, M music box)"),
     expectBytes(image, 0xb78c, "80 3e e3 f6 01 75 04 e8 38 79 c3",
       "idle battle loop enters the dispatcher only while Caps Lock is held"),
-    expectBytes(image, 0x54bc, "e8 0f dc 9a 04 00 3e 13", "target/destination cursor step calls the dispatcher"),
+    expectBytes(image, 0x54bc, "e8 0f dc 9a 04 00 3e 13 e8 60 27 e8 ee f3 b9 09 00 e8 e6 7e c3",
+      "target/destination cursor step: dispatcher, input poll, viewport redraw, cursor blink, delay"),
+    expectBytes(image, 0x54aa, "9a 04 00 3e 13 e8 75 27 e8 1c 00 b9 09 00 e8 fb 7e c3",
+      "idle map click step (only caller 4A0A): input poll, viewport redraw, 54D1 click and keypad -, delay"),
+    // 选格循环先建好范围图（`7C00` 只重画视口），循环体跳回自己的 `54BC` 调用，点击时 `785E`
+    // 才读这张图；所以调试操作返回后选格照常继续，范围图不重建。
+    ...TARGET_CURSOR_LOOPS.map(({ entry, end, sha256: digest, state }) =>
+      expectRoutine(image, entry, end, digest, `${state} cursor loop: 54BC every pass, click checks after it, no range rebuild`)),
+    expectRoutine(image, 0x0744, 0x076b, "c9581592c4c96a2677e9f582ce27c46a2c60860fcd805baf16671b42653172ce",
+      "promotion class-choice loop 0744: redraw, choice step C8A9, dispatcher while no class is chosen, no cancel"),
     expectBytes(image, 0x0766, "e8 65 29", "promotion class-choice loop calls the dispatcher"),
     expectBytes(image, 0x5960, "e8 6b d7", "popup menu move handle calls the dispatcher"),
     expectBytes(image, 0x5cb9, "e8 12 d4", "popup menu second handle calls the dispatcher"),
@@ -670,6 +726,7 @@ async function extract(modulePath, outputPath) {
   const image = await readFile(modulePath);
   assert(sha256(image) === MODULE29_SHA256, "module 29 image hash changed");
   const signatures = verifySignatures(image);
+  verifyDispatcherHosts(image);
   assert(image[dataOffset(0x132f)] === 0x4e, "DS:132F must load as 'N'");
   assert([0x132c, 0x132d, 0x132e].every((offset) => image[dataOffset(offset)] === 0), "combo step flags must load as 0");
 
@@ -722,11 +779,25 @@ async function extract(modulePath, outputPath) {
       address: "0000:30CE",
       liveIn: [
         { site: "0000:B793", state: "idle battle cursor loop", condition: "only while Caps Lock (DS:F6E3) is held; otherwise the normal F1-F4/Esc/Tab/E/M shortcuts run" },
-        { site: "0000:54BC", state: "attack/shoot/move/teleport/technique/construction target cursors", condition: "no Caps Lock needed" },
-        { site: "0000:0766", state: "promotion class-choice screen", condition: "no Caps Lock needed" },
+        {
+          site: "0000:54BC",
+          state: "attack/shoot/move/teleport/technique/construction target cursors",
+          condition: "no Caps Lock needed",
+          loops: TARGET_CURSOR_LOOPS.map(({ site, entry, state, caller }) => ({
+            site: segmentAddress(site), entry: segmentAddress(entry), state, caller,
+          })),
+          afterDebug: "every loop builds its range map before entry and jumps back to its own 54BC call; 785E reads the map only on a click, so the selection continues after a debug action with the map it had on entry",
+        },
+        {
+          site: "0000:0766",
+          state: "promotion class-choice screen",
+          condition: "no Caps Lock needed",
+          loop: "0000:0744..0769 (only caller 0000:0483): redraw, choice step C8A9, dispatcher while DS:3D4A = FFFFh; no cancel branch, the choice is written to the slot that opened the screen",
+        },
         { site: "0000:5960 / 0000:5CB9", state: "popup menus", condition: "pointer resting on the menu drag handles" },
       ],
       notLiveIn: "enemy phase, AI scheduling and module 27 deployment",
+      idleOnly: "keypad - lives in the idle map click step 54D1 (only caller 54B2 inside 54AA, called from 4A0A); Caps+J and Caps+keypad * are read by the idle main loop 4A27; none of them is reachable from a target cursor or the promotion screen",
     },
     hotkeys: [
       { ...key("f1", "F1"), handler: "0000:3221 -> 0000:2302", effect: "AI behaviour editor for the unit under the cursor (either side)" },

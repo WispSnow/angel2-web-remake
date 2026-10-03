@@ -2080,6 +2080,9 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   inset: 0;
   background: transparent;
 }
+/* `REMAKE-174` 原版Debug的選單、編輯畫面或台詞疊在轉職選擇上：轉職選單退到它們（最低是 9 的
+   原版選單）下面，與原版先畫除錯畫面、返回後才重畫轉職選擇一致。 */
+.promotion-layer[data-debug-above="true"] { z-index: 8; }
 .promotion-native-menu {
   position: absolute;
   left: 160px;

@@ -30,6 +30,9 @@ interface DebugStateUnit {
 
 interface DebugTestState {
   actionMode: string;
+  selectedId?: string;
+  phase: string;
+  promotionUnitIds: string[];
   units: DebugStateUnit[];
 }
 
@@ -108,7 +111,7 @@ test("the 原版Debug switch arms the native Caps Lock menus and survives a relo
   await expect(page.getByTestId("original-debug-toggle")).toHaveAttribute("aria-pressed", "true");
 });
 
-test("with Caps Lock on, F1–F4 never fall back to the group commands outside the idle battlefield", async ({ page }) => {
+test("with Caps Lock on, F1–F4 never fall back to the group commands inside a command menu", async ({ page }) => {
   await openDebugBattle(page, "stage-05-player");
   const lamp = page.getByTestId("original-debug-caps");
   await expect(lamp).toBeVisible();
@@ -119,12 +122,123 @@ test("with Caps Lock on, F1–F4 never fall back to the group commands outside t
   await expect.poll(async () => (await testState(page)).actionMode).toBe("actionMenu");
   // 指令選單開著：F1 不是「全軍休息」，只提示先關閉選單；F4 也不會要求撤退。
   await page.keyboard.press("F1");
-  await expect(page.getByTestId("status-strip")).toContainText("熱鍵只在我方待機時有效");
+  await expect(page.getByTestId("status-strip")).toContainText("熱鍵在我方待機、選格與轉職選擇時有效");
   await page.keyboard.press("F4");
   expect((await testState(page)).actionMode).toBe("actionMenu");
   await expect(page.getByTestId("status-strip")).not.toContainText("全軍休息");
   await page.keyboard.up("CapsLock");
   await expect(lamp).toHaveAttribute("data-engaged", "false");
+});
+
+test("hotkeys run inside a move selection, and the promotion they cause waits for the idle battlefield", async ({ page }) => {
+  await openDebugBattle(page, "stage-05-player");
+  const status = page.getByTestId("status-strip");
+  const menu = page.getByTestId("debug-menu");
+  const promotionLayer = page.getByTestId("promotion-layer");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await testState(page)).actionMode).toBe("move");
+
+  await page.keyboard.down("CapsLock");
+  await page.keyboard.press("F3");
+  await expectMenuOpen(menu);
+  await settleMenuAnimation(menu);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "test-results/visual-audit/original-debug-menu-in-move-selection.png",
+  });
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(menu).toBeHidden();
+  await expect(status).toContainText("原版Debug：敵方");
+  expect(await testState(page)).toMatchObject({ actionMode: "move", selectedId: "1:0" });
+
+  // 經驗跨過轉職門檻：原版只在待機循環掃描，所以選格中不跳出轉職。
+  await page.keyboard.press("u");
+  await expect(status).toContainText("經驗 ＋50，現為 349");
+  expect(await testState(page)).toMatchObject({ actionMode: "move", promotionUnitIds: [] });
+  await page.keyboard.press("j");
+  await expect(status).toContainText("這個熱鍵只在我方待機時有效");
+  await page.keyboard.up("CapsLock");
+
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await testState(page)).actionMode).toBe("actionMenu");
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await testState(page)).promotionUnitIds).toEqual(["1:0"]);
+  for (let page_ = 0; page_ < 6 && !(await promotionLayer.isVisible()); page_ += 1) {
+    await page.getByTestId("dialogue-layer").click();
+  }
+  await expect(promotionLayer).toBeVisible();
+  await expect(promotionLayer).toHaveAttribute("data-debug-above", "false");
+
+  // 轉職選擇中同樣接受熱鍵：除錯選單疊在轉職選單上面。
+  await page.keyboard.down("CapsLock");
+  await page.keyboard.press("F4");
+  await expectMenuOpen(menu);
+  await settleMenuAnimation(menu);
+  await expect(promotionLayer).toHaveAttribute("data-debug-above", "true");
+  expect(await menu.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)?.closest("[data-testid='debug-menu']") !== null;
+  })).toBe(true);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "test-results/visual-audit/original-debug-menu-over-promotion.png",
+  });
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await expect(status).toContainText("已返回轉職選擇。");
+  await expect(promotionLayer).toBeVisible();
+  await page.keyboard.press("F5");
+  await expect(status).toContainText("轉職選擇中不能做技術測試");
+
+  // 經驗退回門檻以下：不再符合條件，轉職等待結束，回到待機戰場。
+  await page.keyboard.press("d");
+  await page.keyboard.up("CapsLock");
+  await expect(promotionLayer).toBeHidden();
+  await expect.poll(async () => testState(page)).toMatchObject({
+    phase: "player",
+    actionMode: "idle",
+    promotionUnitIds: [],
+  });
+  expect((await testState(page)).units.find(({ id }) => id === "1:0")?.classId).toBe("soldier");
+});
+
+test("F5 inside a move selection runs a nested technique test and returns to the move", async ({ page }) => {
+  await openDebugBattle(page, "stage-05-player");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await testState(page)).actionMode).toBe("move");
+  const menu = page.getByTestId("debug-menu");
+  await page.keyboard.down("CapsLock");
+  await page.keyboard.press("F6");
+  await expectMenuOpen(menu);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(menu.locator("button")).toHaveText(["初級治療", "中級治療", "高級治療"]);
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await testState(page)).actionMode).toBe("specialTarget");
+  await page.keyboard.press("F5");
+  await expect(page.getByTestId("status-strip")).toContainText("技術測試的選格中不能再開一次技術測試");
+  await page.keyboard.up("CapsLock");
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => testState(page)).toMatchObject({ actionMode: "move", selectedId: "1:0" });
+  await expect(page.getByTestId("status-strip")).toContainText("原版Debug：已取消技術測試。");
+
+  // 妮雅自己施放並完成：施法者寫已行動，原來的移動做不成了，取消回到待機。
+  await page.keyboard.down("CapsLock");
+  await page.keyboard.press("F6");
+  await expectMenuOpen(menu);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await testState(page)).actionMode).toBe("specialTarget");
+  await page.keyboard.up("CapsLock");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await testState(page)).units.find(({ id }) => id === "1:0")?.acted, {
+    timeout: 20_000,
+  }).toBe(true);
+  await expect.poll(async () => (await testState(page)).actionMode).toBe("idle");
+  await expect(page.getByTestId("status-strip")).toContainText("不能再由玩家指揮，這次行動取消。");
 });
 
 test("Caps Lock+J hands the battle to the stage's own victory flow", async ({ page }) => {
