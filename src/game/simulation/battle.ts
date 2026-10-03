@@ -32,7 +32,7 @@ import {
   techniqueActionIdsFor,
 } from "../content/actions";
 import { isDebugAiBehaviourValue, isDebugEditableClassId, isDebugTechniqueAction } from "../content/debug-mode-rules";
-import { createFixedStageEnemy } from "./fixed-stage-battle";
+import { createFixedStageEnemy } from "./fixed-stage-enemy";
 import {
   withClassDataValue,
   withTerrainDataValue,

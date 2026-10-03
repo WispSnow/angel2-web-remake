@@ -5,7 +5,7 @@ import {
   classStatsFor,
   genericUnitName,
 } from "../content/classes";
-import { completeCampaignRoster, initialEnemyExperience, statsFor } from "../content/stage0";
+import { completeCampaignRoster } from "../content/stage0";
 import type { StageDefinition } from "../content/stages";
 import type {
   BattleUnit,
@@ -18,7 +18,14 @@ import type {
 } from "../types";
 import { emptyUnitStatuses } from "./status";
 import type { BattleScenario } from "./battle";
+import {
+  createFixedStageEnemy,
+  type FixedStageEnemyExperienceSeeding,
+  type FixedStageEnemyUnitDefinition,
+} from "./fixed-stage-enemy";
 import type { ForceDefinition } from "./forces";
+
+export { createFixedStageEnemy, type FixedStageEnemyUnitDefinition };
 
 export interface FixedStageAlliedUnitDefinition {
   slot: number;
@@ -36,21 +43,11 @@ export interface FixedStageAlliedUnitDefinition {
   untouchedExperience?: number;
 }
 
-export interface FixedStageEnemyUnitDefinition {
-  slot: number;
-  position: Position;
-  classId: UnitClassId;
-  name: string;
-  /** Omit for a generic class identity; named actors must provide their record. */
-  portrait?: PortraitRecord;
-  aiBehavior: number;
-}
-
 export interface FixedStageUnitConfig {
   alliedUnits: readonly FixedStageAlliedUnitDefinition[];
   enemyUnits: readonly FixedStageEnemyUnitDefinition[];
   /** Whether this ruleset applies the shared enemy difficulty experience loop. */
-  enemyExperienceSeeding?: "difficulty" | "none" | "difficulty-unless-lawless";
+  enemyExperienceSeeding?: FixedStageEnemyExperienceSeeding;
   inheritance: {
     genericPortrait: PortraitRecord;
     defaultClassId: UnitClassId;
@@ -112,37 +109,6 @@ function createInheritedAlly(
     actionDisabled: false,
     statuses: emptyUnitStatuses(),
   };
-}
-
-export function createFixedStageEnemy(
-  definition: FixedStageEnemyUnitDefinition,
-  difficulty: Difficulty,
-  experienceSeeding: FixedStageUnitConfig["enemyExperienceSeeding"] = "difficulty",
-): BattleUnit {
-  const experience = experienceSeeding === "none"
-    || (experienceSeeding === "difficulty-unless-lawless" && difficulty === 3)
-    ? 0
-    : initialEnemyExperience(definition.classId, difficulty);
-  const unit: BattleUnit = {
-    id: `2:${definition.slot}`,
-    side: 2,
-    slot: definition.slot,
-    classId: definition.classId,
-    className: className(definition.classId),
-    name: definition.name,
-    portrait: definition.portrait
-      ?? classFallbackPortraitFor(definition.classId, 2)
-      ?? 48 as PortraitRecord,
-    x: definition.position.x,
-    y: definition.position.y,
-    life: 0,
-    experience,
-    acted: false,
-    actionDisabled: false,
-    statuses: emptyUnitStatuses(),
-  };
-  unit.life = statsFor(unit, difficulty).maxLife;
-  return unit;
 }
 
 export function createFixedStageUnits(

@@ -225,9 +225,12 @@ test("formal battle, deployment and promotion DOM images reuse the current stage
     }
   });
   const expectOnlyObjectUrlImages = async (selector: string) => {
-    await expect.poll(() => page.locator(selector).locator("img").evaluateAll((images) =>
-      images.length > 0 && images.every((image) => (image as HTMLImageElement).src.startsWith("blob:")),
-    )).toBe(true);
+    // 原版 Debug 模式的隱藏編輯器預先掛了 `src=""` 的圖位，載入前不會發出請求；
+    // 只檢查真正帶來源的圖。
+    await expect.poll(() => page.locator(selector).locator("img").evaluateAll((images) => {
+      const sourced = images.filter((image) => image.getAttribute("src"));
+      return sourced.length > 0 && sourced.every((image) => (image as HTMLImageElement).src.startsWith("blob:"));
+    })).toBe(true);
   };
   const expectNoOriginalImagesSince = async (start: number, surface: string) => {
     await page.waitForTimeout(120);

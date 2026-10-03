@@ -227,7 +227,9 @@ test("later-stage and debug modules stay deferred during stage-zero startup", as
   const deferredRequests: string[] = [];
   page.on("request", (request) => {
     const pathname = new URL(request.url()).pathname;
-    const isDeferredStageOrDebug = /stage1|stage-01|debug-scenarios|debug\.css/.test(pathname);
+    // `stage1-actions.generated` 只是沿用旧文件名的共享技術目錄；第 0 關轉職後需要它
+    // （`activateStage0Content`），不是第 1 關的關卡模組。
+    const isDeferredStageOrDebug = /stage1(?!-actions\.generated)|stage-01|debug-scenarios|debug\.css/.test(pathname);
     const isDeferredDeployment = /\/src\/game\/(?:deployment-(?:minimap|session|ui)|simulation\/deployment)\b/
       .test(pathname);
     if (isDeferredStageOrDebug || isDeferredDeployment) {
