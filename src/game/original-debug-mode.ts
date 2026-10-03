@@ -187,10 +187,10 @@ function capsLockAfter(event: KeyboardEvent | PointerEvent): boolean {
   return capsLockEngaged(event);
 }
 
-const CAPS_LOCK_ON_TITLE = "Caps Lock 已開啟：在我方待機、選格或轉職選擇時按熱鍵即可使用原版Debug。";
+const CAPS_LOCK_ON_TITLE = "Caps Lock 已開啟（按鈕外緣亮綠）：在我方待機、選格或轉職選擇時按熱鍵即可使用原版Debug。";
 const CAPS_LOCK_OFF_TITLE = "Caps Lock 未開啟：熱鍵會照平常的意思執行。"
   + "macOS 的拼音輸入法短按 Caps Lock 只切換中英文，不會開啟 Caps Lock："
-  + "請長按到指示燈亮起，或先切換到 ABC 輸入法。";
+  + "請長按到鍵盤指示燈亮起，或先切換到 ABC 輸入法。";
 
 export const ORIGINAL_DEBUG_HOTKEY_SUMMARY =
   "開啟後在戰場打開 Caps Lock 使用：F1 行為、F2 單位編輯、F3 敵方生命、F4 我方生命、"
@@ -201,20 +201,19 @@ export const ORIGINAL_DEBUG_HOTKEY_SUMMARY =
 export function mountOriginalDebugModeToggle(host: HTMLElement): () => void {
   const group = document.createElement("div");
   group.className = "original-debug-trigger";
-  group.innerHTML = `<button type="button" data-testid="original-debug-toggle"
-    title="原版Debug模式。${ORIGINAL_DEBUG_HOTKEY_SUMMARY}">原版Debug</button>
-    <span class="original-debug-caps" data-testid="original-debug-caps" role="status" hidden>Caps Lock</span>`;
+  group.innerHTML = `<button type="button" data-testid="original-debug-toggle">原版Debug</button>`;
   const button = group.querySelector<HTMLButtonElement>("button");
-  const lamp = group.querySelector<HTMLElement>(".original-debug-caps");
-  if (!button || !lamp) return () => undefined;
+  if (!button) return () => undefined;
   // 熱鍵要 Caps Lock 開著才生效，而瀏覽器看到的狀態不一定與鍵盤燈一致（輸入法可能吃掉這個鍵），
-  // 所以開關開著時在旁邊顯示遊戲實際讀到的狀態。
+  // 所以開關開著時把遊戲實際讀到的狀態畫在按鈕自己的外緣（`data-caps-engaged`）並寫進懸浮提示。
+  // 不另放標籤：工具列一行放不下時按鈕會折成兩行。
   let capsLockOn = false;
   const renderLamp = () => {
-    lamp.hidden = !originalDebugModeEnabled();
-    lamp.dataset.engaged = String(capsLockOn);
-    lamp.title = capsLockOn ? CAPS_LOCK_ON_TITLE : CAPS_LOCK_OFF_TITLE;
-    lamp.setAttribute("aria-label", capsLockOn ? "Caps Lock 已開啟" : "Caps Lock 未開啟");
+    const enabled = originalDebugModeEnabled();
+    button.dataset.capsEngaged = String(enabled && capsLockOn);
+    button.title = enabled
+      ? `${capsLockOn ? CAPS_LOCK_ON_TITLE : CAPS_LOCK_OFF_TITLE}\n${ORIGINAL_DEBUG_HOTKEY_SUMMARY}`
+      : `原版Debug模式。${ORIGINAL_DEBUG_HOTKEY_SUMMARY}`;
   };
   const observe = (event: KeyboardEvent | PointerEvent) => {
     const next = capsLockAfter(event);

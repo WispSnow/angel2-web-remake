@@ -77,7 +77,9 @@ test("the 原版Debug switch arms the native Caps Lock menus and survives a relo
   const lifeMenu = page.getByTestId("debug-menu");
   await expect(toggle).toHaveText("原版Debug");
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
-  await expect(page.getByTestId("original-debug-caps")).toBeHidden();
+  // 狀態只畫在按鈕外緣、不另佔版面：關著時不亮，也沒有獨立的標籤元素。
+  await expect(toggle).toHaveAttribute("data-caps-engaged", "false");
+  await expect(page.getByTestId("original-debug-caps")).toHaveCount(0);
 
   // Switch off: Caps Lock+J is an unbound key, and F1–F4 keep their group-command meaning.
   await withCapsLock(page, "j");
@@ -114,11 +116,12 @@ test("the 原版Debug switch arms the native Caps Lock menus and survives a relo
 
 test("with Caps Lock on, F1–F4 never fall back to the group commands inside a command menu", async ({ page }) => {
   await openDebugBattle(page, "stage-05-player");
-  const lamp = page.getByTestId("original-debug-caps");
-  await expect(lamp).toBeVisible();
-  await expect(lamp).toHaveAttribute("data-engaged", "false");
+  const lamp = page.getByTestId("original-debug-toggle");
+  await expect(lamp).toHaveAttribute("data-caps-engaged", "false");
+  await expect(lamp).toHaveAttribute("title", /Caps Lock 未開啟/);
   await page.keyboard.down("CapsLock");
-  await expect(lamp).toHaveAttribute("data-engaged", "true");
+  await expect(lamp).toHaveAttribute("data-caps-engaged", "true");
+  await expect(lamp).toHaveAttribute("title", /Caps Lock 已開啟/);
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await testState(page)).actionMode).toBe("actionMenu");
   // 指令選單開著：F1 不是「全軍休息」，只提示先關閉選單；F4 也不會要求撤退。
@@ -128,7 +131,7 @@ test("with Caps Lock on, F1–F4 never fall back to the group commands inside a 
   expect((await testState(page)).actionMode).toBe("actionMenu");
   await expect(page.getByTestId("status-strip")).not.toContainText("全軍休息");
   await page.keyboard.up("CapsLock");
-  await expect(lamp).toHaveAttribute("data-engaged", "false");
+  await expect(lamp).toHaveAttribute("data-caps-engaged", "false");
 });
 
 test("hotkeys run inside a move selection, and the promotion they cause waits for the idle battlefield", async ({ page }) => {

@@ -2417,20 +2417,11 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   background: var(--gold);
 }
 .original-debug-trigger > button:focus-visible { outline: 2px solid #9fd9ff; outline-offset: 2px; }
-/* 開關開著時旁邊的 Caps Lock 燈：顯示遊戲實際讀到的狀態（輸入法可能吃掉 Caps Lock）。 */
-.original-debug-caps {
-  align-self: center;
-  margin-left: 4px;
-  padding: 1px 6px;
-  border: 1px solid #4b3527;
-  border-radius: 2px;
-  color: #6f6150;
-  font: 11px/1.4 system-ui, sans-serif;
-  white-space: nowrap;
-  cursor: help;
+/* 開關開著且遊戲實際讀到 Caps Lock 開啟時，按鈕外緣亮綠（陰影不佔版面，不會讓工具列折行）；
+   輸入法可能吃掉 Caps Lock，所以顯示的是遊戲讀到的狀態而非鍵盤燈。 */
+.original-debug-trigger > button[data-caps-engaged="true"] {
+  box-shadow: 0 0 0 2px #7fd18b, 0 0 6px 1px rgba(127, 209, 139, .55);
 }
-.original-debug-caps[hidden] { display: none; }
-.original-debug-caps[data-engaged="true"] { border-color: #7fd18b; color: #b8f5c0; box-shadow: 0 0 4px rgba(127, 209, 139, .55); }
 .display-settings-hint { flex: 1 1 100%; margin: 0; color: #8d7c65; font-size: 11px; }
 
 @media (max-width: 560px) {
