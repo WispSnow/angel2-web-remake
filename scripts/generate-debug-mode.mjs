@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * 原版Debug模式的运行时内容：F3/F4 原版选单与效果绑定、格号读数几何、音乐盒名单与播放规则。
+ * 原版Debug模式的运行时内容：各原版选单与效果绑定、F1／EDIT／兵種／地型编辑器版面、格号读数几何、
+ * 音乐盒名单与播放规则。
  * 来源只有 `reverse/parsed/native/debug-mode.json`（`reverse/tools/angel2-debug-mode.mjs` 导出）；
  * 选单原文、名单顺序与单曲集合都从那里读，不在 TypeScript 里手抄。
  */
@@ -52,7 +53,7 @@ const sideLifeMenus = {
 };
 assert(sideLifeMenus.enemy.side === 2 && sideLifeMenus.ally.side === 1, "F3/F4 side binding changed");
 
-// F2：四项结果码与入口都来自 `0000:3113` 的分支，兵種／地型属第三批，这里只登记目标。
+// F2：四项结果码与入口都来自 `0000:3113` 的分支。
 const editTargets = ["allyUnitEditor", "enemyUnitEditor", "classDataEditor", "terrainDataEditor"];
 const editMenu = {
   key: "F2",
@@ -113,6 +114,47 @@ const unitEditor = {
   layout: unitEditorEvidence.layout,
   exitLabel: unitEditorEvidence.layout.exit.text.label,
 };
+
+// 兵種（`0000:1294`）：表头原文照画；七列对应 `DATA` 行的字段，`field5` 原版标「魔防」、等级列重用「經驗」。
+const classEditorEvidence = evidence.classDataEditor;
+const classFieldByEvidence = {
+  experienceThreshold: "experienceThreshold",
+  attack: "attack",
+  defense: "defense",
+  life: "maxLife",
+  movement: "movement",
+  field5: "reservedField5",
+  level: "level",
+};
+assert(classEditorEvidence.header.columns.length === 7, "the class editor must show seven DATA fields");
+const classEditorLayout = classEditorEvidence.layout;
+assert(classEditorLayout.table.columns.length === 7 && classEditorLayout.table.rows.length === 5,
+  "the class editor table must be five rows by seven columns");
+assert(classEditorEvidence.header.columns.every(({ x }, index) => x === classEditorLayout.table.columns[index]),
+  "class editor header columns must sit over the value columns");
+const classEditor = {
+  header: classEditorEvidence.header.raw,
+  fields: classEditorEvidence.header.columns.map(({ field, label }) => {
+    const catalogField = classFieldByEvidence[field];
+    assert(catalogField, `unknown class editor field ${field}`);
+    return { field: catalogField, label };
+  }),
+  layout: classEditorLayout,
+};
+
+// 地型（`0000:1B3A`）：24 个原版地形名；第 24 项是 profile 之间的重叠字，不是逻辑地形槽。
+const terrainEditorEvidence = evidence.terrainDataEditor;
+assert(terrainEditorEvidence.terrainLabels.length === 24, "the terrain editor must name 24 strip cells");
+const terrainEditor = {
+  labels: terrainEditorEvidence.terrainLabels.map(({ slot, label, caution }) => ({
+    slot,
+    label,
+    logicalSlot: caution === undefined,
+  })),
+  layout: terrainEditorEvidence.layout,
+};
+assert(terrainEditor.labels.filter(({ logicalSlot }) => logicalSlot).length === 23,
+  "exactly 23 strip cells must be logical terrain slots");
 
 const readout = evidence.cellReadout;
 assert(readout?.digits === 5 && readout.fields.length === 2, "cell readout evidence missing");
@@ -182,6 +224,12 @@ export const NATIVE_DEBUG_BEHAVIOUR_EDITOR = ${json(behaviourEditor)} as const;
 
 /** 我／敵 EDIT（\`0000:0ABE\`）：每方 60 槽、4 页 × 15 项列优先，原生 640×350 版面与配色。 */
 export const NATIVE_DEBUG_UNIT_EDITOR = ${json(unitEditor)} as const;
+
+/** 兵種（\`0000:1294\`）：39 条职业 × 5 行 × 7 列的 \`DATA\` 编辑器，原生 640×350 版面与配色。 */
+export const NATIVE_DEBUG_CLASS_EDITOR = ${json(classEditor)} as const;
+
+/** 地型（\`0000:1B3A\`）：24 格地形条、职业 0..36 的移动消耗与地形防御，原生 640×350 版面与配色。 */
+export const NATIVE_DEBUG_TERRAIN_EDITOR = ${json(terrainEditor)} as const;
 
 /** 调试键 2 的两个五位数字段（\`0000:326A\`），原生 640×350 座标。 */
 export const NATIVE_DEBUG_CELL_READOUT = ${json(cellReadout)} as const;

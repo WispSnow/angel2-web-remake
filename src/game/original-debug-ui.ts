@@ -14,6 +14,7 @@ import { paintNativeDomText } from "./native-dom-text";
 import { nativeNumericField } from "./native-text";
 import { debugMenuAccessibleName } from "./original-debug-menus";
 import { DEBUG_EDITOR_PAGES, DEBUG_EDITOR_SLOTS_PER_PAGE } from "./original-debug-editor";
+import { mountOriginalDebugDataEditors, ORIGINAL_DEBUG_DATA_EDITORS_MARKUP } from "./original-debug-data-editors-ui";
 import {
   BATTLE_TILE_HEIGHT,
   BATTLE_TILE_WIDTH,
@@ -29,6 +30,7 @@ import type { UnitClassId } from "./types";
  * - F2–F6 與技術二級選單共用原版選單外框，原文（含字串裡的半形空格）以原版點陣字繪製；
  * - F1 行為面板照 `0000:2302` 的 120×270 面板、13 列與紅字標出現值；
  * - 我／敵 EDIT 照 `0000:0ABE` 的整屏版面：深藍底、3 欄 × 5 列、四個頁籤與 EXIT；
+ * - 兵種／地型見 `original-debug-data-editors-ui.ts`；
  * - 格號（鍵 2）與範圍（Caps Lock+1）讀數用原版五位數字；
  * - 音樂盒是複刻自己的清單介面，原版那一行之外的用途說明與操作提示屬複刻自撰，用現代字體。
  */
@@ -136,6 +138,7 @@ export const ORIGINAL_DEBUG_UI_MARKUP = `
     <p class="debug-edit-help" data-testid="debug-edit-help">方向鍵選槽　Enter 移出／放回　－／＋ 職業　［／］ 行為　PageUp／PageDown 換頁　Esc 返回<br>
       棋子框與行為框：左鍵上一個、右鍵下一個。職業只開放這場戰鬥已備妥圖像的普通職業。</p>
   </section>
+  ${ORIGINAL_DEBUG_DATA_EDITORS_MARKUP}
   <section class="music-box-panel modal-panel" id="music-box" data-testid="music-box"
     role="dialog" aria-label="音樂盒" hidden>
     <span class="panel-kicker">MUSIC BOX</span><h2>音樂盒</h2>
@@ -314,6 +317,7 @@ export function mountOriginalDebugUi(
     event.stopImmediatePropagation();
   }, { capture: true, signal });
 
+  const renderDataEditors = mountOriginalDebugDataEditors(root, controller, signal);
   let previousMusicIndex = -1;
   let previousMenuKey = "";
   return () => {
@@ -351,6 +355,7 @@ export function mountOriginalDebugUi(
 
     renderBehaviourEditor(controller, behaviourEditor, behaviourHighlight, behaviourFigure);
     renderUnitEditor(controller, unitEditor, editSlots);
+    renderDataEditors();
 
     musicBox.hidden = !controller.musicBoxOpen;
     if (controller.musicBoxOpen) {

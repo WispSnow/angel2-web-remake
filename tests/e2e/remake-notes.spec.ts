@@ -413,6 +413,8 @@ test("REMAKE-174 把原版Debug模式與音樂盒列入功能增強，並在操�
   await expect(debugMode).toContainText("「原版Debug」開關");
   await expect(debugMode).toContainText("音樂盒常駐「音樂開關」面板");
   await expect(debugMode).toContainText("F2 我／敵 EDIT");
+  await expect(debugMode).toContainText("兵種／地型數值編輯");
+  await expect(debugMode).toContainText("複刻只在這場戰鬥生效");
   await expect(debugMode.locator(".rn-note-id")).toHaveText("REMAKE-174");
 
   await page.getByTestId("remake-notes-tab-controls").click();

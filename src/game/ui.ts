@@ -71,6 +71,7 @@ import { finishMenuClose, setMenuOpen } from "./menu-animation";
 import {
   capsLockEngaged,
   installCapsLockTracker,
+  isOriginalDebugFunctionKey,
   onOriginalDebugModeChange,
   originalDebugHotkey,
 } from "./original-debug-mode";
@@ -1188,11 +1189,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     lastInputSource = "keyboard-or-gamepad";
     settleMenuPointerGlide();
     if (recordBackupUi.handleKeyDown(event)) return;
-    // `REMAKE-174`：開關開啟且 Caps Lock 開著時，原版Debug熱鍵先於一般鍵位；待機戰場以外
-    // 不消費，S／D／M 等鍵照常走平常的意思。
-    const debugHotkey = controller.originalDebugActive && !event.repeat
-      ? originalDebugHotkey(event)
-      : undefined;
+    // `REMAKE-174`：開關開啟且 Caps Lock 開著時，原版Debug熱鍵先於一般鍵位。待機戰場以外
+    // 字母與數字鍵照常走平常的意思（S／D 移動游標等），F 鍵只提示（`isOriginalDebugFunctionKey`）。
+    const debugKey = controller.originalDebugActive ? originalDebugHotkey(event) : undefined;
+    // 按住不放的自動重複不再觸發一次除錯，但 F 鍵仍不能落回集體命令或瀏覽器的 F5。
+    if (debugKey && event.repeat && isOriginalDebugFunctionKey(event)) {
+      event.preventDefault();
+      return;
+    }
+    const debugHotkey = event.repeat ? undefined : debugKey;
     if (debugHotkey === "rangeReadout" && controller.phase === "player") {
       rangeReadoutDigitHeld = true;
       controller.setDebugRangeReadoutHeld(true);
@@ -1201,6 +1206,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     if (debugHotkey && controller.runOriginalDebugHotkey(debugHotkey)) {
       event.preventDefault();
+      return;
+    }
+    if (debugHotkey && isOriginalDebugFunctionKey(event)) {
+      event.preventDefault();
+      controller.noteOriginalDebugHotkeyUnavailable();
       return;
     }
     const key = event.key;

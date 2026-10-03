@@ -2,6 +2,7 @@ export {
   isSaveData,
   SAVE_CONTENT_VERSION,
   SAVE_VERSION,
+  savedBattleUnitMaximumLife,
 } from "./save/current-schema";
 export { parseSaveData } from "./save/migrations";
 export { saveRecordStageLabel } from "./save/record-labels";

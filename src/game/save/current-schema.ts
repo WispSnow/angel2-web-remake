@@ -222,6 +222,19 @@ function hasValidWaterWarriorGroups(units: readonly BattleUnit[]): boolean {
   return true;
 }
 
+/**
+ * 戰中記錄裡一名單位的生命上限：關卡另給的逐難度上限優先，否則是職業與難度推出的上限。
+ * 寫出端（原版Debug改過兵種數值的戰鬥）與讀取校驗共用這一條，兩邊不會各說各話。
+ */
+export function savedBattleUnitMaximumLife(
+  unit: BattleUnit,
+  stageId: StageId,
+  difficulty: Difficulty,
+): number {
+  return namedUnitRuleFor(unit, STAGE_RUNTIME_MANIFEST[stageId].save)?.maximumLifeByDifficulty?.[difficulty]
+    ?? statsFor(unit, difficulty).maxLife;
+}
+
 function namedUnitRuleFor(
   unit: BattleUnit,
   schema: StageSaveSchema,
@@ -340,8 +353,7 @@ export function isSavedBattleState(
       const formSequence = saveSchema.enemyFormSequences?.find(
         ({ unitId }) => unitId === waterWarriorRootId(unit),
       );
-      const maximumLife = namedUnitRuleFor(unit, saveSchema)?.maximumLifeByDifficulty?.[difficulty]
-        ?? statsFor(unit, difficulty).maxLife;
+      const maximumLife = savedBattleUnitMaximumLife(unit, stageId, difficulty);
       // `REMAKE-174` EDIT 改職業保留原經驗（原版只改職業陣列），所以新職業的入場經驗不是它的下限。
       const minimumExperience = saveSchema.enemyExperienceFloor === "none"
         || (saveSchema.enemyExperienceFloor === "difficulty-unless-lawless" && difficulty === 3)

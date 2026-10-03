@@ -31,6 +31,13 @@ import {
   techniqueActionIdsFor,
 } from "../content/actions";
 import { isDebugAiBehaviourValue, isDebugEditableClassId, isDebugTechniqueAction } from "../content/debug-mode-rules";
+import {
+  withClassDataValue,
+  withTerrainDataValue,
+  type BattleDataEdits,
+  type ClassDataField,
+  type TerrainDataTable,
+} from "../content/battle-data-edits";
 import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_ALLY_INITIAL_EXPERIENCE, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, activateStage0Content, completeCampaignRoster, createStage0Units, effectiveStatsFor, isStage0Exit, nextExperienceThresholdAt, statsFor, terrainSlotAt } from "../content/stage0";
 import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
 import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, PortraitRecord, Position, SaveRosterEntry, SavedBattleState, Side, UnitClassId, UnitStats, UnitStatuses } from "../types";
@@ -557,6 +564,11 @@ export class Stage0Battle {
   private readonly debugDepartedUnits = new Map<string, BattleUnit>();
   /** `REMAKE-174` 原版Debug技術測試準備的動作；只有這裡建立的物件能走除錯提交。 */
   private readonly debugPreparedActions = new WeakSet<PreparedBattleAction>();
+  /**
+   * `REMAKE-174` 原版Debug第三批：兵種／地型數值的本場覆寫。不序列化、`restore()` 清除，
+   * 控制器以 `setBattleDataEditsSource` 讓查表跟著目前戰鬥走（見 `battle-data-edits.ts`）。
+   */
+  debugDataEdits?: BattleDataEdits;
   private aiPlanningCache?: AiPlanningCache;
   private activeAiPlanningCache?: AiPlanningCache;
 
@@ -631,7 +643,7 @@ export class Stage0Battle {
       unit.debugAiBehavior === undefined ? "-" : "d",
       ...UNIT_STATUS_KEYS.map((key) => unit.statuses[key]),
     ].join(",")).join("|");
-    return `${this.round}/${this.rng.state}/${this.rng.calls}/${terrain}/${units}`;
+    return `${this.round}/${this.rng.state}/${this.rng.calls}/${this.debugDataEdits?.revision ?? 0}/${terrain}/${units}`;
   }
 
   private createAiPlanningCache(signature: string): AiPlanningCache {
@@ -841,6 +853,7 @@ export class Stage0Battle {
   ): void {
     this.pendingTransformations.splice(0);
     this.debugDepartedUnits.clear();
+    this.debugDataEdits = undefined;
     this.round = snapshot.round;
     this.focusId = snapshot.focusId;
     this.units = snapshot.units.map((unit) => ({
@@ -4238,6 +4251,32 @@ export class Stage0Battle {
       this.recordCampaignUnit(unit);
     }
     return targets.length;
+  }
+
+  /** 兵種：改一格職業資料。原版直接寫即時表，所以全場單位的屬性立刻跟著變。 */
+  debugEditClassData(classId: ClassId, row: number, field: ClassDataField, value: number): void {
+    this.debugDataEdits = withClassDataValue(this.debugDataEdits, classId, row, field, value);
+  }
+
+  /** 地型：改一格移動消耗或地形防禦百分比。 */
+  debugEditTerrainData(classId: ClassId, table: TerrainDataTable, slot: number, value: number): void {
+    this.debugDataEdits = withTerrainDataValue(this.debugDataEdits, classId, table, slot, value);
+  }
+
+  /**
+   * 兵種編輯退出（`0000:53ED/53FD → 547F`）：雙方在場單位生命不低於新上限的，壓到新上限；
+   * 原版只降不升。上限已由 `withinDataBounds` 保證至少 1，所以不會留下 0 生命的單位。
+   */
+  debugClampLifeToMaximum(): number {
+    let clamped = 0;
+    for (const unit of this.units) {
+      const maximum = this.statsFor(unit).maxLife;
+      if (unit.life <= maximum) continue;
+      unit.life = maximum;
+      this.recordCampaignUnit(unit);
+      clamped += 1;
+    }
+    return clamped;
   }
 
   private repairFocusAfterRemoval(): void {

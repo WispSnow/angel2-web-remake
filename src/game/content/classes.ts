@@ -5,6 +5,11 @@ import {
   type ClassId,
 } from "./class-catalog.generated";
 import { CLASS_GROWTH_OVERRIDES, type ClassGrowthSegment } from "./class-balance-overrides";
+import {
+  classDataRowsWithEdits,
+  terrainDataWithEdits,
+  type ClassDataRow,
+} from "./battle-data-edits";
 import { genericAllyLabelFor } from "./generic-ally-labels";
 import type { EnemyGrowthMode } from "./enemy-scaling";
 import type { BattleUnit, UnitStats } from "../types";
@@ -96,6 +101,25 @@ export function classIdFromNativeRecord(record: number): ClassId | undefined {
 
 export function className(classId: ClassId): string {
   return classDefinition(classId).nativeName;
+}
+
+/**
+ * 職業的五條 `DATA` 資料行。戰鬥規則一律從這裡讀，原版Debug的兵種編輯（只在本場戰鬥
+ * 生效）因此同時作用於屬性、等級、經驗門檻與敵方成長，和原版讀即時表一致。
+ */
+export function classDataRowsFor(classId: ClassId): readonly ClassDataRow[] {
+  return classDataRowsWithEdits(classId);
+}
+
+/**
+ * 原版 `0000:5256`：先裝第一行，第二行的門檻達到才裝第二行，第三行同理，一行沒達到就停。
+ * 原版資料的門檻遞增，這與「取最後一個達到的門檻」相同；只有原版Debug改出不遞增的門檻
+ * 時兩者才不同。
+ */
+function fixedRowIndexFor(rows: readonly ClassDataRow[], experience: number): 0 | 1 | 2 {
+  if (experience < rows[1].experienceThreshold) return 0;
+  if (experience < rows[2].experienceThreshold) return 1;
+  return 2;
 }
 
 /**
@@ -322,7 +346,7 @@ export function linearExperienceStepFor(
 ): number | undefined {
   const nativeStep = nativePostThirdRowExperienceStepFor(classId, side);
   if (nativeStep === undefined || isBossClass(classId)) return nativeStep;
-  const rows = classDefinition(classId).dataRows;
+  const rows = classDataRowsFor(classId);
   return rows[1].experienceThreshold - rows[0].experienceThreshold;
 }
 
@@ -344,9 +368,10 @@ function linearGrowthSegmentsFor(
   classId: ClassId,
   side: BattleUnit["side"],
 ): readonly ClassGrowthSegment[] {
-  const rows = classDefinition(classId).dataRows;
+  const rows = classDataRowsFor(classId);
   const thresholdIncrement = linearExperienceStepFor(classId, side);
-  if (thresholdIncrement === undefined) return [];
+  // 原版資料的步長都是正數；原版Debug可以把前兩行門檻改成相等或倒序，那時沒有可延續的成長。
+  if (thresholdIncrement === undefined || thresholdIncrement <= 0) return [];
   return [{
     thresholdIncrement,
     attackIncrement: rows[1].attack - rows[0].attack,
@@ -434,15 +459,11 @@ export function classStatsFor(
   unit: ClassProgressionState,
   mode: EnemyGrowthMode = "legacy",
 ): UnitStats {
-  const definition = classDefinition(unit.classId);
-  const fixedRows = definition.dataRows.slice(0, 3);
-  const selectedIndex = fixedRows.reduce(
-    (selected, row, index) => unit.experience >= row.experienceThreshold ? index : selected,
-    0,
-  );
+  const fixedRows = classDataRowsFor(unit.classId);
+  const selectedIndex = fixedRowIndexFor(fixedRows, unit.experience);
   const selected = fixedRows[selectedIndex];
-  if (selectedIndex < fixedRows.length - 1) {
-    return {
+  if (selectedIndex < 2) {
+    return withinDataBounds({
       attack: selected.attack,
       defense: selected.defense,
       maxLife: selected.maxLife,
@@ -451,31 +472,40 @@ export function classStatsFor(
       // 4). The HUD marker is the row within the current profession, so a
       // freshly promoted unit starts at profession level 1.
       level: selectedIndex + 1,
-    };
+    });
   }
 
   const progress = postThirdRowProgress(
     growthSegmentsFor(unit.classId, unit.side, mode),
     unit.experience - fixedRows[2].experienceThreshold,
   );
-  return {
+  return withinDataBounds({
     attack: selected.attack + progress.attack,
     defense: selected.defense + progress.defense,
     maxLife: selected.maxLife + progress.maxLife,
     movement: selected.movement,
     level: selectedIndex + 1 + progress.rows,
+  });
+}
+
+/**
+ * 原版資料推不出負攻防或 0 生命上限；原版Debug的兵种編輯（包括 `linear` 成長沿用改過的
+ * 前兩行差值）可以。`[SR]`（`REMAKE-174`）：攻防不低於 0、生命上限不低於 1，退出編輯時的
+ * 生命壓低因此不會留下 0 生命的在場單位。對原版資料是恆等。
+ */
+function withinDataBounds(stats: UnitStats): UnitStats {
+  return {
+    ...stats,
+    attack: Math.max(0, stats.attack),
+    defense: Math.max(0, stats.defense),
+    maxLife: Math.max(1, stats.maxLife),
   };
 }
 
 export function classTierFor(
   unit: Pick<BattleUnit, "classId" | "experience">,
 ): 1 | 2 | 3 {
-  const rows = classDefinition(unit.classId).dataRows.slice(0, 3);
-  const selectedIndex = rows.reduce(
-    (selected, row, index) => unit.experience >= row.experienceThreshold ? index : selected,
-    0,
-  );
-  return (selectedIndex + 1) as 1 | 2 | 3;
+  return (fixedRowIndexFor(classDataRowsFor(unit.classId), unit.experience) + 1) as 1 | 2 | 3;
 }
 
 /**
@@ -486,22 +516,20 @@ export function classTierFor(
  * the only evidence-backed way to order careers across the promotion tree.
  */
 export function classEntryLevelFor(classId: ClassId): number {
-  return classDefinition(classId).dataRows[0].level;
+  return classDataRowsFor(classId)[0].level;
 }
 
 export function nextExperienceThresholdFor(
   unit: ClassProgressionState,
   mode: EnemyGrowthMode = "legacy",
 ): number {
-  const definition = classDefinition(unit.classId);
-  const fixedThreshold = definition.dataRows
-    .slice(0, 3)
-    .map((row) => row.experienceThreshold)
-    .find((threshold) => threshold > unit.experience);
-  if (fixedThreshold !== undefined) return fixedThreshold;
+  const rows = classDataRowsFor(unit.classId);
+  // 原版的下一門檻是所選資料行之後那一行的 `field0`（`+0Eh`），不是第一個高於經驗的門檻。
+  const selectedIndex = fixedRowIndexFor(rows, unit.experience);
+  if (selectedIndex < 2) return rows[selectedIndex + 1].experienceThreshold;
 
   const segments = growthSegmentsFor(unit.classId, unit.side, mode);
-  const thirdThreshold = definition.dataRows[2].experienceThreshold;
+  const thirdThreshold = rows[2].experienceThreshold;
   const reached = postThirdRowProgress(segments, unit.experience - thirdThreshold).rows;
   const next = experienceForPostThirdRows(segments, reached + 1);
   return next === undefined ? Number.MAX_SAFE_INTEGER : thirdThreshold + next;
@@ -518,11 +546,11 @@ export function promotionExperienceThresholdFor(classId: ClassId): number {
 }
 
 export function movementRulesFor(classId: ClassId): readonly number[] {
-  return classDefinition(classId).movementRules;
+  return terrainDataWithEdits(classId, "movement");
 }
 
 export function terrainDefensePercentFor(classId: ClassId, terrainSlot: number): number {
-  return classDefinition(classId).terrainDefensePercents[terrainSlot] ?? 0;
+  return terrainDataWithEdits(classId, "defense")[terrainSlot] ?? 0;
 }
 
 export function killRewardFor(classId: ClassId, side: BattleUnit["side"]): number {

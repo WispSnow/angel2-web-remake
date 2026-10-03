@@ -22,6 +22,7 @@ import {
   KINS_ENTRY_CLASS_ID,
   KINS_ENTRY_EXPERIENCE,
 } from "../../content/campaign-entry-experience";
+import { withNativeBattleData } from "../../content/battle-data-edits";
 import { STAGE0_DEFINITION } from "../../content/stages";
 import { consumedEventIdsForBattleResume } from "../../simulation/stage-events";
 import type {
@@ -3587,6 +3588,11 @@ function raiseKinsEntryExperience(save: SaveData): SaveData {
 }
 
 export function parseSaveData(raw: string): SaveData | undefined {
+  // 原版Debug的兵種／地型覆寫只屬於目前戰鬥；記錄永遠按原版數值校驗（`REMAKE-174`）。
+  return withNativeBattleData(() => parseSaveDataWithNativeRules(raw));
+}
+
+function parseSaveDataWithNativeRules(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     // A save already at the current version is returned untouched: its sisters

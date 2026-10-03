@@ -99,8 +99,9 @@ describe("REMAKE-174 batch 2 content", () => {
       .map(({ enabled }) => enabled)).toEqual([true, true, false, true]);
     expect(debugMenuItems({ kind: "techniqueRank", group: "attack", category: "3?", casterId: "x", index: 0 })
       .map(({ code, enabled }) => [code, enabled])).toEqual([["1V", false], ["2V", false], ["3V", false]]);
+    // 第三批起兵種／地型也開放（`original-debug-batch3.test.ts`）。
     expect(debugMenuItems({ kind: "edit", index: 0 }).map(({ enabled }) => enabled))
-      .toEqual([true, true, false, false]);
+      .toEqual([true, true, true, true]);
     // 本關沒預載演出的技術列出但不可選。
     expect(debugMenuItems(
       { kind: "techniqueRank", group: "attack", category: "1?", casterId: "x", index: 0 },

@@ -40,9 +40,6 @@ const lifeItems = (side: 1 | 2): readonly DebugMenuItem[] =>
   (side === 2 ? NATIVE_DEBUG_SIDE_LIFE_MENUS.enemy : NATIVE_DEBUG_SIDE_LIFE_MENUS.ally).items
     .map(({ code, label }) => ({ code, label, enabled: true }));
 
-/** F2 的兵種／地型屬第三批，先列出但不可選。 */
-const EDIT_TARGETS_AVAILABLE = new Set<string>(["allyUnitEditor", "enemyUnitEditor"]);
-
 const techniqueCategory = (group: DebugTechniqueGroup, category: string) =>
   NATIVE_DEBUG_TECHNIQUE_MENUS[group].items.find(({ code }) => code === category);
 
@@ -67,11 +64,7 @@ export function debugMenuItems(
     case "life":
       return lifeItems(menu.side);
     case "edit":
-      return NATIVE_DEBUG_EDIT_MENU.items.map(({ code, label, target }) => ({
-        code,
-        label,
-        enabled: EDIT_TARGETS_AVAILABLE.has(target),
-      }));
+      return NATIVE_DEBUG_EDIT_MENU.items.map(({ code, label }) => ({ code, label, enabled: true }));
     case "technique":
       return NATIVE_DEBUG_TECHNIQUE_MENUS[menu.group].items.map(({ code, label, ranks }) => ({
         code,

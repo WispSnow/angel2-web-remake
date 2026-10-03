@@ -38,6 +38,20 @@ function expectBytes(image, offset, signature, label) {
   return { address: segmentAddress(offset), bytes: expected.length, label };
 }
 
+/** 整段例程逐字节固定（兵種／地型编辑器各有数百字节的立即数，逐条列字节不如整段哈希清楚）。 */
+function expectRoutine(image, start, end, digest, label) {
+  assert(sha256(image.subarray(start, end)) === digest, `${label}: routine bytes changed at ${segmentAddress(start)}`);
+  return { address: segmentAddress(start), bytes: end - start, sha256: digest, label };
+}
+
+/** 读一条已核验指令的立即数：先比对操作码字节，再取紧随其后的 8／16 位值。 */
+function immediate(image, offset, opcode, size = 16) {
+  const prefix = Buffer.from(bytes(opcode));
+  assert(image.subarray(offset, offset + prefix.length).equals(prefix), `unexpected instruction at ${segmentAddress(offset)}`);
+  const at = offset + prefix.length;
+  return size === 8 ? image[at] : image.readUInt16LE(at);
+}
+
 const dataOffset = (offset) => MODULE29_DATA_BASE + offset;
 const word = (image, dsOffset) => image.readUInt16LE(dataOffset(dsOffset));
 
@@ -228,6 +242,16 @@ function verifySignatures(image) {
       "2 readout: clear 1B7A, cell DS:5A09 at (40,30); clear 1B84, DS:0000 at (120,30)"),
     expectBytes(image, 0x12f1, "e8 1c 00 e8 9e 00", "class editor Esc: DATA.SWF writer 1310 then loader 1395"),
     expectBytes(image, 0x1baf, "e8 1c 00 e8 59 00", "terrain editor Esc: MAP.SWF writer 1BCE then loader 1C0E"),
+    expectRoutine(image, 0x1294, 0x1b3a, "6e3a608a5ac840a1302afe04e87cd0f778ccc684b5d26391930f9b49dbbf0b48",
+      "class data editor 1294..1B39: 13x3 grid, hover highlight, panel, row/column/digit pickers, digit editor, DATA.SWF I/O"),
+    expectRoutine(image, 0x1b3a, 0x2302, "64516ee092526a67403ec37568d58eb2d2c4d09a97fbd5befdcf38427ec5e66c",
+      "terrain data editor 1B3A..2301: 2x12 strip, 10x4 class grid, row/digit pickers, digit editor, MAP.SWF I/O"),
+    expectRoutine(image, 0x5256, 0x52e7, "0ec65a7ee60d5dbb64ef50aed31c70a16798c34d5850b016ecf197fd2ebe9328",
+      "every unit context load re-selects its DATA row (5256) and copies attack/defense/max life/movement/level (52BC)"),
+    expectBytes(image, 0x53ed, "c7 06 8a 31 7f 54 2e c6 06 34 54 01 e8 11 00 cb c7 06 8a 31 7f 54 2e c6 06 34 54 02 e8 01 00 cb",
+      "兵種 exit clamps side 1 (53ED) then side 2 (53FD) through 540D + 547F"),
+    expectBytes(image, 0x547f, "a1 9f 31 8b 0e c3 31 3b c1 72 06 8b 1e b9 31 89 0f c3",
+      "clamp: life >= max life DS:31C3 -> life = max life; never raises"),
   ];
 }
 
@@ -422,6 +446,204 @@ function parseUnitEditorLayout(image) {
   };
 }
 
+/** 两张矩形叠成的格：外框色留成一圈 1 px 边，内矩形（右下各缩 1）填内部。 */
+function parseFramedCell(image, outerOffset, innerOffset) {
+  const outer = parseRect(image, outerOffset);
+  const inner = parseRect(image, innerOffset);
+  assert(inner.x === outer.x + 1 && inner.y === outer.y + 1
+    && inner.width === outer.width - 2 && inner.height === outer.height - 2,
+  `framed cell ${ds(outerOffset)} drifted`);
+  return { width: outer.width, height: outer.height, border: outer.colour, fill: inner.colour };
+}
+
+/** 四条 1 px 线组成的选取框：上、左、下（y+高）、右（x+宽），都落在格外缘之外一格。 */
+function parseSelectionLines(image, offsets, colourOffset, eraseOffset) {
+  const [top, left, bottom, right] = offsets.map((offset) => parseRect(image, offset));
+  assert(top.height === 1 && bottom.height === 1 && left.width === 1 && right.width === 1
+    && top.width === bottom.width && left.height === right.height, "selection lines drifted");
+  return {
+    width: top.width,
+    height: left.height,
+    colour: immediate(image, colourOffset, "b8"),
+    eraseColour: immediate(image, eraseOffset, "b8"),
+    note: "top/left lines sit on the cell's own border, bottom/right one pixel past it (on the next cell's border); the erase repaints the old lines white",
+  };
+}
+
+/** 兵種／地型两个编辑器都不写墨色变量 DS:F93C/F93E，文字沿用进入时的战场默认 15／0。 */
+function assertInheritedInk(image, start, end, label) {
+  for (const pattern of ["c7 06 3c f9", "c7 06 3e f9"]) {
+    const needle = Buffer.from(bytes(pattern));
+    const hit = image.subarray(start, end).indexOf(needle);
+    assert(hit < 0, `${label} writes the text ink at ${segmentAddress(start + hit)}`);
+  }
+}
+
+/**
+ * 兵種（`0000:1294`）的版面。上方 13×3 格列出 39 条职业（side 2 棋子），指针悬停即移动红框；
+ * 在行区之外按主键，下方面板换成红框所在职业。面板上的五行×七列都是五位数，指针所在
+ * 行垫蓝底、所在列与位在行的上下各画一条白括线与红刻线。
+ */
+function parseClassDataEditorLayout(image) {
+  assertInheritedInk(image, 0x1294, 0x1b3a, "class data editor");
+  const rows = [0x1634, 0x1641, 0x164e, 0x165b, 0x1668].map((offset) => immediate(image, offset, "c7 06 d7 13"));
+  const rowHits = [0x169d, 0x16a2, 0x16a7, 0x16ac, 0x16b1, 0x16b6].map((offset) => immediate(image, offset, "3d"));
+  assert(rows.every((y, index) => rowHits[index] === y), "class editor row hit bands must start at the row text");
+  const columns = [0x1806, 0x1818, 0x182a, 0x183c, 0x184e, 0x1860, 0x1872].map((offset) => immediate(image, offset, "b8"));
+  const columnHits = [0x18b5, 0x18b0, 0x18ab, 0x18a6, 0x18a1, 0x189c, 0x1897].map((offset) => immediate(image, offset, "3d"));
+  assert(columns.every((x, index) => columnHits[index] === x), "class editor column hit bands must start at the column text");
+  const grid = {
+    x: immediate(image, 0x148a, "c7 06 30 13"),
+    y: immediate(image, 0x1480, "c7 06 32 13"),
+    columns: immediate(image, 0x1490, "b9"),
+    rows: immediate(image, 0x1486, "b9"),
+    xStep: immediate(image, 0x14e9, "83 06 30 13", 8),
+    yStep: immediate(image, 0x14f1, "83 06 32 13", 8),
+    lastRecord: immediate(image, 0x14c0, "83 3e 8c 31", 8),
+    sheet: ds(immediate(image, 0x14ba, "c7 06 84 f8")),
+    cell: parseFramedCell(image, 0x1348, 0x1352),
+    order: "row-major: record = row * columns + column",
+  };
+  assert(grid.columns * grid.rows === 39 && grid.lastRecord === 38, "the class grid must hold the 39 DATA records");
+  const hover = {
+    xMax: immediate(image, 0x14fd, "3d"),
+    yMax: immediate(image, 0x1505, "3d"),
+    rule: "x <= xMax and y <= yMax: record = floor(y / yStep) * columns + floor(x / xStep)",
+  };
+  const rowBand = parseRect(image, 0x1413);
+  const markerBelow = immediate(image, 0x1990, "05");
+  return {
+    grid,
+    hover,
+    selection: parseSelectionLines(image, [0x135c, 0x1366, 0x1370, 0x137a], 0x1598, 0x154e),
+    panel: {
+      outer: parseRect(image, 0x1334),
+      inner: parseRect(image, 0x133e),
+      trigger: "primary button while the pointer is outside the five row bands redraws the panel for the highlighted record",
+      figure: { x: immediate(image, 0x1457, "ba"), y: immediate(image, 0x145a, "bb"), sheet: ds(immediate(image, 0x1451, "c7 06 84 f8")) },
+      code: { x: immediate(image, 0x15fb, "b8"), y: immediate(image, 0x1601, "b8"), source: "side-1 descriptor short code" },
+      name: { x: immediate(image, 0x1611, "b8"), y: immediate(image, 0x1617, "b8"), source: "descriptor display name" },
+      header: { x: immediate(image, 0x1622, "b8"), y: immediate(image, 0x1628, "b8"), text: ds(immediate(image, 0x162e, "be")) },
+    },
+    table: {
+      rows,
+      rowHitBottom: rowHits[5],
+      columns,
+      digits: 5,
+      digitWidth: immediate(image, 0x1940, "bb"),
+      fieldWidth: immediate(image, 0x1921, "83 c2", 8),
+      rowBand: {
+        x: rowBand.x,
+        dy: -immediate(image, 0x1752, "2d"),
+        width: rowBand.width,
+        height: rowBand.height,
+        colour: immediate(image, 0x1773, "c7 06 1b 14"),
+        eraseColour: immediate(image, 0x1749, "c7 06 1b 14"),
+      },
+      markers: {
+        dyBelow: markerBelow,
+        dyAbove: markerBelow - immediate(image, 0x19c0, "83 2e 2b 14", 8),
+        bar: parseRect(image, 0x1429),
+        bracket: parseRect(image, 0x141f),
+        tick: parseRect(image, 0x1433),
+        note: "a 2 px bar in the row-band colour wipes the old marks, then a white bracket under the column and a red tick under the digit, above and below the row",
+      },
+      edit: {
+        primary: 1,
+        secondary: -1,
+        digitMax: immediate(image, 0x1a82, "3c", 8),
+        rule: "the picked digit of the 5-digit decimal value wraps 0..9 without carry; the value is recomposed as a 16-bit word",
+      },
+    },
+    exitKey: { ...key("escape", "Esc"), check: ds(immediate(image, 0x12dd, "80 3e")) },
+    ink: "inherited: neither editor writes DS:F93C/F93E, so text uses the battle default ink 15 with outline 0",
+  };
+}
+
+/**
+ * 地型（`0000:1B3A`）的版面。上方 2×12 地形条（悬停红框、按主键选定），`(0,60)` 另画一格
+ * 显示选定的地形；下方 10×4 格列出职业记录 0..36，每格两行五位数：该职业在选定地形的
+ * 移动消耗与防御百分比，只有十位与个位能改。
+ */
+function parseTerrainDataEditorLayout(image) {
+  assertInheritedInk(image, 0x1b3a, 0x2302, "terrain data editor");
+  const strip = {
+    x: immediate(image, 0x1d99, "c7 06 a8 14"),
+    y: immediate(image, 0x1d8f, "c7 06 aa 14"),
+    columns: immediate(image, 0x1d9f, "b9"),
+    rows: immediate(image, 0x1d95, "b9"),
+    xStep: immediate(image, 0x1daa, "83 06 a8 14", 8),
+    yStep: immediate(image, 0x1db2, "83 06 aa 14", 8),
+    cell: parseFramedCell(image, 0x14d4, 0x14de),
+    label: { dx: 1, dy: 1, table: ds(immediate(image, 0x1ded, "81 c6")), stride: immediate(image, 0x1de6, "bb") },
+    order: "row-major: slot = row * columns + column",
+  };
+  assert(strip.columns * strip.rows === 24, "the terrain strip must hold 24 labels");
+  const classGrid = {
+    x: immediate(image, 0x1ca4, "c7 06 a8 14"),
+    y: immediate(image, 0x1c9a, "c7 06 aa 14"),
+    columns: immediate(image, 0x1caa, "b9"),
+    rows: immediate(image, 0x1ca0, "b9"),
+    xStep: immediate(image, 0x1cb5, "83 06 a8 14", 8),
+    yStep: immediate(image, 0x1cbd, "83 06 aa 14", 8),
+    recordLimit: immediate(image, 0x1cf2, "83 3e 8c 31", 8),
+    sheet: ds(immediate(image, 0x1cec, "c7 06 84 f8")),
+    cell: parseFramedCell(image, 0x14c0, 0x14ca),
+    order: "row-major: record = row * columns + column; cells at or past recordLimit stay empty",
+  };
+  assert(classGrid.recordLimit === 37 && classGrid.columns * classGrid.rows === 40, "the terrain class grid must show records 0..36");
+  const movementDy = immediate(image, 0x1d50, "83 c3", 8);
+  const valueDx = immediate(image, 0x1d53, "83 c2", 8);
+  const rowTop = immediate(image, 0x1ff6, "83 c3", 8);
+  const rowStep = immediate(image, 0x1ffd, "83 c3", 8);
+  assert(rowTop === movementDy && immediate(image, 0x2004, "83 c3", 8) === rowStep, "terrain value rows drifted");
+  return {
+    strip,
+    stripHover: {
+      xMax: immediate(image, 0x1e09, "3d"),
+      yMax: immediate(image, 0x1e14, "3d"),
+      rule: "x <= xMax and y <= yMax: slot = floor(y / yStep) * columns + floor(x / xStep); the primary button selects it",
+    },
+    stripSelection: parseSelectionLines(image, [0x14e8, 0x14f2, 0x14fc, 0x1506], 0x1eb1, 0x1e67),
+    current: {
+      x: immediate(image, 0x1b4c, "c7 06 a8 14"),
+      y: immediate(image, 0x1b52, "c7 06 aa 14"),
+      initialSlot: word(image, 0x165a),
+      note: "one more strip cell showing the selected slot's label; DS:165A survives between openings in the same battle",
+    },
+    classGrid,
+    classHover: {
+      xMax: immediate(image, 0x1ee4, "3d"),
+      yMin: immediate(image, 0x1eef, "3d"),
+      yMax: immediate(image, 0x1ef4, "3d"),
+      rule: "x <= xMax and yMin <= y <= yMax: record = floor((y - grid.y) / yStep) * columns + floor(x / xStep)",
+    },
+    classSelection: parseSelectionLines(image, [0x1510, 0x151a, 0x1524, 0x152e], 0x1fb0, 0x1f4a),
+    values: {
+      dx: valueDx,
+      movementDy,
+      defenseDy: movementDy + immediate(image, 0x1d74, "83 c3", 8),
+      digits: 5,
+      rowHeight: rowStep,
+    },
+    editableDigits: {
+      dx: immediate(image, 0x20a4, "83 c3", 8),
+      width: immediate(image, 0x20ab, "83 c3", 8),
+      digitWidth: immediate(image, 0x20ef, "bb"),
+      fieldDigits: [immediate(image, 0x21e6, "bf"), immediate(image, 0x21ea, "bf")],
+      rule: "only the tens and ones digits; primary +1 / secondary -1, each wrapping 0..9 without carry",
+    },
+    markers: {
+      bracket: parseRect(image, 0x1613),
+      tick: parseRect(image, 0x1627),
+      dySecond: immediate(image, 0x2163, "83 06 15 16", 8),
+      note: "a white 16 px bracket over both editable digits and a red tick over the picked one, at the row top and 17 px below it",
+    },
+    exitKey: { ...key("escape", "Esc"), check: ds(immediate(image, 0x1b9b, "80 3e")) },
+    ink: "inherited: neither editor writes DS:F93C/F93E, so text uses the battle default ink 15 with outline 0",
+  };
+}
+
 function parseTerrainLabels(image) {
   return Array.from({ length: 24 }, (_, slot) => ({
     slot,
@@ -589,14 +811,30 @@ async function extract(modulePath, outputPath) {
       header: parseClassEditorHeader(image),
       editing: "pointer selects class (39 records), row (5), column (7) and digit; primary +1 / secondary -1 per digit, wrapping 0..9 without carry, recomposed in 16 bits",
       exit: "Esc only; writes DATA.SWF (2730 bytes) through 0000:1310 + E7D4, reloads it through 1395, then clamps current HP to the new max for both sides",
+      liveEffect: "edits land in the live row array DS:8838..92E1 at once; every unit context load re-selects its row (5256/52BC), so attack, defense, max life, movement and level follow the edit immediately, while the HP clamp runs only on exit",
       persistence: "module 29 reloads DATA.SWF at every battle start and module 33 reads records 0..34, so edits are permanent for the installation",
+      layout: parseClassDataEditorLayout(image),
+      knownDefects: [
+        "the grid hover accepts x = 624 and y = 150, which pick the next row's first record or records 39..52 past the table",
+        "x = column + 40 picks digit 5, which 1A3C does not map, so the edit reuses whatever digit register was left over",
+        "five digits recompose into 16 bits, so 65536..99999 wrap",
+        "the clamp writes the new max even when it is 0, leaving 0-HP units on the board",
+        "the erase pass repaints the old selection lines white, including the lines outside the grid on its last row and column",
+      ],
     },
     terrainDataEditor: {
       entry: "0000:1B3A",
       terrainLabels: parseTerrainLabels(image),
       editing: "select a terrain slot from the 2x12 strip, then edit the tens/ones digits of movement cost or defense percent for class records 0..36",
       exit: "Esc only; writes MAP.SWF (3744 bytes) through 0000:1BCE + E7D4 and reloads it through 1C0E",
+      liveEffect: "edits land in the live profiles at once; every movement and terrain-defense query re-reads them",
       persistence: "module 29 reloads MAP.SWF at every battle entry",
+      layout: parseTerrainDataEditorLayout(image),
+      knownDefects: [
+        "slot 23 (障礙) is the overlap word: editing it writes slot 0 of the next profile",
+        "the strip hover accepts x = 576, which picks slot 12 on the first row and the garbage slot 24 on the second",
+        "class cells 37..39 are empty frames but keep the previous cell's profile pointers, so their rows edit the last hovered class",
+      ],
     },
     ungatedReleaseBehaviour: [
       { key: "K", site: "0000:11D2", effect: "toggles MOUSE_USE DS:FB1A between Y and N" },

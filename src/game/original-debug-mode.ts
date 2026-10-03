@@ -1,3 +1,5 @@
+import { CLASS_IDS } from "./content/class-catalog.generated";
+import { enemyMapUnitAsset } from "./content/map-unit-assets";
 import {
   DEFAULT_DEBUG_PREFERENCES,
   loadDebugPreferences,
@@ -23,6 +25,18 @@ const storage = (): Storage | undefined => {
     return undefined;
   }
 };
+
+/**
+ * 兵種／地型編輯器照原版用 side 2 棋子圖列出全部 39 條職業（DS:`022D`）。開關打開時由每關的
+ * 資源門一併備妥，編輯器才不必在戰場上另發原始素材請求；士兵、騎兵兩張在戰場共用包裡。
+ * 戰鬥中途才打開開關時，這一關沒備妥的棋子框留空。
+ */
+export function originalDebugEditorAssetUrls(): readonly string[] {
+  if (!originalDebugModeEnabled()) return [];
+  return CLASS_IDS
+    .filter((classId) => classId !== "soldier" && classId !== "cavalry")
+    .map(enemyMapUnitAsset);
+}
 
 export function originalDebugModeEnabled(): boolean {
   if (current !== undefined) return current;
@@ -136,6 +150,28 @@ export function originalDebugHotkey(event: DebugKeyEvent): OriginalDebugHotkey |
   return BY_CODE[event.code];
 }
 
+/**
+ * Caps Lock 開著時 F1–F6、F10 屬於原版Debug。待機戰場以外它們只提示、不執行：否則會落回
+ * F1–F4 的集體命令（全軍休息、跟隨、自由行動、撤退），F5 甚至是瀏覽器的重新整理。字母與數字鍵
+ * 在選格、選單中照常走平常的意思（例如 S、D 移動游標）。
+ */
+export function isOriginalDebugFunctionKey(event: Pick<DebugKeyEvent, "code">): boolean {
+  return /^F\d+$/u.test(event.code) && BY_CODE[event.code] !== undefined;
+}
+
+/** 這個鍵盤或指標事件之後，Caps Lock 算不算開著（Caps Lock 鍵本身的事件先於追蹤器更新）。 */
+function capsLockAfter(event: KeyboardEvent | PointerEvent): boolean {
+  if (event instanceof KeyboardEvent && (event.key === "CapsLock" || event.code === "CapsLock")) {
+    return event.type === "keydown" || event.getModifierState("CapsLock");
+  }
+  return capsLockEngaged(event);
+}
+
+const CAPS_LOCK_ON_TITLE = "Caps Lock 已開啟：在我方待機戰場按熱鍵即可使用原版Debug。";
+const CAPS_LOCK_OFF_TITLE = "Caps Lock 未開啟：熱鍵會照平常的意思執行。"
+  + "macOS 的拼音輸入法短按 Caps Lock 只切換中英文，不會開啟 Caps Lock："
+  + "請長按到指示燈亮起，或先切換到 ABC 輸入法。";
+
 export const ORIGINAL_DEBUG_HOTKEY_SUMMARY =
   "開啟後在戰場打開 Caps Lock 使用：F1 行為、F2 單位編輯、F3 敵方生命、F4 我方生命、"
   + "F5／F6 技術測試、F10 全員再行動、U／D 經驗 ±50、－ 生命 −10、S 台詞、1 範圍讀數（按住）、"
@@ -146,12 +182,41 @@ export function mountOriginalDebugModeToggle(host: HTMLElement): () => void {
   const group = document.createElement("div");
   group.className = "original-debug-trigger";
   group.innerHTML = `<button type="button" data-testid="original-debug-toggle"
-    title="原版Debug模式。${ORIGINAL_DEBUG_HOTKEY_SUMMARY}">原版Debug</button>`;
+    title="原版Debug模式。${ORIGINAL_DEBUG_HOTKEY_SUMMARY}">原版Debug</button>
+    <span class="original-debug-caps" data-testid="original-debug-caps" role="status" hidden>Caps Lock</span>`;
   const button = group.querySelector<HTMLButtonElement>("button");
-  if (!button) return () => undefined;
+  const lamp = group.querySelector<HTMLElement>(".original-debug-caps");
+  if (!button || !lamp) return () => undefined;
+  // 熱鍵要 Caps Lock 開著才生效，而瀏覽器看到的狀態不一定與鍵盤燈一致（輸入法可能吃掉這個鍵），
+  // 所以開關開著時在旁邊顯示遊戲實際讀到的狀態。
+  let capsLockOn = false;
+  const renderLamp = () => {
+    lamp.hidden = !originalDebugModeEnabled();
+    lamp.dataset.engaged = String(capsLockOn);
+    lamp.title = capsLockOn ? CAPS_LOCK_ON_TITLE : CAPS_LOCK_OFF_TITLE;
+    lamp.setAttribute("aria-label", capsLockOn ? "Caps Lock 已開啟" : "Caps Lock 未開啟");
+  };
+  const observe = (event: KeyboardEvent | PointerEvent) => {
+    const next = capsLockAfter(event);
+    if (next === capsLockOn) return;
+    capsLockOn = next;
+    renderLamp();
+  };
+  const listeners = new AbortController();
+  for (const type of ["keydown", "keyup"] as const) {
+    window.addEventListener(type, observe, { capture: true, signal: listeners.signal });
+  }
+  for (const type of ["pointermove", "pointerdown"] as const) {
+    window.addEventListener(type, observe, { capture: true, passive: true, signal: listeners.signal });
+  }
+  window.addEventListener("blur", () => {
+    capsLockOn = false;
+    renderLamp();
+  }, { signal: listeners.signal });
   const render = (enabled: boolean) => {
     button.setAttribute("aria-pressed", String(enabled));
     button.classList.toggle("is-selected", enabled);
+    renderLamp();
   };
   const click = (event: MouseEvent) => {
     setOriginalDebugModeEnabled(!originalDebugModeEnabled());
@@ -167,6 +232,7 @@ export function mountOriginalDebugModeToggle(host: HTMLElement): () => void {
   render(originalDebugModeEnabled());
   return () => {
     unsubscribe();
+    listeners.abort();
     button.removeEventListener("click", click);
     group.remove();
   };

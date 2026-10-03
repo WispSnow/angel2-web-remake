@@ -26,6 +26,28 @@ import {
   steppedDebugClass,
   type DebugEditorSlot,
 } from "./original-debug-editor";
+import {
+  activatedDebugClassEditor,
+  activatedDebugTerrainEditor,
+  debugClassEditorHitAt,
+  debugTerrainEditorHitAt,
+  hoveredDebugClassEditor,
+  hoveredDebugTerrainEditor,
+  initialDebugClassEditor,
+  initialDebugTerrainEditor,
+  movedDebugClassEditor,
+  movedDebugTerrainEditor,
+  pressedDebugClassEditor,
+  pressedDebugTerrainEditor,
+  steppedDebugClassEditor,
+  steppedDebugTerrainEditor,
+  toggledDebugClassEditorFocus,
+  toggledDebugTerrainEditorFocus,
+  type DebugClassEditorState,
+  type DebugDataEditorResult,
+  type DebugTerrainEditorState,
+} from "./original-debug-data-editors";
+import { setBattleDataEditsSource, withNativeBattleData } from "./content/battle-data-edits";
 import { stagedRenderAssetAvailable } from "./staged-render-asset-cache";
 import { fullCombatImageAvailable } from "./full-combat-image-cache";
 import { MUSIC_BOX_TRACKS, musicBoxProgram } from "./content/music-box";
@@ -172,6 +194,7 @@ import {
   SAVE_SLOT_COUNT,
   SAVE_VERSION,
   saveSlotKey,
+  savedBattleUnitMaximumLife,
   writeSaveSlot,
 } from "./save";
 import {
@@ -573,6 +596,12 @@ export class GameController {
   debugBehaviourEditor?: { unitId: string; index: number };
   /** `REMAKE-174` 原版Debug我／敵 EDIT；`slotIndex` 是本頁 0..14 的焦點。 */
   debugUnitEditor?: { side: 1 | 2; page: number; slotIndex: number };
+  /** `REMAKE-174` 原版Debug兵種（`0000:1294`）；改動直接寫進本場覆寫。 */
+  debugClassEditor?: DebugClassEditorState;
+  /** `REMAKE-174` 原版Debug地型（`0000:1B3A`）。 */
+  debugTerrainEditor?: DebugTerrainEditorState;
+  /** 原版 DS:`165A`：同一場戰鬥內下次打開地型時沿用上次選定的地形。 */
+  private debugTerrainSlotMemory?: { readonly battle: Stage0Battle; readonly slot: number };
   /** EDIT 點了不在場的單位：下一次點格把它放回（原版 `0000:0C8C`）。 */
   debugPlacement?: { unitId: string };
   /** 技術測試的施法者；選格與提交走除錯入口，取消時直接回到戰場。 */
@@ -703,6 +732,8 @@ export class GameController {
   ) {
     this.difficulty = difficulty;
     this.battle = new Stage0Battle(difficulty);
+    // 原版Debug的兵種／地型覆寫屬於「目前這場戰鬥」：查表時才讀，換掉戰鬥物件就自然還原。
+    setBattleDataEditsSource(() => this.battle.debugDataEdits);
     this.stageEntrySnapshot = cloneCampaignState(this.battle.campaignSnapshot());
     this.stageEventState = createStageEventState(this.battle.stage);
     const preferences = loadPresentationPreferences(localStorage);
@@ -1224,6 +1255,8 @@ export class GameController {
       || this.debugMenu !== undefined
       || this.debugBehaviourEditor !== undefined
       || this.debugUnitEditor !== undefined
+      || this.debugClassEditor !== undefined
+      || this.debugTerrainEditor !== undefined
       || this.musicBoxOpen
       || this.promotionUnitIds.length > 0;
   }
@@ -4858,12 +4891,29 @@ export class GameController {
     return true;
   }
 
+  /**
+   * Caps Lock 開著、按了 F1–F6／F10，但不在待機戰場（選了單位、開著選單或選格中）：只提示，
+   * 不落回集體命令。演出與敵方階段不改信息欄。
+   */
+  noteOriginalDebugHotkeyUnavailable(): void {
+    if (this.phase !== "player" || this.busy) return;
+    this.statusMessage = this.debugDataEditorOpen || this.debugUnitEditor || this.debugBehaviourEditor || this.debugMenu
+      ? "原版Debug：先關閉目前的除錯畫面，再按其他除錯熱鍵。"
+      : "原版Debug：熱鍵只在我方待機時有效；請先關閉選單或取消選格。";
+    this.emit();
+  }
+
   /** 關掉所有原版Debug的選單、面板與待放置狀態（系統選單、勝負與重開時一併收起）。 */
   private clearOriginalDebugSurfaces(): void {
     this.debugMenu = undefined;
     this.debugBehaviourEditor = undefined;
     this.debugUnitEditor = undefined;
     this.debugPlacement = undefined;
+    // 兵種的改動是即時的；被迫收起（勝負、重開、系統選單）時照樣做退出時的生命壓低。
+    if (this.debugClassEditor) this.battle.debugClampLifeToMaximum();
+    this.debugClassEditor = undefined;
+    this.rememberDebugTerrainSlot();
+    this.debugTerrainEditor = undefined;
   }
 
   // ── 原版選單（F2–F6 與技術二級選單共用 `0000:5651`） ──
@@ -4916,9 +4966,7 @@ export class GameController {
     const item = this.debugMenuItems[menu?.index ?? -1];
     if (!menu || !item) return;
     if (!item.enabled) {
-      this.statusMessage = menu.kind === "edit"
-        ? "原版Debug：兵種／地型編輯將在第三批復刻。"
-        : item.code.endsWith("V") || item.code === "3?"
+      this.statusMessage = item.code.endsWith("V") || item.code === "3?"
           ? "原版Debug：VIRT 是原版的開發測試技術，複刻暫不提供。"
           : "原版Debug：這場戰鬥沒有備妥這項技術的演出。";
       this.emit();
@@ -4940,7 +4988,9 @@ export class GameController {
         return;
       }
       case "edit":
-        this.openDebugUnitEditor(item.code === "1D" ? 1 : 2);
+        if (item.code === "3D") this.openDebugClassEditor();
+        else if (item.code === "4D") this.openDebugTerrainEditor();
+        else this.openDebugUnitEditor(item.code === "1D" ? 1 : 2);
         return;
       case "technique":
         this.openDebugMenu(
@@ -5265,6 +5315,117 @@ export class GameController {
     this.finishOriginalDebugControlChange("已返回戰場。");
   }
 
+  // ── 兵種（`0000:1294`）與地型（`0000:1B3A`）：只在本場戰鬥生效 ──
+
+  private openDebugClassEditor(): void {
+    this.debugMenu = undefined;
+    this.debugClassEditor = initialDebugClassEditor();
+    this.statusMessage = "原版Debug：兵種數值編輯；改動只在本場戰鬥生效。";
+    this.emit();
+  }
+
+  private openDebugTerrainEditor(): void {
+    this.debugMenu = undefined;
+    const memory = this.debugTerrainSlotMemory;
+    this.debugTerrainEditor = initialDebugTerrainEditor(memory?.battle === this.battle ? memory.slot : undefined);
+    this.statusMessage = "原版Debug：地型數值編輯；改動只在本場戰鬥生效。";
+    this.emit();
+  }
+
+  private rememberDebugTerrainSlot(): void {
+    if (this.debugTerrainEditor) {
+      this.debugTerrainSlotMemory = { battle: this.battle, slot: this.debugTerrainEditor.terrainSlot };
+    }
+  }
+
+  get debugDataEditorOpen(): boolean {
+    return this.debugClassEditor !== undefined || this.debugTerrainEditor !== undefined;
+  }
+
+  private applyDebugClassEditor(result: DebugDataEditorResult<DebugClassEditorState>): void {
+    const changed = result.message !== undefined || result.state !== this.debugClassEditor;
+    this.debugClassEditor = result.state;
+    if (result.message) this.statusMessage = result.message;
+    if (changed) this.emit();
+  }
+
+  private applyDebugTerrainEditor(result: DebugDataEditorResult<DebugTerrainEditorState>): void {
+    const changed = result.message !== undefined || result.state !== this.debugTerrainEditor;
+    this.debugTerrainEditor = result.state;
+    if (result.message) this.statusMessage = result.message;
+    if (changed) this.emit();
+  }
+
+  /** 指標移動（原生 640×350 座標）：紅框、藍底行與標記跟著指標。 */
+  hoverDebugDataEditor(position: Position): void {
+    const classEditor = this.debugClassEditor;
+    const terrainEditor = this.debugTerrainEditor;
+    if (classEditor) {
+      const state = hoveredDebugClassEditor(classEditor, debugClassEditorHitAt(position));
+      if (state !== classEditor) this.applyDebugClassEditor({ state });
+    } else if (terrainEditor) {
+      const state = hoveredDebugTerrainEditor(terrainEditor, debugTerrainEditorHitAt(position));
+      if (state !== terrainEditor) this.applyDebugTerrainEditor({ state });
+    }
+  }
+
+  /** 指標按鍵：主鍵 +1、次鍵 −1（原版 `1A6F/1A92`、`21EE/2211`）。 */
+  pressDebugDataEditor(position: Position, delta: 1 | -1): void {
+    if (this.debugClassEditor) {
+      this.applyDebugClassEditor(pressedDebugClassEditor(this.battle, this.debugClassEditor, position, delta));
+    } else if (this.debugTerrainEditor) {
+      this.applyDebugTerrainEditor(pressedDebugTerrainEditor(this.battle, this.debugTerrainEditor, position, delta));
+    }
+  }
+
+  /** 鍵盤補充（原版只能用指標）：＋／－ 改游標那一位。 */
+  stepDebugDataEditor(delta: 1 | -1): void {
+    if (this.debugClassEditor) {
+      this.applyDebugClassEditor(steppedDebugClassEditor(this.battle, this.debugClassEditor, delta));
+    } else if (this.debugTerrainEditor) {
+      this.applyDebugTerrainEditor(steppedDebugTerrainEditor(this.battle, this.debugTerrainEditor, delta));
+    }
+  }
+
+  moveDebugDataEditor(delta: Position): void {
+    if (this.debugClassEditor) {
+      this.applyDebugClassEditor({ state: movedDebugClassEditor(this.debugClassEditor, delta) });
+    } else if (this.debugTerrainEditor) {
+      this.applyDebugTerrainEditor({ state: movedDebugTerrainEditor(this.debugTerrainEditor, delta) });
+    }
+  }
+
+  toggleDebugDataEditorFocus(): void {
+    if (this.debugClassEditor) {
+      this.applyDebugClassEditor({ state: toggledDebugClassEditorFocus(this.debugClassEditor) });
+    } else if (this.debugTerrainEditor) {
+      this.applyDebugTerrainEditor({ state: toggledDebugTerrainEditorFocus(this.debugTerrainEditor) });
+    }
+  }
+
+  activateDebugDataEditor(): void {
+    if (this.debugClassEditor) this.applyDebugClassEditor(activatedDebugClassEditor(this.debugClassEditor));
+    else if (this.debugTerrainEditor) this.applyDebugTerrainEditor(activatedDebugTerrainEditor(this.debugTerrainEditor));
+  }
+
+  /**
+   * 原版只能按 Esc 退出。兵種退出時雙方生命高於新上限的壓到上限（`53ED/53FD`），之後照原版
+   * 待機迴圈做一次轉職掃描與勝負判定（門檻或屬性改了，轉職資格可能跟著變）。
+   */
+  closeDebugDataEditor(): void {
+    if (this.debugClassEditor) {
+      this.debugClassEditor = undefined;
+      const clamped = this.battle.debugClampLifeToMaximum();
+      this.finishOriginalDebugMutation(clamped > 0
+        ? `原版Debug：兵種編輯結束，${clamped} 人生命壓到新上限。`
+        : "原版Debug：兵種編輯結束。");
+    } else if (this.debugTerrainEditor) {
+      this.rememberDebugTerrainSlot();
+      this.debugTerrainEditor = undefined;
+      this.finishOriginalDebugMutation("原版Debug：地型編輯結束。");
+    }
+  }
+
   /** 放回一個離場單位：只放在空著、這個職業能站的格上。 */
   placeDebugUnit(position: Position): void {
     const placement = this.debugPlacement;
@@ -5548,6 +5709,7 @@ export class GameController {
     else if (this.debugMenu) this.closeDebugMenu();
     else if (this.debugBehaviourEditor) this.closeDebugBehaviourEditor();
     else if (this.debugUnitEditor) this.closeDebugUnitEditor();
+    else if (this.debugDataEditorOpen) this.closeDebugDataEditor();
     else if (this.debugPlacement) this.cancelDebugPlacement();
     else if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
@@ -5580,6 +5742,7 @@ export class GameController {
     else if (this.debugMenu) this.closeDebugMenu();
     else if (this.debugBehaviourEditor) this.closeDebugBehaviourEditor();
     else if (this.debugUnitEditor) this.closeDebugUnitEditor();
+    else if (this.debugDataEditorOpen) this.closeDebugDataEditor();
     else if (this.debugPlacement) this.cancelDebugPlacement();
     else if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
@@ -6003,10 +6166,37 @@ export class GameController {
     this.emit();
   }
 
-  /** 我方階段的戰中記錄內容；寫入槽位與存檔校驗測試共用。 */
-  createBattleSaveData(): BattleSaveData {
+  /**
+   * 兵種／地型覆寫不進存檔（`REMAKE-174`）。記錄按原版數值成立：覆寫抬高生命上限後補過血
+   * 的單位，寫出時壓回原版上限，讀回就是還原數值之後的同一個戰局。沒有覆寫時原樣寫出。
+   */
+  private savedBattleState(): {
+    readonly campaign: CampaignState;
+    readonly snapshot: ReturnType<Stage0Battle["serializableSnapshot"]>;
+  } {
     const campaign = this.battle.campaignSnapshot();
     const snapshot = this.battle.serializableSnapshot();
+    if (!this.battle.debugDataEdits) return { campaign, snapshot };
+    const stageId = this.battle.stage.id;
+    const units = withNativeBattleData(() => snapshot.units.map((unit) => ({
+      ...unit,
+      life: Math.min(unit.life, savedBattleUnitMaximumLife(unit, stageId, campaign.difficulty)),
+    })));
+    // 在場我方的名冊條目由棋盤現值推出，存檔校驗逐一比對生命，所以跟著一起壓回。
+    const lowered = new Map(snapshot.units.flatMap((unit, index) => {
+      const life = units[index]?.life ?? unit.life;
+      return unit.side === 1 && life < unit.life ? [[unit.slot, { from: unit.life, to: life }] as const] : [];
+    }));
+    const roster = campaign.roster.map((entry) => {
+      const change = lowered.get(entry.slot);
+      return change && entry.life === change.from ? { ...entry, life: change.to } : entry;
+    });
+    return { campaign: { ...campaign, roster }, snapshot: { ...snapshot, units } };
+  }
+
+  /** 我方階段的戰中記錄內容；寫入槽位與存檔校驗測試共用。 */
+  createBattleSaveData(): BattleSaveData {
+    const { campaign, snapshot } = this.savedBattleState();
     return {
       format: "ANGEL2-web-save",
       version: SAVE_VERSION,
@@ -6316,6 +6506,10 @@ export class GameController {
       this.moveDebugUnitEditorFocus(delta);
       return;
     }
+    if (this.debugDataEditorOpen) {
+      this.moveDebugDataEditor(delta);
+      return;
+    }
     if (this.recordMenuMode) {
       if (delta.y !== 0) this.moveRecordMenuSelection(delta.y);
       else if (delta.x !== 0) this.moveRecordMenuPage(delta.x);
@@ -6460,6 +6654,7 @@ export class GameController {
     else if (this.debugMenu) this.activateDebugMenuSelection();
     else if (this.debugBehaviourEditor) this.applyDebugBehaviourSelection();
     else if (this.debugUnitEditor) this.toggleDebugUnitPresence();
+    else if (this.debugDataEditorOpen) this.activateDebugDataEditor();
     else if (this.recordMenuMode) this.activateRecordMenuSelection();
     else if (this.quitConfirmOpen) this.activateQuitSelection();
     else if (this.settingsOpen) this.activateSettingsMenuSelection();

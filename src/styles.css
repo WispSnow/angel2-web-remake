@@ -1137,6 +1137,37 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   color: #c9d4ff;
   font: 11px/1.45 system-ui, sans-serif;
 }
+/* 兵種 `0000:1294`／地型 `0000:1B3A`：原版不清畫面，格子與面板之外看得到戰場；格框、面板、
+   紅框、藍底行與括線／刻線全部取自原版矩形描述。 */
+.debug-data-editor { position: absolute; z-index: 16; inset: 0; overflow: hidden; cursor: var(--native-cursor-hand, default); }
+.debug-data-editor[hidden] { display: none; }
+.debug-data-editor > span,
+.debug-data-cell > span,
+.debug-data-panel-figure > span { position: absolute; display: block; box-sizing: border-box; }
+.debug-data-editor [hidden] { display: none; }
+.debug-data-figure { display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
+.debug-data-cell > .debug-data-figure { left: -1px; top: -1px; }
+.debug-data-panel-figure > .debug-data-figure { left: 0; top: 0; }
+.debug-data-figure img { display: block; image-rendering: var(--image-rendering, pixelated); }
+.debug-data-figure img[hidden] { display: none; }
+.debug-data-text,
+.debug-data-label,
+.debug-data-marker { pointer-events: none; }
+.debug-data-selection { box-sizing: border-box; border-style: solid; border-width: 1px 1px 1px 1px; pointer-events: none; }
+.debug-data-help {
+  position: absolute;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 4px 6px;
+  color: #c9d4ff;
+  background: rgba(0, 0, 0, .72);
+  font: 10px/1.4 system-ui, sans-serif;
+}
+.debug-data-help p { margin: 0 0 3px; }
+.debug-data-help button { font: inherit; padding: 2px 8px; cursor: pointer; }
+.debug-class-help { left: 524px; top: 160px; width: 112px; }
+.debug-terrain-help { left: 4px; top: 306px; width: 632px; display: flex; gap: 10px; align-items: center; }
+.debug-terrain-help p { flex: 1; margin: 0; }
 /* 原版Debug鍵 2：`0000:326A` 先以色 0 填 48×16 的框，再畫五位數字，覆蓋在戰場視口上。 */
 .debug-cell-readout { position: absolute; z-index: 8; inset: 0; pointer-events: none; }
 .debug-cell-readout[hidden] { display: none; }
@@ -2382,6 +2413,20 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   background: var(--gold);
 }
 .original-debug-trigger > button:focus-visible { outline: 2px solid #9fd9ff; outline-offset: 2px; }
+/* 開關開著時旁邊的 Caps Lock 燈：顯示遊戲實際讀到的狀態（輸入法可能吃掉 Caps Lock）。 */
+.original-debug-caps {
+  align-self: center;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border: 1px solid #4b3527;
+  border-radius: 2px;
+  color: #6f6150;
+  font: 11px/1.4 system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: help;
+}
+.original-debug-caps[hidden] { display: none; }
+.original-debug-caps[data-engaged="true"] { border-color: #7fd18b; color: #b8f5c0; box-shadow: 0 0 4px rgba(127, 209, 139, .55); }
 .display-settings-hint { flex: 1 1 100%; margin: 0; color: #8d7c65; font-size: 11px; }
 
 @media (max-width: 560px) {

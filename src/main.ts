@@ -16,6 +16,7 @@ import { mountCreditsUi } from "./game/credits-ui";
 import "./credits.css";
 import { ResourcePackLoader } from "./game/resource-loader";
 import { classPresentationAssetUrls } from "./game/content/class-presentation-assets";
+import { originalDebugEditorAssetUrls } from "./game/original-debug-mode";
 import { createStage0Units } from "./game/content/stage0";
 import { stageDialoguePortraitRecords } from "./game/content/portrait-assets";
 import { STAGE0_DEFINITION } from "./game/content/stages";
@@ -71,7 +72,7 @@ const stageAssetGate: StageAssetGate = (stageId, resolveRequirements) => {
     `讀取 ${stageId} 關卡資料`,
     async () => {
       requirements = await resolveRequirements();
-      return classPresentationAssetUrls(requirements);
+      return [...classPresentationAssetUrls(requirements), ...originalDebugEditorAssetUrls()];
     },
     async () => {
       if (requirements?.usesDeploymentSurface) await loadDeploymentSurfaceModules();
