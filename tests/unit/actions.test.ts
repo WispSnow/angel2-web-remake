@@ -21,6 +21,7 @@ import {
   techniqueStepsToTarget,
 } from "../../src/game/simulation/actions/range-map";
 import { prepareSpecialAction } from "../../src/game/simulation/actions/resolve";
+import { constructionPath, constructionReachableCells, movementMap } from "../../src/game/simulation/grid";
 import {
   prepareIronPlateConstruction,
   prepareObstacleConstruction,
@@ -298,6 +299,52 @@ describe("Stage-0 class actions", () => {
     ]);
   });
 
+  it("builds the construction range like a five-point ordinary move, enemy control zone included (REMAKE-179)", () => {
+    const battle = new Stage0Battle(0);
+    const source = battle.unit("1:0")!;
+    const enemySource = battle.units.find((unit) => unit.side === 2)!;
+    const engineer = {
+      ...source,
+      id: "engineer",
+      classId: "engineer" as const,
+      className: className("engineer"),
+      x: 5,
+      y: 5,
+      acted: false,
+      actionDisabled: false,
+      statuses: { ...source.statuses },
+    };
+    const enemy = { ...enemySource, id: "zone-enemy", x: 6, y: 6 };
+    // Slot 2 (草地) costs the engineer 1, so the seed-5 range is four steps.
+    const grass = { width: 11, height: 11, terrainSlotAt: (_position: Position) => 2 };
+    const keys = (cells: readonly Position[]) => cells.map(({ x, y }) => `${x},${y}`).sort();
+    const sameAsFivePointMove = (units: BattleUnit[]) => keys(
+      movementMap(engineer, units, grass, 5).cells
+        .filter(({ x, y }) => x !== engineer.x || y !== engineer.y),
+    );
+
+    // `0000:76C0` uses mode M through `1000:39D4`: (5,6) and (6,7) border the
+    // enemy, so they can be chosen but not crossed, and (6,8)/(7,7) — four steps
+    // through them — drop out; (5,7) is still reached round the west side.
+    const zoned = constructionReachableCells(engineer, [engineer, enemy], grass);
+    expect(keys(zoned)).toEqual(sameAsFivePointMove([engineer, enemy]));
+    expect(zoned).toContainEqual({ x: 5, y: 6 });
+    expect(zoned).toContainEqual({ x: 5, y: 7 });
+    expect(zoned).not.toContainEqual({ x: 6, y: 8 });
+    expect(zoned).not.toContainEqual({ x: 7, y: 7 });
+    expect(constructionPath(engineer, { x: 6, y: 8 }, [engineer, enemy], grass)).toEqual([]);
+
+    // REMAKE-105's gap carries over: an ally on the bordering cell is crossed in
+    // transit, so (6,8) is four steps away again.
+    const ally = { ...source, id: "zone-ally", x: 5, y: 6, statuses: { ...source.statuses } };
+    const gapped = constructionReachableCells(engineer, [engineer, enemy, ally], grass);
+    expect(keys(gapped)).toEqual(sameAsFivePointMove([engineer, enemy, ally]));
+    expect(gapped).not.toContainEqual({ x: 5, y: 6 });
+    expect(gapped).toContainEqual({ x: 6, y: 8 });
+    expect(constructionPath(engineer, { x: 6, y: 8 }, [engineer, enemy, ally], grass))
+      .toEqual([{ x: 5, y: 5 }, { x: 5, y: 6 }, { x: 5, y: 7 }, { x: 5, y: 8 }, { x: 6, y: 8 }]);
+  });
+
   it("uses the independent obstacle kind while preserving the shared reachable player route", () => {
     const battle = new Stage0Battle(0);
     const source = battle.unit("1:0")!;
@@ -473,6 +520,46 @@ describe("Stage-0 class actions", () => {
       linePath: [{ x: actor.x, y: actor.y }, { x: target.x, y: target.y }],
     })).toThrow("illegal magic archer line path");
     expect(battle.rng.calls).toBe(0);
+  });
+
+  it("consumes magic guard only on enemies on the magic-arrow line, not on the shooter or allies (REMAKE-178)", () => {
+    // `1000:6532` clears +0C on every occupied path cell, shooter and allies
+    // included; the remake keeps guards on the shooter's side.
+    const battle = new Stage0Battle(0, new DeterministicRng(0x178));
+    const actor = battle.unit("1:0")!;
+    const ally = { ...actor, id: "magic-arrow-ally", classId: "soldier" as const, statuses: { ...actor.statuses } };
+    const [lineEnemy, target] = battle.units.filter((unit) => unit.side === 2).slice(0, 2);
+    if (!lineEnemy || !target) throw new Error("missing magic-arrow fixtures");
+    actor.classId = "magic-archer";
+    actor.className = className(actor.classId);
+    actor.acted = false;
+    Object.assign(actor, { x: 20, y: 20 });
+    Object.assign(ally, { x: 21, y: 20 });
+    Object.assign(lineEnemy, { x: 22, y: 20 });
+    Object.assign(target, { x: 24, y: 20 });
+    for (const unit of [actor, ally, lineEnemy]) unit.statuses.magicGuard = 1;
+    battle.units = [actor, ally, lineEnemy, target];
+
+    const prepared = battle.prepareSpecialAction({
+      actionId: "magic-archer-shot",
+      actorId: actor.id,
+      targetId: target.id,
+      target: { x: target.x, y: target.y },
+    });
+    expect(prepared.result.effectCells.map(({ position }) => position))
+      .toContainEqual({ x: ally.x, y: ally.y });
+    expect(prepared.result.affectedUnits.map(({ unitId }) => unitId).sort())
+      .toEqual([lineEnemy.id, target.id].sort());
+    expect(prepared.result.affectedUnits.find(({ unitId }) => unitId === lineEnemy.id)).toMatchObject({
+      damage: 0,
+      blocked: true,
+      blockReason: "magicGuard",
+      statusesAfter: expect.objectContaining({ magicGuard: 0 }),
+    });
+    battle.commitPreparedAction(prepared);
+    expect(lineEnemy.statuses.magicGuard).toBe(0);
+    expect(actor.statuses.magicGuard).toBe(1);
+    expect(ally.statuses.magicGuard).toBe(1);
   });
 
   // REMAKE-006/009：魔弓的兩次半傷必須來自同一次 PRNG 取樣，提交不得重擲。
@@ -2465,6 +2552,35 @@ describe("Stage-0 class actions", () => {
     expect(actor.experience).toBe(prepared.actorExperienceBefore + 5);
   });
 
+  it("lets female stomp target enemies only, unlike the native IA slot (REMAKE-176)", () => {
+    // `1000:8D94` compares IA where 3D belongs, so the original accepts any
+    // occupied cell for 女踏 and then hurts that unit's whole side.
+    const battle = new Stage0Battle(0);
+    const { actor, target } = arrangeTarget(battle, "stomp-3", 2);
+    const ally = { ...actor, id: "stomp-3-ally", classId: "soldier" as const, statuses: { ...actor.statuses } };
+    actor.x = 20;
+    actor.y = 20;
+    ally.x = 21;
+    ally.y = 20;
+    target.x = 22;
+    target.y = 20;
+    battle.units = [actor, ally, target];
+
+    const cells = battle.actionTargetCells(actor.id, "stomp-3");
+    expect(cells).toContainEqual({ x: target.x, y: target.y });
+    expect(cells).not.toContainEqual({ x: ally.x, y: ally.y });
+    expect(cells).not.toContainEqual({ x: actor.x, y: actor.y });
+    for (const chosen of [ally, actor]) {
+      expect(() => battle.prepareSpecialAction({
+        actionId: "stomp-3",
+        actorId: actor.id,
+        targetId: chosen.id,
+        viewportOrigin: { x: 15, y: 15 },
+      })).toThrow("illegal special action");
+    }
+    expect(battle.rng.calls).toBe(0);
+  });
+
   it("heals every unfrozen ally in the recovery diamond and derives experience from actual healing", () => {
     const battle = new Stage0Battle(0);
     const actor = {
@@ -2800,7 +2916,7 @@ describe("Stage-0 class actions", () => {
     expect(battle.actionTargetCells(actor.id, "recovery-2")).toEqual([]);
   });
 
-  it("pushes ice targets along the caster's line, resolves occupancy in row-major order, and rolls experience only when something moved", () => {
+  it("pushes ice targets along the caster's line, resolves occupancy in row-major order, and rolls experience once whenever a target is frozen or pushed", () => {
     const battle = new Stage0Battle(0);
     const actor = { ...battle.unit("1:0")!, id: "ice-actor", x: 5, y: 4, classId: "magician" as const };
     const first = {
@@ -2934,8 +3050,34 @@ describe("Stage-0 class actions", () => {
       blocked: false,
       actionDisabledAfter: true,
     }));
-    expect(noMove.result.experienceGained).toBe(0);
-    expect(noMove.rngCallsAfter).toBe(noMove.rngCallsBefore);
+    // REMAKE-177: freezing a target that cannot retreat still counts as a cast
+    // that acted, so the tier roll is made exactly once.
+    expect(noMove.result.experienceGained).toBeGreaterThanOrEqual(8);
+    expect(noMove.result.experienceGained).toBeLessThanOrEqual(9);
+    expect(noMove.rngCallsAfter).toBe(noMove.rngCallsBefore + 1);
+  });
+
+  it("pays no ice experience when the cast acts on nobody, 1C included (REMAKE-177)", () => {
+    // The native 1C stub never reloads the success flag, so the original pays
+    // 8..9 even with no enemy in range; the remake treats that as a bug.
+    const battle = new Stage0Battle(0);
+    const actor = { ...battle.unit("1:0")!, id: "ice-empty-actor", x: 5, y: 5, classId: "magician" as const };
+    const far = { ...battle.units.find((unit) => unit.side === 2)!, id: "ice-far", x: 10, y: 10 };
+    const empty = prepareSpecialAction(
+      { actionId: "ice-1", actorId: actor.id },
+      actor,
+      undefined,
+      new DeterministicRng(0x1c1c),
+      {
+        units: [actor, far],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      actor,
+    );
+    expect(empty.result.affectedUnits).toEqual([]);
+    expect(empty.result.experienceGained).toBe(0);
+    expect(empty.rngCallsAfter).toBe(empty.rngCallsBefore);
   });
 
   it("does not stack, refresh, move, or consume guard when ice hits an already frozen target", () => {
@@ -3113,7 +3255,7 @@ describe("Stage-0 class actions", () => {
       actionDisabledAfter: false,
     });
     // Landing outside the effect is what removes the freeze, not the push itself:
-    // displacement experience still rolls exactly once.
+    // the pushed target still counts, so experience rolls exactly once.
     expect(shoved.result.experienceGained).toBeGreaterThanOrEqual(10);
     expect(shoved.rngCallsAfter).toBe(shoved.rngCallsBefore + 1);
 
@@ -3147,8 +3289,10 @@ describe("Stage-0 class actions", () => {
         actionDisabledAfter: true,
       }),
     ]);
-    expect(pinned.result.experienceGained).toBe(0);
-    expect(pinned.rngCallsAfter).toBe(pinned.rngCallsBefore);
+    // REMAKE-177: frozen in place is still a target the cast acted on.
+    expect(pinned.result.experienceGained).toBeGreaterThanOrEqual(10);
+    expect(pinned.result.experienceGained).toBeLessThanOrEqual(11);
+    expect(pinned.rngCallsAfter).toBe(pinned.rngCallsBefore + 1);
 
     // An inner-ring target still lands inside the effect, so it freezes as before.
     const inner = { ...enemyTemplate, id: "ice-094-inner", x: 5, y: 7 };

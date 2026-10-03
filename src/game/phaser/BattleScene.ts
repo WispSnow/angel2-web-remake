@@ -748,8 +748,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       for (const tile of this.rangeMaskTiles) tile.destroy();
       this.rangeMaskTiles = [];
 
+      // REMAKE-180: the move mask follows the native range map, so same-side
+      // cells the walk may cross stay bright although they are not landings.
       const nativeLegalCells = controller.actionMode === "move"
-        ? controller.reachable
+        ? controller.moveRangeDisplay
         : controller.actionMode === "target"
           ? controller.targets
           : controller.actionMode === "specialTarget"
@@ -977,6 +979,9 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       }
       if (controller.isTestMode) {
         this.game.canvas.dataset.nativeDitherCellCount = String(this.rangeMaskTiles.length);
+        this.game.canvas.dataset.nativeDitherCells = this.rangeMaskTiles
+          .map((tile) => `${Math.round(tile.x / TILE_WIDTH)},${Math.round(tile.y / TILE_HEIGHT)}`)
+          .join(" ");
         this.game.canvas.dataset.nativeDitherRetainedFraction = this.rangeMaskTiles.length > 0 ? "0.25" : "1";
         this.game.canvas.dataset.effectPreviewActionId = controller.effectPreviewCells.length > 0
           ? controller.selectedActionId ?? ""

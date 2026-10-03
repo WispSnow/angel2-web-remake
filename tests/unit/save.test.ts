@@ -5842,6 +5842,23 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
   });
 
+  it("migrates version-128 saves by identity when ice experience and construction ranges change (REMAKE-177/179)", () => {
+    // REMAKE-177 的冰雪经验与 REMAKE-179 的构筑控制区都在下一次施法／构筑时从棋盘重算，
+    // 不入档，所以 v128 战中档与完成档逐字段保留。
+    for (const current of [stage8BattleSave(), stage3BattleSave(), battleSave(), completedSave()]) {
+      expect(parseSaveData(JSON.stringify({
+        ...current,
+        version: 128,
+        contentVersion: "original-debug-edits-1",
+      })), `${current.kind} ${current.stageId}`).toEqual(current);
+    }
+    expect(parseSaveData(JSON.stringify({
+      ...battleSave(),
+      version: 128,
+      contentVersion: "ice-cast-experience-construction-zone-1",
+    }))).toBeUndefined();
+  });
+
   it("migrates version-126 saves by identity when ranged approach rings follow walls (REMAKE-173)", () => {
     // REMAKE-173 只改自动远程单位的落点规划与第 8 关魔術士的禁区；规划每次行动都从公开棋盘
     // 重算、禁区来自关卡内容，都不入档，所以 v126 战中档与完成档逐字段保留。

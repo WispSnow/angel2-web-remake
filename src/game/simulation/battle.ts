@@ -1328,6 +1328,20 @@ export class Stage0Battle {
     return this.movementMapFor(unit, budget).cells.map((position) => ({ ...position }));
   }
 
+  /**
+   * `REMAKE-180`: the cells the native move range map leaves nonzero — every
+   * legal landing plus the same-side cells crossed in transit — for the same
+   * budget as `reachableCells` (halved for the flying dragon knight's extra
+   * move). Presentation only; landings stay `reachableCells`.
+   */
+  movementDisplayCells(id: string, extraMove = false): Position[] {
+    const unit = this.unit(id);
+    if (!unit) return [];
+    const movement = this.statsFor(unit).movement;
+    return this.movementMapFor(unit, extraMove ? Math.floor(movement / 2) : movement)
+      .reachedCells.map((position) => ({ ...position }));
+  }
+
   scriptedPath(id: string, destination: Position, movementBudget: number): Position[] {
     const unit = this.unit(id);
     if (!unit) return [];

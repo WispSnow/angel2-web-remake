@@ -225,6 +225,28 @@ describe("stage 0 battle simulation", () => {
     expect(ally).toMatchObject({ x: 21, y: 20 });
   });
 
+  it("draws friendly transit cells at full brightness without making them landings (REMAKE-180)", () => {
+    // Mode M writes a remaining value into same-side cells (`1000:3C46/3C8C`), so
+    // the native range map keeps them nonzero and undimmed.
+    const battle = battleAtPlayableOpening();
+    const nia = battle.unit("1:0")!;
+    const ally = battle.unit("1:43")!;
+    nia.x = 21;
+    nia.y = 19;
+    ally.x = 21;
+    ally.y = 20;
+    battle.units = [nia, ally];
+
+    const display = battle.movementDisplayCells(nia.id);
+    const landings = battle.reachableCells(nia.id);
+    expect(display).toContainEqual({ x: 21, y: 20 });
+    expect(landings).not.toContainEqual({ x: 21, y: 20 });
+    expect(display).toContainEqual({ x: 21, y: 19 });
+    const key = ({ x, y }: { x: number; y: number }) => `${x},${y}`;
+    const extra = display.map(key).filter((cell) => !landings.map(key).includes(cell));
+    expect(extra).toEqual(["21,20"]);
+  });
+
   it("allows entering an enemy zone of control but never paths through it", () => {
     const battle = battleAtPlayableOpening();
     const nia = battle.unit("1:0")!;

@@ -309,8 +309,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 128;
-  contentVersion: "original-debug-edits-1";
+  version: 129;
+  contentVersion: "ice-cast-experience-construction-zone-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

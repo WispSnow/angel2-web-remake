@@ -537,6 +537,8 @@ export class GameController {
   cameraOrigin: Position = { x: 25, y: 23 };
   minimapPreviewOrigin?: Position;
   reachable: Position[] = [];
+  /** `REMAKE-180`: cells drawn at full brightness while choosing a move destination. */
+  moveRangeDisplay: Position[] = [];
   targets: Position[] = [];
   actionRange: Position[] = [];
   selectedActionId?: BattleActionId;
@@ -2128,6 +2130,20 @@ export class GameController {
     this.emit();
   }
 
+  /**
+   * Landings stay `reachable`; `REMAKE-180` adds the display set, which also
+   * holds the same-side cells the walk may cross, as the native range map
+   * leaves them nonzero.
+   */
+  private loadMoveRange(unitId: string, extraMove: boolean): void {
+    this.reachable = extraMove
+      ? this.battle.extraMovementRange(unitId)
+      : this.battle.reachableCells(unitId);
+    this.moveRangeDisplay = this.reachable.length > 0
+      ? this.battle.movementDisplayCells(unitId, extraMove)
+      : [];
+  }
+
   chooseMove(): void {
     const unit = this.selectedUnit;
     if (
@@ -2136,9 +2152,7 @@ export class GameController {
       || (this.commandMenuKind !== "initial" && this.commandMenuKind !== "extraMove")
       || !unit
     ) return;
-    this.reachable = this.commandMenuKind === "extraMove"
-      ? this.battle.extraMovementRange(unit.id)
-      : this.battle.reachableCells(unit.id);
+    this.loadMoveRange(unit.id, this.commandMenuKind === "extraMove");
     this.actionMode = "move";
     this.statusMessage = this.pendingExtraMove
       ? "藍色格為攻擊後可再次移動的範圍；此次不能再攻擊。"
@@ -7306,6 +7320,7 @@ export class GameController {
         path: this.movementPresentation.path.map((step) => ({ ...step })),
       } : undefined,
       reachable: this.reachable.map((cell) => ({ ...cell })),
+      moveRangeDisplay: this.moveRangeDisplay.map((cell) => ({ ...cell })),
       targets: this.targets.map((cell) => ({ ...cell })),
       actionRange: this.actionRange.map((cell) => ({ ...cell })),
       effectPreviewCells: this.effectPreviewCells.map((cell) => ({ ...cell })),
@@ -7503,9 +7518,7 @@ export class GameController {
       // back into the destination loop at `734C`. Only a cancel from that loop
       // reaches the command menu again, or 移動／放棄 after an attack.
       this.awaitingMoveConfirmation = false;
-      this.reachable = this.pendingExtraMove
-        ? this.battle.extraMovementRange(unit.id)
-        : this.battle.reachableCells(unit.id);
+      this.loadMoveRange(unit.id, Boolean(this.pendingExtraMove));
       this.actionMode = "move";
       this.statusMessage = !completed
         ? "無法返回原位置。"

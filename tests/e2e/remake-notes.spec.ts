@@ -376,6 +376,34 @@ test("REMAKE-173 把「營地遭到偷襲 ２」魔術士不進木屋列入 Bug 
   await expect(page.getByTestId("remake-note-REMAKE-173")).toHaveCount(0);
 });
 
+test("REMAKE-176／177／178 把女踏敵我、冰雪經驗與魔弓防魔列入 Bug 修復", async ({ page }) => {
+  await page.goto("/");
+  // 使用者批准的、與原版不同的規則一律算原版缺陷修復，不歸「平衡性調整」。
+  await openNotes(page, "fixes");
+  const femaleStomp = page.getByTestId("remake-note-REMAKE-176");
+  await expect(femaleStomp).toContainText("女踏只能指定敵人，不再誤傷我方");
+  await expect(femaleStomp).toContainText("可以選中射程內的友軍");
+  await expect(femaleStomp.locator(".rn-note-id")).toHaveText("REMAKE-176");
+  const iceExperience = page.getByTestId("remake-note-REMAKE-177");
+  await expect(iceExperience).toContainText("冰雪施法經驗依實際作用的目標判定");
+  await expect(iceExperience).toContainText("即使範圍內沒有任何敵人也一樣");
+  await expect(iceExperience).toContainText("至少一名敵人被冰封或被擊退時取得一次施法經驗");
+  const archerGuard = page.getByTestId("remake-note-REMAKE-178");
+  await expect(archerGuard).toContainText("魔弓兵射擊不再清除自己與友軍的防魔");
+  await expect(archerGuard).toContainText("射手與友軍保留各自的防魔");
+  await expect(page.getByTestId("remake-note-REMAKE-125")).toContainText("冰雪的施法經驗見 REMAKE-177");
+  // 原版炎暴本來就先由防魔擋下再清除，REMAKE-005 不再把它當成原版缺陷。
+  await expect(page.getByTestId("remake-note-REMAKE-005")).not.toContainText("炎暴");
+  await captureVisualAudit(iceExperience, {
+    path: "artifacts/playwright/remake-notes-ice-experience.png",
+  });
+
+  await page.getByTestId("remake-notes-tab-balance").click();
+  for (const id of ["REMAKE-176", "REMAKE-177", "REMAKE-178", "REMAKE-179", "REMAKE-180"]) {
+    await expect(page.getByTestId(`remake-note-${id}`)).toHaveCount(0);
+  }
+});
+
 test("REMAKE-174 把原版Debug模式與音樂盒列入功能增強，並在操作說明列出熱鍵", async ({ page }) => {
   await page.goto("/");
   await openNotes(page, "features");

@@ -300,9 +300,10 @@ function prepareSingleTarget(
       blocked = true;
       blockReason = "frozen";
     } else {
-      // REMAKE-005 classifies fire as magic damage: the native path pierced
-      // the guard and then cleared it, while stableRemake blocks first and
-      // still consumes the one-cast guard at the atomic settlement boundary.
+      // REMAKE-005 classifies fire as magic damage: the guard blocks it and is
+      // then consumed. The native per-point tick `0000:64D6 → 783D` already
+      // skips guarded targets and `0000:CFFB` clears +0C afterwards, so this
+      // is the original rule, not a repair of it.
       const guarded = target.statuses.magicGuard > 0;
       targetStatusesAfter.magicGuard = 0;
       if (guarded) {
@@ -674,7 +675,7 @@ function prepareIce(
   trial: DeterministicRng,
 ): { affectedUnits: SpecialActionAffectedUnit[]; experienceGained: number; effectCells: PreparedBattleAction["result"]["effectCells"] } {
   const definition = BATTLE_ACTION_DEFINITIONS[actionId];
-  const { effect, targets, movedCount } = planIceDisplacement(
+  const { effect, targets } = planIceDisplacement(
     actionId,
     actor,
     center,
@@ -695,9 +696,12 @@ function prepareIce(
       blockReason,
     });
   });
-  // Native experience still keys off displacement, not off how many targets the
-  // narrowed gate actually froze.
-  const experienceGained = movedCount > 0
+  // REMAKE-177: one tier roll when the cast acts on at least one target, frozen
+  // or pushed. 2C..4C set the native success flag from the freeze loop before
+  // any push (`1000:6A3A/6A4A`); 1C's stub never reloads that flag, which the
+  // remake treats as a bug. Blocked targets (already frozen, guarded, immune)
+  // do not count, even when their guard is consumed.
+  const experienceGained = targets.some(({ blocked }) => !blocked)
     ? trial.between(definition.experience.base + definition.experience.randomMinimum,
       definition.experience.base + definition.experience.randomMaximum)
     : 0;

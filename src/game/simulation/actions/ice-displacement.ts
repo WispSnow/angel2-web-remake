@@ -55,8 +55,6 @@ export interface IcePlannedTarget {
 export interface IceDisplacementPlan {
   readonly effect: NumericRangeMap;
   readonly targets: readonly IcePlannedTarget[];
-  /** Native experience keys off displacement, so the resolver needs this count. */
-  readonly movedCount: number;
 }
 
 const positionKey = ({ x, y }: Position): string => `${x},${y}`;
@@ -99,7 +97,6 @@ export function planIceDisplacement(
     definition.range.effectRadius,
   );
   const occupied = new Set(units.map(positionKey));
-  let movedCount = 0;
 
   const targets = units
     .filter((unit) => unit.side !== actor.side && effect.valueAt(unit) > 0)
@@ -147,7 +144,6 @@ export function planIceDisplacement(
         occupied.delete(positionKey(unit));
         occupied.add(positionKey(destination));
         positionAfter = destination;
-        movedCount += 1;
       }
       return {
         unit,
@@ -159,5 +155,5 @@ export function planIceDisplacement(
       };
     });
 
-  return { effect, targets, movedCount };
+  return { effect, targets };
 }

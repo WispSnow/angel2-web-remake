@@ -31,8 +31,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 128 as const;
-export const SAVE_CONTENT_VERSION = "original-debug-edits-1" as const;
+export const SAVE_VERSION = 129 as const;
+export const SAVE_CONTENT_VERSION = "ice-cast-experience-construction-zone-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;

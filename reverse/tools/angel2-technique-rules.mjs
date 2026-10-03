@@ -95,7 +95,58 @@ const CODE_SIGNATURES = [
   { address: "1000:3BB0", offset: 0x13bb0, hex: "833e0f1f307401c38bdf031e111fe88901e802033d63007416268a078acdfec9740d3ac1730926880fc606131f59c3" },
   { address: "1000:3C5C", offset: 0x13c5c, hex: "8bdf031e111fe8f2002e3a06890074043c00751b" },
   { address: "1000:3C70", offset: 0x13c70, hex: "e8d700e850023d630074103d6200740b" },
+  // Technique target loop: range != 0 (785E), side map != 0 (7890), then the absolute-side filter.
+  { address: "0000:76FC", offset: 0x76fc, hex: "e85f013c0074e6e88a013c0074dfe8130083fa4e74d7a1095aa3c177" },
+  { address: "0000:7720", offset: 0x7720, hex: "2e8b1e2b779a3402b618c3" },
+  { address: "0000:7890", offset: 0x7890, hex: "a124008ec08b36095a268a04c3" },
+  { address: "1000:8DF7", offset: 0x18df7, hex: "81fb49417446" },
+  { address: "1000:8E3F", offset: 0x18e3f, hex: "ba5900cb3c017404ba5900cbba4e00cb3c027404ba5900cbba4e00cb" },
+  // Ice success flag: the 1C stub alone returns without reloading AL from DS:68C8.
+  { address: "1000:6740", offset: 0x16740, hex: "c706181f0300e82800cbc706181f0400e81e00a0c868cbc706181f0500e81100a0c868cbc706181f0600e80400a0c868cb" },
+  { address: "1000:69C1", offset: 0x169c1, hex: "c606c86859b95900c3" },
+  { address: "1000:6A30", offset: 0x16a30, hex: "b0018b1ecb318887933cc606c86859c3b0018b1ecb318887de3cc606c86859c3" },
+  { address: "0000:63F9", offset: 0x63f9, hex: "a19379cb" },
+  // Fire: per-point tick through the guarded decrement, then the +0C clear.
+  { address: "1000:62B0", offset: 0x162b0, hex: "c7062a5201008b0e305283f9007409519ad664000059e2f79acf630000cb" },
+  { address: "0000:64D6", offset: 0x64d6, hex: "9a00004d188b363652e85b133d0000741cbe3852a136529a10004d18a13652e8ad178b0e2a52e8b76eb85900cbb84e00cb" },
+  { address: "0000:783D", offset: 0x783d, hex: "8bdee8e8d7f706ab3100807401c3a19f31483d00007d03b800008b1eb9318907c3" },
+  { address: "0000:CB9D", offset: 0xcb9d, hex: "8bc8e85904ba0200e8620403c883c108c3" },
+  { address: "0000:CFFB", offset: 0xcffb, hex: "518b1ec177e827809a6f01b61859c3" },
+  { address: "1000:8CCF", offset: 0x18ccf, hex: "8b36b9318b440cb8000089440ccb" },
+  // Magic-archer line: selection clears the source, the commit rebuild does not.
+  { address: "1000:3FA8", offset: 0x13fa8, hex: "e8d9ffc7064a3d3000c7060f1f32000ee819fae85600" },
+  { address: "1000:4014", offset: 0x14014, hex: "a1a9018ec08b3e161fb8000026880526884501268845ff26884532268845cec3" },
+  { address: "1000:1FF1", offset: 0x11ff1, hex: "c706181f0600c7060f1f32009a04009d13ba0a00e80e00b9320003c8b8a4cc9adeca0000c3" },
+  { address: "1000:6532", offset: 0x16532, hex: "89367c689a0c00de17893e8068893e82688bc79a386400008b1e80689a585000009a91540000" },
+  { address: "0000:644D", offset: 0x644d, hex: "a124008ec0268a043c0174053c02740dc3813ef41e43597410e8d413c3813ef41e434d7404e8c813c3c3" },
+  { address: "1000:7EFB", offset: 0x17efb, hex: "8bdf031ea777268a2f3ae97301c38acd8ad6891ea577c3" },
+  // Construction and the shared mode-M builder with its enemy-adjacent reservation.
+  { address: "0000:76C0", offset: 0x76c0, hex: "c706181f0500c7060f1f4d009a04009d13e859009aac009d13c3" },
+  { address: "1000:39D4", offset: 0x139d4, hex: "a1161fa3f71e9ad30e4711e82b00e88700e88503e86f00e89e00e8d403e8fa06cb" },
+  { address: "1000:3A0D", offset: 0x13a0d, hex: "833e0f1f597437813e0f1f4659742f813e0f1f43597427833e0f1f4d7427813e0f1f464d741f813e0f1f434d7417833e0f1f417410813e0f1f46417408c32ec606890002c32ec606890001c3" },
+  { address: "1000:3D9C", offset: 0x13d9c, hex: "833e0f1f4d7408833e0f1f417401c3a124008ec0c7061a1f5304c7060b1f6b042e8a168900e84e00c3" },
+  { address: "1000:3E23", offset: 0x13e23, hex: "3c0074043ac27501c306e841fde854fde846fde859fd07c38bfe033e111f268a2580fc007537a1a7018ec033db268a1d03db8baf7d2e06a126008ec033db268a5e000703dbe81b033d630074103d6200740ba1a9018ec0b0ff268805c3c3" },
+  { address: "1000:3E81", offset: 0x13e81, hex: "3cff7401c3268a44ce3cff74043c01772a268a44323cff74043c01771e268a44ff3cff74043c017712268a44013cff74043c017706b000268804c3b001268804c3" },
+  { address: "1000:3C8C", offset: 0x13c8c, hex: "8acd2ac8720f740d3ace760926880fc606131f59c3c3" },
+  { address: "1000:40C2", offset: 0x140c2, hex: "c7060f1f30000ee808f9cb" },
 ];
+
+/**
+ * `1000:8D94` (far-called as `18B6:0234` from `0000:7725`) is the absolute-side
+ * filter of the generic technique target loop. Each entry is `cmp bx,imm16`
+ * followed by `jnz +3 / jmp rel16` or `jz rel8`; the jump lands on one of two
+ * tails that reject side 1 or side 2. The chain is parsed rather than listed so
+ * that the `IA` entry at `1000:8DF7` (where `3D` would complete the stomp set)
+ * stays visible.
+ */
+const TARGET_SIDE_VALIDATOR = 0x18d94;
+const TARGET_SIDE_TAIL = Buffer.from("ba5900cb", "hex");
+const EXPECTED_TARGET_SIDE_FILTER = {
+  1: ["1L", "2L", "3L", "4L", "1F", "2F", "3F", "4F", "1D", "2D", "SD", "SA", "LA", "IP", "IA", "SN"],
+  2: ["1I", "2I", "3I", "1H", "2H", "3H", "AD", "AA", "FM", "TR"],
+};
+/** Player branches at 0000:75FA..762F route these before the generic target loop. */
+const VALIDATOR_BYPASS_CODES = ["1C", "2C", "3C", "4C", "OJ", "1K", "2K"];
 
 const EXPECTED_CLASS_MENUS = {
   "4A": [["1F", "1H"], ["1F", "1H"], ["1F", "1H"]],
@@ -377,7 +428,85 @@ function directNearCallers(buffer, target) {
   return callers;
 }
 
-function nativeTechniqueRules() {
+function rejectedSideOfTail(buffer, target) {
+  // cmp al,side / jz +4 / mov dx,'Y' / retf / mov dx,'N' / retf
+  const expected = (side) => Buffer.from([0x3c, side, 0x74, 0x04, 0xba, 0x59, 0x00, 0xcb, 0xba, 0x4e, 0x00, 0xcb]);
+  for (const side of [1, 2]) {
+    if (buffer.subarray(target, target + 12).equals(expected(side))) return side;
+  }
+  throw new Error(`1000:${hex(target & 0xffff)}: unexpected target-side filter tail`);
+}
+
+function parseTargetSideFilter(buffer, dispatchTable) {
+  const entries = [];
+  let cursor = TARGET_SIDE_VALIDATOR;
+  for (let index = 0; index < 64; index += 1) {
+    if (buffer.subarray(cursor, cursor + TARGET_SIDE_TAIL.length).equals(TARGET_SIDE_TAIL)) break;
+    if (buffer[cursor] !== 0x81 || buffer[cursor + 1] !== 0xfb) {
+      throw new Error(`1000:${hex(cursor & 0xffff)}: target-side filter entry is not cmp bx,imm16`);
+    }
+    const address = cursor;
+    const actionCode = decodeCode(buffer.readUInt16LE(cursor + 2));
+    cursor += 4;
+    let target;
+    if (buffer[cursor] === 0x75 && buffer[cursor + 1] === 0x03 && buffer[cursor + 2] === 0xe9) {
+      target = cursor + 5 + buffer.readInt16LE(cursor + 3);
+      cursor += 5;
+    } else if (buffer[cursor] === 0x74) {
+      target = cursor + 2 + buffer.readInt8(cursor + 1);
+      cursor += 2;
+    } else {
+      throw new Error(`1000:${hex(cursor & 0xffff)}: target-side filter comparison has no branch`);
+    }
+    entries.push({ address: `1000:${hex(address & 0xffff)}`, actionCode, rejectsSide: rejectedSideOfTail(buffer, target) });
+  }
+  for (const side of [1, 2]) {
+    const codes = entries.filter((entry) => entry.rejectsSide === side).map((entry) => entry.actionCode);
+    if (codes.join(",") !== EXPECTED_TARGET_SIDE_FILTER[side].join(",")) {
+      throw new Error(`target-side filter rejecting side ${side} differs from the recovered runtime: ${codes.join(" ")}`);
+    }
+  }
+  // `IA` must stay a lone typo-shaped entry: no other cmp/mov immediate in module 29 uses it.
+  const iaImmediates = [];
+  for (let offset = 0; offset + 4 <= DATA_LINEAR_BASE; offset += 1) {
+    const isCmpRegister = buffer[offset] === 0x81 && (buffer[offset + 1] & 0xf8) === 0xf8
+      && buffer.readUInt16LE(offset + 2) === 0x4149;
+    const isAccumulatorOrMov = [0x3d, 0xb8, 0xb9, 0xba, 0xbb].includes(buffer[offset])
+      && buffer.readUInt16LE(offset + 1) === 0x4149;
+    if (isCmpRegister || isAccumulatorOrMov) iaImmediates.push(offset);
+  }
+  if (iaImmediates.length !== 1 || iaImmediates[0] !== 0x18df7) {
+    throw new Error(`expected the IA immediate only at 1000:8DF7, found ${iaImmediates.map((offset) => hex(offset, 5)).join(",")}`);
+  }
+  const dispatchCodes = dispatchTable.map((entry) => entry.actionCode);
+  const listed = new Set(entries.map((entry) => entry.actionCode));
+  const listedDispatch = (side) => entries
+    .filter((entry) => entry.rejectsSide === side && dispatchCodes.includes(entry.actionCode))
+    .map((entry) => entry.actionCode);
+  const unlisted = dispatchCodes.filter((code) => !listed.has(code));
+  const anyOccupiedSide = unlisted.filter((code) => !VALIDATOR_BYPASS_CODES.includes(code));
+  if (anyOccupiedSide.join(",") !== "1V,2V,3V,3D") {
+    throw new Error(`unexpected dispatch codes accepted on any side: ${anyOccupiedSide.join(",")}`);
+  }
+  return {
+    validator: "1000:8D94",
+    farAddress: "18B6:0234",
+    callSite: "0000:7725, reached from the 0000:76DC target loop only after 0000:785E (range-map byte nonzero) and 0000:7890 (side-map byte DS:0024 nonzero) accept the cursor cell",
+    acceptance: "BX is the action word and AL the cursor cell's side-map byte; DX='N' rejects the cell, DX='Y' accepts it",
+    enemyOnly: listedDispatch(1),
+    allyOnly: listedDispatch(2),
+    anyOccupiedSide,
+    anyOccupiedSideNote: "dispatch codes that reach the generic target loop but are absent from the filter: any occupied cell inside the selection range is accepted, including side 1 allies and the caster's own cell (the mode 0 technique build 1000:40C2 keeps the origin nonzero). 3D is the only one with a normal player producer; 1V/2V/3V reach this loop only through the debug technique test (3V's normal producer is the 魔弓兵 shooting branch, which does not use this loop)",
+    bypassesValidator: VALIDATOR_BYPASS_CODES.filter((code) => dispatchCodes.includes(code)),
+    bypassNote: "0000:75FA..762F sends 1C..4C and OJ to 0000:76B0 (caster-centred, no target selection) and 1K/2K to the construction route 0000:76C0",
+    nonDispatchEntries: entries
+      .filter((entry) => !dispatchCodes.includes(entry.actionCode))
+      .map((entry) => ({ ...entry, note: "not one of the 36 DS:52A2 dispatch codes and not used as an immediate anywhere else in module 29; it sits where 3D would complete the 1D/2D stomp pair, so 3D falls through to the accept tail" })),
+    entries,
+  };
+}
+
+function nativeTechniqueRules(targetGroups) {
   return {
     costModel: {
       resourceCost: "no MP or consumable-cost field was found in the player technique commit chain",
@@ -385,12 +514,7 @@ function nativeTechniqueRules() {
       cancellation: "restores the pre-action cell/position and does not set the action-spent bit",
       seal: "SN/禁咒 writes 8003h to state +16h; its high bit blocks entry to 技術",
     },
-    targetGroups: {
-      enemyOnly: ["1L", "2L", "3L", "4L", "1F", "2F", "3F", "4F", "1D", "2D", "3D", "SD", "SA", "LA", "IP", "SN"],
-      allyOnly: ["1I", "2I", "3I", "1H", "2H", "3H", "AD", "AA", "FM", "TR"],
-      unrestrictedOrSpecial: ["1C", "2C", "3C", "4C", "OJ", "1K", "2K"],
-      validator: "1000:8D94",
-    },
+    targetGroups,
     families: {
       L: {
         visibleName: "落雷",
@@ -415,7 +539,8 @@ function nativeTechniqueRules() {
           { code: "4F", percentMaxLife: 44, damageCap: 270, experienceBase: 15, experienceRandom: [0, 2] },
         ],
         formula: "damage = min(currentLife, damageCap, floor(maxLife * percentMaxLife / 100))",
-        defenseMagic: "the damage loop does not test +0C, but the post-effect path clears +0C on the target",
+        defenseMagic: "blocked and consumed, like lightning: the effect loop 1000:62B6 calls 0000:64D6 once per damage point, and each call goes through 0000:783D, which reloads the target and returns without decrementing while +0C bit15 is set; after the effect returns, 0000:CB9F calls 0000:CFFB, which writes 0 to the target's +0C through 18B6:016F (1000:8CCF)",
+        defenseMagicCorrection: "2026-10-02: replaces the earlier reading that the fire damage loop does not test +0C",
         experience: "kill reward + tier base + tier random",
       },
       C: {
@@ -437,7 +562,23 @@ function nativeTechniqueRules() {
         displacement: "for each affected enemy, try destination offsets +50, -50, -1, +1 in that order; accept only an empty passable cell with a lower range-map value; zero is allowed, so an outer-ring value 1 target may move outside the effect",
         immunity: "defense-magic high bit blocks the effect; 1P/2P/3P boss parts are immune",
         shieldConsumption: "after resolving the area, +0C is cleared for affected enemies",
-        experience: "zero if no unit is successfully affected; otherwise tier base + tier random",
+        experience: "1C: tier base + tier random unless the low byte of the kill total is exactly 4Eh, i.e. practically always, even with no unit in range. 2C..4C: tier base + tier random when at least one other-side unit in the effect area was frozen (unguarded and not 1P/2P/3P), whether or not it was pushed; otherwise 0. Kill rewards are never added (mov cx,ax replaces CX with the roll)",
+        experienceSuccessFlag: {
+          flag: "DS:68C8",
+          reset: "1000:6771 writes 'N' before the effect",
+          writers: [
+            "1000:6A3A / 1000:6A4A: the freeze loop 1000:69CA..6A4F writes 'Y' for every unguarded, non-1P/2P/3P unit of the other side on a nonzero range cell; it runs before any push",
+            "1000:69C1: a successful push writes 'Y'; push candidates (1000:6835 → 68CA → 690B) pass the same guard/boss filter, so a push never sets the flag for a unit that the freeze loop skipped",
+          ],
+          tierStubs: {
+            "1C": "1000:6740 (1674:0000) ends call 6771 / retf without A0 C8 68 (mov al,[68C8]); AL is the low byte of AX = DS:7993, the kill total returned by 0000:63CF at 0000:63F9",
+            "2C": "1000:674A (1674:000A) reloads AL from DS:68C8 before retf",
+            "3C": "1000:6757 (1674:0017) reloads AL from DS:68C8 before retf",
+            "4C": "1000:6764 (1674:0024) reloads AL from DS:68C8 before retf",
+          },
+          test: "each handler (0000:CCF1/CD10/CD2F/CD4E) returns CX=0 when AL='N' (4Eh), otherwise CX = randomBelow(2/2/3/3) + 8/10/12/15",
+          correction: "2026-10-02: replaces 'zero if no unit is successfully displaced'",
+        },
       },
       H: {
         visibleName: "治療",
@@ -479,7 +620,8 @@ function nativeTechniqueRules() {
         },
         viewportUnion: "after the base area is built, every cell in the current clamped 10x7 battle viewport is overwritten with range-map value 1; cells already marked outside the viewport are not cleared",
         receiverFilter: "scan all 2500 cells in ascending order; require nonzero range-map value, occupied side-map cell, and side equal to the selected target's side",
-        playerTargeting: "all three player actions require an enemy target, so normal player use damages only enemy-side units in the union area",
+        playerTargeting: "1D and 2D are in the 1000:8D94 reject-side-1 list, so the player must pick a side 2 cell and only enemy units in the union area are hit. 3D is absent from that list (IA sits at 1000:8DF7), so 女踏 accepts any occupied cell within its selection range, including a side 1 ally or the caster itself; aimed at a side 1 unit it damages every side 1 unit in the union area, normally including the caster, and still returns the fixed 5 experience",
+        playerTargetingCorrection: "2026-10-02: replaces 'all three player actions require an enemy target'",
         defenseMagic: "not tested or cleared; attack, defense and terrain-defense stats are not used",
         death: "the common post-effect chain invokes the zero-life unit remover",
         experience: "fixed 5 returned by the handler; kill experience returned by the common effect finalizer is ignored",
@@ -491,6 +633,7 @@ function nativeTechniqueRules() {
         playerRoute: {
           branch: "0000:761A..762F recognizes 1K/2K and jumps to the construction-specific 0000:76C0 path instead of the generic technique handler call",
           placement: "build seed 5 with mode M, require a nonzero-range empty destination, then move the engineer to that cell",
+          rangeRule: "0000:76C0 builds through 139D:0004 = 1000:39D4, the same builder and mode M as the ordinary 移動 command (0000:7336), with seed 5 instead of the unit's movement: entry costs come from the engineer's terrain profile with 98/99 refused, side 1 cells are passable but not selectable, side 2 cells block, and the enemy-adjacent FFh reservation and conversion (1000:3D6D/3E23/3E3B, 1000:3DC5/3E81) apply, so an empty cell next to an enemy can be chosen but not crossed",
           neighborOrder: [50, -50, 1, -1],
           neighborFilter: "0000:77CD converts each neighboring raw token to its logical terrain slot and skips slot 0",
           mutation: "write the stage-specific sourceToken itself to every accepted orthogonal neighbor; the selected center cell is not written by this player route",
@@ -539,7 +682,11 @@ function nativeTechniqueRules() {
       V: {
         visibility: "present in the 36-entry dispatch table but absent from the 13 player technique menus",
         codes: ["1V", "2V", "3V"],
-        behavior: "build a target-to-source line list; apply floor(inputDamage/2) once to each eligible occupied path cell, then apply the same half once more to the selected target at list index 0; +0C is cleared rather than checked",
+        behavior: "build a target-to-source line list; apply floor(inputDamage/2) once to each eligible occupied path cell, then apply the same half once more to the selected target at list index 0; every point goes through 0000:783D, so +0C bit15 blocks a cell's growth-phase half, and 1000:6532 then clears +0C on that cell",
+        pathIncludesSource: "the walk 1000:7E3B stops at the first cell with no neighbour >= its value; the 魔弓兵 commit 0000:72B7 and the AI shot 1000:1FF1 rebuild the mode 2 map through 139D:0004 = 1000:39D4 without the 1000:4014 source/neighbour clear used for selection (1000:3FA8), so the shooter's cell keeps the seed value and is the last path entry",
+        receiverFilter: "0000:644D damages only cells whose side matches the selected target (DS:1EF4 CM/CY), so the shooter and side 1 allies on the path take no damage",
+        defenseMagicClear: "1000:6532 reloads every path cell through 0000:5058 and calls 0000:5491 (18B6:016F, +0C := 0) with no side or damage test: every occupied path cell loses 防魔, including the shooter and allies; on empty cells 0000:5058 leaves DS:31B9 on the previously loaded path unit, so no unit off the path is touched",
+        correction: "2026-10-02: replaces '+0C is cleared rather than checked' and the earlier reading that only damaged line units lose 防魔",
         selectedTargetQuirk: "selected target damage is 2*floor(inputDamage/2), while other eligible occupied line cells receive floor(inputDamage/2); odd input rolls therefore lose one point at the target",
         inputs: { "1V": 40, "2V": 40, "3V": "caller supplied; 魔弓兵射擊 supplies 50..69" },
       },
@@ -631,6 +778,7 @@ async function extract(runtimePath, descriptorPath, battleTemplatePath, battleDi
     classMenus.map((entry) => entry.classCode),
   );
   const dispatchTable = parseDispatchTable(buffer);
+  const targetGroups = parseTargetSideFilter(buffer, dispatchTable);
   const menuCodes = new Set(classMenus.flatMap((entry) => entry.tiers.flatMap((tier) => tier.entries.map((item) => item.actionCode))));
   const dispatchCodes = new Set(dispatchTable.map((entry) => entry.actionCode));
   for (const code of menuCodes) if (!dispatchCodes.has(code)) throw new Error(`${code}: menu action is absent from dispatch table`);
@@ -689,7 +837,7 @@ async function extract(runtimePath, descriptorPath, battleTemplatePath, battleDi
         boundary: "1V and 2V remain dormant dispatch-table compatibility entries unless corrupted/external state injects their action words",
       },
     },
-    rules: nativeTechniqueRules(),
+    rules: nativeTechniqueRules(targetGroups),
     terrainConstructionTokens: await terrainConstructionTokens(battleTemplates, battleDirectory),
     verifiedCodeSignatures: validateCodeSignatures(buffer),
     evidenceLogs: [

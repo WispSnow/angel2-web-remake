@@ -163,6 +163,13 @@ interface SearchResult {
  */
 export interface MovementMap {
   readonly cells: readonly Position[];
+  /**
+   * `REMAKE-180`: every cell the propagation reached, i.e. every cell the native
+   * range map leaves nonzero. Besides the legal landings in `cells` this holds
+   * the same-side cells crossed in transit, which the original draws at full
+   * brightness although they cannot be chosen.
+   */
+  readonly reachedCells: readonly Position[];
   pathTo: (destination: Position) => Position[];
   /**
    * Whether the propagation reached this cell at all, including cells only a
@@ -290,6 +297,7 @@ export function movementMap(
     .map(parsePositionKey);
   return {
     cells,
+    reachedCells: [...result.costs.keys()].map(parsePositionKey),
     pathTo: (destination) => occupied.has(positionKey(destination))
       ? []
       : reconstructPath(unit, destination, result),
@@ -366,27 +374,36 @@ export function movementPath(
   return movementMap(unit, units, battlefield, movementBudget).pathTo(destination);
 }
 
-/** Module 29 mode M: friendly cells are transit-only, enemies block, and no ZOC is applied. */
+/**
+ * `0000:76C0` builds the 1K/2K range through the ordinary builder `1000:39D4`
+ * in mode `M` with a fixed seed of 5: the engineer's terrain costs, same-side
+ * cells as transit only, opposing cells blocked, and — `REMAKE-179` — the same
+ * `FFh` control zone as an ordinary move, so an empty cell beside an enemy can
+ * be chosen but not crossed.
+ */
+function constructionSearch(
+  unit: BattleUnit,
+  units: readonly BattleUnit[],
+  battlefield: GridBattlefield,
+): SearchResult {
+  return search(
+    unit,
+    unit.classId,
+    5,
+    opposingOccupants(unit, units),
+    controlZoneFor(unit, units, battlefield),
+    NATIVE_CONSTRUCTION_DIRECTIONS,
+    battlefield,
+  );
+}
+
 export function constructionReachableCells(
   unit: BattleUnit,
   units: readonly BattleUnit[],
   battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
 ): Position[] {
   const occupied = new Set(units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
-  const blocked = new Set(
-    units
-      .filter((candidate) => candidate.id !== unit.id && candidate.side !== unit.side)
-      .map(positionKey),
-  );
-  const result = search(
-    unit,
-    unit.classId,
-    5,
-    blocked,
-    new Set(),
-    NATIVE_CONSTRUCTION_DIRECTIONS,
-    battlefield,
-  );
+  const result = constructionSearch(unit, units, battlefield);
   const originKey = positionKey(unit);
   return [...result.costs.keys()]
     .filter((key) => key !== originKey && !occupied.has(key))
@@ -401,21 +418,7 @@ export function constructionPath(
 ): Position[] {
   const occupied = new Set(units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
   if (occupied.has(positionKey(destination))) return [];
-  const blocked = new Set(
-    units
-      .filter((candidate) => candidate.id !== unit.id && candidate.side !== unit.side)
-      .map(positionKey),
-  );
-  const result = search(
-    unit,
-    unit.classId,
-    5,
-    blocked,
-    new Set(),
-    NATIVE_CONSTRUCTION_DIRECTIONS,
-    battlefield,
-  );
-  return reconstructPath(unit, destination, result);
+  return reconstructPath(unit, destination, constructionSearch(unit, units, battlefield));
 }
 
 export function routePath(

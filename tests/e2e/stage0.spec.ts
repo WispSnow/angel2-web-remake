@@ -199,6 +199,7 @@ interface DebugState {
     stepIndex: number;
   };
   reachable: Array<{ x: number; y: number }>;
+  moveRangeDisplay: Array<{ x: number; y: number }>;
   targets: Array<{ x: number; y: number }>;
   promotionUnitIds: string[];
   promotionDialogueIndex?: number;
@@ -3538,6 +3539,43 @@ test("S00-I: native range dither and ordinary attack target-count branches", asy
   await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
   expect((await debugState(page)).actionMode).toBe("idle");
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-cell-count", "0");
+});
+
+test("REMAKE-180: friendly cells a move may cross stay bright in the native move dither", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "openingStory");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "player");
+
+  await page.keyboard.press(" ");
+  await page.getByTestId("unit-command-move").click();
+  const state = await debugState(page);
+  expect(state.actionMode).toBe("move");
+  const key = ({ x, y }: { x: number; y: number }) => `${x},${y}`;
+  const landings = new Set(state.reachable.map(key));
+  const allies = new Set(state.units
+    .filter((unit) => unit.side === 1 && unit.id !== state.selectedId)
+    .map(key));
+  // Mode M writes a remaining value into same-side cells, so the native range
+  // map leaves them nonzero: they are drawn bright although they are not landings.
+  const transit = state.moveRangeDisplay.map(key).filter((cell) => !landings.has(cell));
+  expect(transit.length).toBeGreaterThan(0);
+  expect(transit.every((cell) => allies.has(cell))).toBe(true);
+  expect(state.reachable.every((cell) => state.moveRangeDisplay.some((shown) => key(shown) === key(cell))))
+    .toBe(true);
+
+  const canvas = page.getByTestId("battle-canvas");
+  const dimmed = new Set(((await canvas.getAttribute("data-native-dither-cells")) ?? "").split(" "));
+  const bright = new Set(state.moveRangeDisplay.map(key));
+  for (const cell of transit) expect(dimmed.has(cell), cell).toBe(false);
+  for (let row = 0; row < 7; row += 1) {
+    for (let column = 0; column < 10; column += 1) {
+      const cell = key({ x: state.cameraOrigin.x + column, y: state.cameraOrigin.y + row });
+      expect(dimmed.has(cell), cell).toBe(!bright.has(cell));
+    }
+  }
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/remake-180-move-transit-bright.png" });
 });
 
 test("S00-J: native map hit, point-drain and death descriptors preserve the board erase boundary", async ({ page }) => {

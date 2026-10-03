@@ -770,6 +770,23 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-177 pays ice experience whenever a cast acts on a target and REMAKE-179
+ * gives construction the ordinary control zone. Both are read from the board at
+ * the next cast or build, so a v128 save only moves to the current identity.
+ */
+function migrateVersion128Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 128
+    || value.contentVersion !== "original-debug-edits-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-174 adds two optional unit fields that only the original debug mode
  * writes (`debugAiBehavior`, `debugClassEdit`). A v127 save never holds them, so
  * it only moves to the current identity.
@@ -3590,6 +3607,8 @@ function migratePreviousSaveData(raw: unknown): SaveData | undefined {
   const value = restoreStage11PursuerIdentity(
     rescaleLinearEnemyExperience(restoreOriginalStageTitle(addStage3CounterattackCompletion(raw))),
   );
+  const migratedVersion128 = migrateVersion128Save(value);
+  if (migratedVersion128) return migratedVersion128;
   const migratedVersion127 = migrateVersion127Save(value);
   if (migratedVersion127) return migratedVersion127;
   const migratedVersion126 = migrateVersion126Save(value);
