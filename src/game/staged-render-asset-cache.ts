@@ -24,7 +24,7 @@ export interface StagedRenderAssetOptions {
 }
 
 interface ActiveStagedRenderAssets {
-  readonly entries: ReadonlyMap<string, StagedRenderAssetEntry>;
+  readonly entries: Map<string, StagedRenderAssetEntry>;
   readonly urlApi: Pick<typeof URL, "createObjectURL" | "revokeObjectURL">;
   readonly blobConstructor: typeof Blob;
   readonly decodeImage: (source: string, originalUrl: string) => Promise<HTMLImageElement>;
@@ -137,6 +137,24 @@ export function activateStagedRenderAssets(
       releaseAssets(next);
     },
   };
+}
+
+/**
+ * 把已下載的檔案補進目前的租約，回傳真的補進去的網址；沒有租約時什麼都不做。原版Debug EDIT
+ * 當場改到這一關沒備妥的職業時用它，不必像換關那樣整份換掉租約（那會撤銷畫面正在用的網址）。
+ */
+export function extendStagedRenderAssets(
+  encodedBytes: ReadonlyMap<string, Uint8Array>,
+): readonly string[] {
+  const assets = activeAssets;
+  if (!assets || assets.released) return [];
+  const added: string[] = [];
+  for (const [url, bytes] of encodedBytes) {
+    if (!isStagedRenderAssetUrl(url) || assets.entries.has(url)) continue;
+    assets.entries.set(url, { bytes, contentType: contentTypeFor(url) });
+    added.push(url);
+  }
+  return added;
 }
 
 function encodedBlob(assets: ActiveStagedRenderAssets, entry: StagedRenderAssetEntry): Blob {

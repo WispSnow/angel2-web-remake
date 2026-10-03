@@ -117,6 +117,10 @@ const mountController = (
   stagedResources?: ResourcePackLoader,
 ) => {
   const audio = new AudioManager(controller, root, userActivated);
+  // `REMAKE-174` 原版Debug EDIT 改到這一關沒備妥的職業時，補下載它的圖像進目前的租約。
+  if (stagedResources) {
+    controller.setOriginalDebugAssetLoader((urls) => stagedResources.extendActiveStage(urls));
+  }
   let surfaceKey = "";
   let surfaceGeneration = 0;
   let destroySurface: () => void = () => undefined;

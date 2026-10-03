@@ -200,5 +200,6 @@ export function createFixedStageScenario(
     ),
     forces: config.forces,
     campaignUnitSlots: config.campaignUnitSlots,
+    enemyExperienceSeeding: config.enemyExperienceSeeding,
   };
 }

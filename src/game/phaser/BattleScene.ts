@@ -589,11 +589,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private debugEditedFigureSignature = "";
 
     /**
-     * `REMAKE-174` 原版Debug EDIT 在同一個棋盤上改職業。只有被它改過職業的單位才會走到這裡：
-     * EDIT 只開放這場戰鬥資源租約裡有棋子的職業，所以補排的是租約內的圖，不另發原始請求。
+     * `REMAKE-174` 原版Debug EDIT 在同一個棋盤上改職業或放上部署候選、模板敵人。只有這些單位才會
+     * 走到這裡：EDIT 改職業或放置之前已把棋子備妥進資源租約（必要時當場下載），所以補排的是
+     * 租約內的圖，不另發原始請求。
      */
     private scheduleDebugEditedFigures(): void {
-      const edited = controller.battle.units.filter(({ debugClassEdit }) => debugClassEdit === true);
+      const edited = controller.battle.units.filter(({ debugClassEdit, debugPlaced }) =>
+        debugClassEdit === true || debugPlaced === true);
       const signature = [...new Set(edited.map(({ side, classId }) => `${side}:${classId}`))].sort().join(",");
       if (signature === this.debugEditedFigureSignature) return;
       this.debugEditedFigureSignature = signature;

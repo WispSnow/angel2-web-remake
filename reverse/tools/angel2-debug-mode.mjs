@@ -182,6 +182,17 @@ function verifySignatures(image) {
     expectRoutine(image, 0x0744, 0x076b, "c9581592c4c96a2677e9f582ce27c46a2c60860fcd805baf16671b42653172ce",
       "promotion class-choice loop 0744: redraw, choice step C8A9, dispatcher while no class is chosen, no cancel"),
     expectBytes(image, 0x0766, "e8 65 29", "promotion class-choice loop calls the dispatcher"),
+    // EDIT 名字框與之後的放置：不在場的任一槽都能放，原版不分部署候選、模板或劇情。
+    expectBytes(image, 0x0c55, `
+      c6 06 90 f5 00 33 d2 a1 9a 08 bb 0f 00 f7 e3 03 06 0a f7 a3 9a 45 8b d8 03 db 8b 87 3c 09 3d 00 00 74 14
+      35 01 00 89 87 3c 09 e8 04 ff a1 80 f8 e8 72 eb e8 df 02 c3 35 01 00 89 87 3c 09 c6 06 77 0c 59 c3`,
+    "EDIT name box: slot = page*15+item into DS:459A; present -> clear board cells (0B86), absent -> close the editor"),
+    expectBytes(image, 0x55d3, "8b 36 09 5a 83 3e 9a 45 00 75 42",
+      "idle map click: a pending EDIT slot (DS:459A != 0) diverts the click to the placement"),
+    expectBytes(image, 0x5620, `
+      8b 36 09 5a a1 24 00 8e c0 a0 d3 7f 26 88 04 a1 22 00 8e c0 a1 9a 45 26 88 04 c7 06 9a 45 00 00
+      8b 1e 09 5a e8 e3 f9 a1 c3 31 8b 1e b9 31 89 07 c3`,
+    "EDIT placement: side DS:7FD3 and slot DS:459A written at the cursor cell, then life = maximum from the slot record"),
     expectBytes(image, 0x5960, "e8 6b d7", "popup menu move handle calls the dispatcher"),
     expectBytes(image, 0x5cb9, "e8 12 d4", "popup menu second handle calls the dispatcher"),
     expectBytes(image, 0x4a27, "80 3e 2f 13 4e 74 9d 80 3e e3 f6 01 75 96 80 3e cd f6 01 74 32 80 3e e0 f6 01 74 63 eb 86",

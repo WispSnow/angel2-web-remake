@@ -31,8 +31,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 129 as const;
-export const SAVE_CONTENT_VERSION = "ice-cast-experience-construction-zone-1" as const;
+export const SAVE_VERSION = 130 as const;
+export const SAVE_CONTENT_VERSION = "original-debug-full-edit-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;
@@ -165,6 +165,7 @@ function isBattleUnit(
     || !isPosition(value)
     || (value.debugAiBehavior !== undefined && !isDebugAiBehaviourValue(value.debugAiBehavior))
     || (value.debugClassEdit !== undefined && value.debugClassEdit !== true)
+    || (value.debugPlaced !== undefined && value.debugPlaced !== true)
   ) return false;
 
   const rootId = waterWarriorRootId({
@@ -382,20 +383,22 @@ export function isSavedBattleState(
   if (objectiveConditionSatisfied(units, saveSchema.defeat)) return false;
 
   const allies = units.filter((unit) => unit.side === 1);
-  const alliedRoots = allies.filter((unit) => unit.id === `${unit.side}:${unit.slot}`);
+  // `REMAKE-174` 原版Debug EDIT 放上場的部署候選不佔部署格數：原版 EDIT 放置不看人數。
+  const alliedRoots = allies.filter((unit) => unit.id === `${unit.side}:${unit.slot}` && unit.debugPlaced !== true);
+  const debugPlacedAllies = allies.filter((unit) => unit.debugPlaced === true);
   const alliedRule = saveSchema.alliedUnits;
   if (alliedRule.kind === "deployment") {
     const eligibleSlots = new Set<number>(alliedRule.eligibleSlots);
     const optionalSlots = new Set<number>(alliedRule.optionalSlots);
     if (alliedRoots.length > alliedRule.maximumUnits
-      || alliedRoots.some(({ slot }) => !eligibleSlots.has(slot))
+      || [...alliedRoots, ...debugPlacedAllies].some(({ slot }) => !eligibleSlots.has(slot))
       || alliedRoots.filter(({ slot }) => optionalSlots.has(slot)).length
         > alliedRule.openCellCount) {
       return false;
     }
   } else if (alliedRule.kind === "fixed-roster") {
     const rosterSlots = new Set<number>(alliedRule.slots);
-    if (alliedRoots.some(({ slot }) => !rosterSlots.has(slot))) return false;
+    if ([...alliedRoots, ...debugPlacedAllies].some(({ slot }) => !rosterSlots.has(slot))) return false;
   }
 
   // 关卡来宾不写回战役名册：名册里是入关时的条目，棋盘上才是它们的现值，所以这些槽

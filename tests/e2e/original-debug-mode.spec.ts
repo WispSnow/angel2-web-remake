@@ -353,6 +353,81 @@ test("我 EDIT draws the native page, edits a class and puts a removed unit back
     .toBe("ally-magic-sword-warrior");
 });
 
+test("我 EDIT puts an undeployed candidate on the board and downloads a class this stage did not prepare", async ({ page }) => {
+  // 開關先開著進關：全部技術演出隨資源門備妥，技術職業才能一路改過去。
+  await openBattleWithDebugSwitch(page, "stage-05-player");
+  const status = page.getByTestId("status-strip");
+  const editor = page.getByTestId("debug-unit-editor");
+  await openEditMenuItem(page, 0);
+  await expect(editor).toBeVisible();
+
+  // 第 21 槽愛歐里雅是本關的部署候選，這一場沒派出：可以放上場。
+  await page.getByTestId("debug-edit-page-1").click();
+  const bench = page.getByTestId("debug-edit-slot-6");
+  await expect(bench).toHaveAttribute("data-slot", "21");
+  await expect(bench).toHaveAttribute("data-state", "absent");
+  await expect(bench).toHaveAttribute("data-placeable", "true");
+  await bench.locator("[data-debug-edit-field=name]").click();
+  await expect(editor).toBeHidden();
+  await expect(status).toContainText("點選空格放上愛歐里雅");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Enter");
+  await expect(status).toContainText("愛歐里雅已放上戰場");
+  expect((await testState(page)).units.find(({ id }) => id === "1:21")).toMatchObject({ x: 24, y: 33, acted: false });
+
+  // 妮雅從士兵一路往後改：記錄 8 半龍戰士不在這一關的士兵轉職閉包裡，選到時當場下載。
+  await openEditMenuItem(page, 0);
+  await expect(editor).toBeVisible();
+  const nia = page.getByTestId("debug-edit-slot-0");
+  const atlasResponse = page.waitForResponse((response) =>
+    response.url().includes("/full-combat-atlases/left-half-dragon-warrior.png"));
+  for (let step = 0; step < 8; step += 1) {
+    await nia.locator("[data-debug-edit-field=figure]").click({ button: "right" });
+    if (step < 7) await expect(nia).not.toHaveAttribute("data-class-id", "soldier");
+  }
+  expect((await atlasResponse).ok()).toBe(true);
+  await expect(nia).toHaveAttribute("data-class-id", "half-dragon-warrior");
+  await expect(nia).toHaveAttribute("data-loading", "false");
+  await expect(status).toContainText("妮雅改為半龍戰士");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "test-results/visual-audit/original-debug-full-edit.png",
+  });
+  await page.keyboard.press("Escape");
+  await expect(editor).toBeHidden();
+  const canvas = page.getByTestId("battle-canvas");
+  await expect.poll(async () => JSON.parse((await canvas.getAttribute("data-unit-texture-by-id")) ?? "{}")["1:0"])
+    .toBe("ally-half-dragon-warrior");
+  await expect.poll(async () => JSON.parse((await canvas.getAttribute("data-unit-texture-by-id")) ?? "{}")["1:21"])
+    .toMatch(/^ally-/u);
+});
+
+test("with the switch on at stage entry, stage 0 casts 究級落雷 although its own pack has no lightning", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  await openBattleWithDebugSwitch(page, "stage-00-player");
+  const menu = page.getByTestId("debug-menu");
+  await withCapsLock(page, "F5");
+  await expectMenuOpen(menu);
+  await page.keyboard.press("Enter");
+  await expect(menu.locator("button")).toHaveText(["初級落雷", "中級落雷", "高級落雷", "究級落雷"]);
+  await expect(menu.locator("button[aria-disabled=true]")).toHaveCount(0);
+  for (let step = 0; step < 3; step += 1) await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await testState(page)).actionMode).toBe("specialTarget");
+  // 妮雅在 (29,26)，左邊兩格是敵兵 2:45。
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await testState(page)).units.find(({ id }) => id === "1:0")?.acted, {
+    timeout: 30_000,
+  }).toBe(true);
+  await expect.poll(async () => (await testState(page)).actionMode, { timeout: 30_000 }).toBe("idle");
+  expect(errors).toEqual([]);
+});
+
 test("F6 lets a soldier cast a heal through the full presentation", async ({ page }) => {
   await openDebugBattle(page, "stage-05-player");
   await withCapsLock(page, "F6");

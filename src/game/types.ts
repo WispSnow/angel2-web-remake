@@ -136,6 +136,11 @@ export interface BattleUnit extends Position {
   debugAiBehavior?: number;
   /** `REMAKE-174` 原版Debug EDIT 改過職業；存檔校驗不再要求它符合本關的職業表。 */
   debugClassEdit?: true;
+  /**
+   * `REMAKE-174` 原版Debug EDIT 從部署候選或關卡模板放上場（不是放回本場離場的單位）。
+   * 存檔校驗不把它算進部署人數上限；之後輪到同一槽的增援、劇情登場與替補都跳過。
+   */
+  debugPlaced?: true;
 }
 
 export type BattleOutcome = "ongoing" | "victory" | "defeat";
@@ -309,8 +314,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 129;
-  contentVersion: "ice-cast-experience-construction-zone-1";
+  version: 130;
+  contentVersion: "original-debug-full-edit-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

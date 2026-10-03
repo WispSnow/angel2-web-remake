@@ -1127,7 +1127,8 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .debug-edit-tab.is-active .debug-edit-tab-fill { visibility: visible; }
 .debug-edit-slot.is-focused > .debug-edit-box:first-child { outline: 1px dashed #ffdf10; outline-offset: 1px; }
 .debug-edit-slot[data-state="empty"] .debug-edit-name,
-.debug-edit-slot[data-state="absent"] .debug-edit-name { cursor: default; }
+.debug-edit-slot[data-state="absent"][data-placeable="false"] .debug-edit-name { cursor: default; }
+.debug-edit-slot[data-loading="true"] .debug-edit-figure img { opacity: .4; }
 .debug-edit-help {
   position: absolute;
   left: 8px;

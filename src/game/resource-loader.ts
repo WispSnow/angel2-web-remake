@@ -18,6 +18,7 @@ import {
 import {
   activateStagedRenderAssets,
   decodeStagedRenderImages,
+  extendStagedRenderAssets,
   isStagedRenderAssetUrl,
   type StagedRenderAssetLease,
 } from "./staged-render-asset-cache";
@@ -186,6 +187,38 @@ export class ResourcePackLoader {
     supplementalUrls: readonly string[] = [],
   ): Promise<void> {
     await this.ensurePackVisible(route, label, supplementalUrls);
+  }
+
+  /**
+   * 原版Debug EDIT 改到這一關沒備妥的職業：不顯示載入頁，下載它的棋子、全景戰鬥圖與通用肖像，
+   * 補進目前這一關的租約。下一次換關照常整份換掉。
+   */
+  async extendActiveStage(urls: readonly string[]): Promise<void> {
+    const manifest = await this.loadManifest();
+    const unique = [...new Set(urls)];
+    await this.loadUrls(manifest, unique);
+    const encodedBytes = new Map<string, Uint8Array>();
+    for (const url of unique) {
+      const encoded = this.states.get(url)?.encodedRenderAsset;
+      if (encoded) encodedBytes.set(url, encoded);
+    }
+    for (const url of extendStagedRenderAssets(encodedBytes)) this.stagedRenderAssetUrls.add(url);
+    const imageUrls = unique.filter((url) => isFullCombatImageUrl(url) && !this.fullCombatImageUrls.has(url));
+    if (imageUrls.length === 0) return;
+    const added = await acquireFullCombatImages(imageUrls, {
+      encodedBytes,
+      fetchImage: this.fetchAsset,
+      ownerDocument: this.ownerDocument,
+    });
+    const base = this.fullCombatImageLease;
+    this.fullCombatImageLease = {
+      urls: [...(base?.urls ?? []), ...added.urls],
+      release: () => {
+        base?.release();
+        added.release();
+      },
+    };
+    for (const url of imageUrls) this.fullCombatImageUrls.add(url);
   }
 
   prefetchStage(stageId: StageId, supplementalUrls: readonly string[] = []): void {

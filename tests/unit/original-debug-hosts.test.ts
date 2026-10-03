@@ -192,7 +192,7 @@ describe("REMAKE-174 hotkeys in target selection", () => {
     controller.toggleDebugUnitPresence(slot);
     expect(controller.debugPlacement).toBeUndefined();
     expect(controller.debugUnitEditor).toBeDefined();
-    expect(controller.statusMessage).toBe("原版Debug：放回單位要在我方待機時進行。");
+    expect(controller.statusMessage).toBe("原版Debug：放置單位要在我方待機時進行。");
     controller.closeDebugUnitEditor();
     expect(controller.actionMode).toBe("move");
     expect(controller.statusMessage).toBe("已返回選格。");

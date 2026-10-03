@@ -22,6 +22,7 @@ import {
   DEBUG_EDITOR_SLOT_COUNT,
   DEBUG_EDITOR_SLOTS_PER_PAGE,
   debugEditorSlots,
+  debugTemplateEnemyDefinition,
   steppedDebugBehaviour,
   steppedDebugClass,
   type DebugEditorSlot,
@@ -57,7 +58,11 @@ import {
   refreshedPromotionQueue,
   type OriginalDebugHost,
 } from "./original-debug-hosts";
-import { originalDebugModeEnabled, type OriginalDebugHotkey } from "./original-debug-mode";
+import {
+  ORIGINAL_DEBUG_PRESENTATION_ACTION_IDS,
+  originalDebugModeEnabled,
+  type OriginalDebugHotkey,
+} from "./original-debug-mode";
 import {
   cameraContains,
   cameraFocusForOrigin,
@@ -108,7 +113,7 @@ import {
   storyPhaseForStageStory,
   type StageStoryPhase,
 } from "./content/dialogue";
-import { stageDialoguePortraitRecords } from "./content/portrait-assets";
+import { portraitAssetUrlsForRecords, stageDialoguePortraitRecords } from "./content/portrait-assets";
 import {
   deferredAllyClassIds,
   stageSimulationEffectFor,
@@ -641,6 +646,12 @@ export class GameController {
    * 待機時再掃描。
    */
   private debugPromotionScanDeferred = false;
+  /** 原版Debug EDIT 當場補下載職業圖像的宿主入口（資源門的 `extendActiveStage`）。 */
+  private originalDebugAssetLoader?: (urls: readonly string[]) => Promise<void>;
+  /** EDIT 正在等圖像下載的改職業。 */
+  debugClassLoading?: { readonly unitId: string; readonly classId: UnitClassId };
+  /** 每一關進場時決定的地圖演出清單；見 `currentMapPresentationActionIds`。 */
+  private readonly presentationIdsByRuntime = new WeakMap<object, readonly BattleActionId[]>();
   /** `REMAKE-174` 原版Debug鍵 2 的格號讀數；游標或鏡頭一動就失效，與原版被下一次視口重畫蓋掉一致。 */
   debugCellReadout?: { cell: number; difficulty: number; cursor: Position; cameraOrigin: Position };
   /** `REMAKE-174` 原版Debug Caps Lock+1 是否按住；宿主鍵盤層寫入。 */
@@ -862,8 +873,25 @@ export class GameController {
     return this.stageRuntime.assets;
   }
 
-  get currentMapPresentationActionIds() {
-    return this.stageRuntime.mapPresentationActionIds;
+  /**
+   * 這一關的地圖演出。戰場場景在進場時按它建好全部演出，之後不能再補，所以每一關第一次讀到時
+   * 就定下來：原版Debug開關開著時加上 `ORIGINAL_DEBUG_PRESENTATION_ACTION_IDS`（資源門也一併
+   * 備妥了它們），技術測試與 EDIT 改職業因此不受本關原有技術的限制。
+   */
+  get currentMapPresentationActionIds(): readonly BattleActionId[] {
+    const runtime = this.stageRuntime;
+    const cached = this.presentationIdsByRuntime.get(runtime);
+    if (cached) return cached;
+    const ids: readonly BattleActionId[] = this.originalDebugActive
+      ? [...new Set<BattleActionId>([...runtime.mapPresentationActionIds, ...ORIGINAL_DEBUG_PRESENTATION_ACTION_IDS])]
+      : runtime.mapPresentationActionIds;
+    this.presentationIdsByRuntime.set(runtime, ids);
+    return ids;
+  }
+
+  /** 宿主把資源門的補下載入口交給控制器；沒有時（單元測試）EDIT 視圖像為已備妥。 */
+  setOriginalDebugAssetLoader(loader: (urls: readonly string[]) => Promise<void>): void {
+    this.originalDebugAssetLoader = loader;
   }
 
   /**
@@ -5007,6 +5035,7 @@ export class GameController {
   /** 關掉所有原版Debug的選單、面板與待放置狀態（系統選單、勝負與重開時一併收起）。 */
   private clearOriginalDebugSurfaces(): void {
     this.debugSuspendedSelection = undefined;
+    this.debugClassLoading = undefined;
     this.debugMenu = undefined;
     this.debugBehaviourEditor = undefined;
     this.debugUnitEditor = undefined;
@@ -5318,6 +5347,7 @@ export class GameController {
       roster: this.battle.campaignSnapshot().roster,
       save: this.stageRuntime.save,
       nativeStage: this.battle.stage.nativeStage,
+      benchSlots: new Set(this.battle.debugBenchSlots),
     });
   }
 
@@ -5367,8 +5397,8 @@ export class GameController {
   }
 
   /**
-   * 名字框（`0000:0C10`）：在場的單位立即移出棋盤、畫面保持；本場離場的單位關閉編輯畫面，
-   * 下一次點格放回。其餘槽不能放置（受限版）。
+   * 名字框（`0000:0C10`）：在場的單位立即移出棋盤、畫面保持；可以放置的不在場單位（本場離場、
+   * 部署候選、敵方模板）關閉編輯畫面，下一次點格放上場，圖像在背景先備妥。其餘槽不能放置。
    */
   toggleDebugUnitPresence(slot = this.debugUnitEditorFocusSlot): void {
     const editor = this.debugUnitEditor;
@@ -5380,33 +5410,65 @@ export class GameController {
         this.debugEditsPending = true;
         this.statusMessage = `原版Debug：${unitDisplayName(unit)}已移出戰場。`;
       }
-    } else if (entry.state === "departed" && this.originalDebugHostBeneath !== "idle") {
-      // `[DD]` 原版要到下一次待機點格才放回；複刻只從待機開始放置，不讓它插進選格或轉職選擇。
-      this.statusMessage = "原版Debug：放回單位要在我方待機時進行。";
-    } else if (entry.state === "departed") {
+    } else if (entry.placeable && this.originalDebugHostBeneath !== "idle") {
+      // `[DD]` 原版要到下一次待機點格才放上場；複刻只從待機開始放置，不讓它插進選格或轉職選擇。
+      this.statusMessage = "原版Debug：放置單位要在我方待機時進行。";
+    } else if (entry.placeable) {
       this.debugUnitEditor = undefined;
       this.debugPlacement = { unitId: entry.unitId };
-      this.statusMessage = `原版Debug：點選空格放回${entry.name ?? ""}；右鍵取消。`;
+      this.statusMessage = `原版Debug：點選空格${entry.state === "departed" ? "放回" : "放上"}${entry.name ?? ""}；右鍵取消。`;
+      if (entry.classId) void this.ensureDebugClassAssets(editor.side, entry.classId).catch(() => undefined);
+    } else if (entry.state === "absent") {
+      this.statusMessage = editor.side === 1
+        ? `原版Debug：${entry.name ?? ""}不是這一關的出戰候選，不能放置。`
+        : `原版Debug：${entry.name ?? ""}依專屬腳本行動，不能從這裡放置。`;
     } else {
-      this.statusMessage = entry.state === "absent"
-        ? `原版Debug：${entry.name ?? ""}不在這場戰鬥中，不能放置。`
-        : "原版Debug：這一槽沒有單位。";
+      this.statusMessage = "原版Debug：這一槽沒有單位。";
     }
     this.emit();
   }
 
-  /** 這場戰鬥的資源門已備妥棋子、全景戰鬥圖的職業，才能改成它（否則畫面會缺圖）。 */
-  debugClassAvailable(side: 1 | 2, classId: UnitClassId): boolean {
-    const figure = side === 1
-      ? allyMapUnitAsset(classId)
-      : this.enemyFigureUrl(classId);
-    const atlas = FULL_COMBAT_ATLASES.find(({ id }) => id === `${side === 1 ? "left" : "right"}-${classId}`);
+  /** 這個職業的技術演出這一關有沒有備妥；戰場場景只在進場時建演出，缺的話不能改成它。 */
+  private debugClassPresentationsReady(side: 1 | 2, classId: UnitClassId): boolean {
     const preloaded = new Set<BattleActionId>(this.currentMapPresentationActionIds);
-    return figure !== undefined
-      && atlas !== undefined
-      && stagedRenderAssetAvailable(figure)
-      && fullCombatImageAvailable(atlas.image)
-      && presentationActionIdsForClass(classId, side).every((actionId) => preloaded.has(actionId));
+    return presentationActionIdsForClass(classId, side).every((actionId) => preloaded.has(actionId));
+  }
+
+  /**
+   * 這個職業在這一邊還沒備妥、可以當場下載的圖像：棋子、全景戰鬥圖，以及我方通用身分會換上的
+   * 肖像。這一邊根本沒有棋子或全景圖時回傳 `undefined`。
+   */
+  private debugClassMissingAssetUrls(side: 1 | 2, classId: UnitClassId): string[] | undefined {
+    const figure = side === 1 ? allyMapUnitAsset(classId) : this.enemyFigureUrl(classId);
+    const atlas = FULL_COMBAT_ATLASES.find(({ id }) => id === `${side === 1 ? "left" : "right"}-${classId}`);
+    if (!figure || !atlas) return undefined;
+    const portrait = side === 1 ? classFallbackPortraitFor(classId, 1) : undefined;
+    return [
+      ...(stagedRenderAssetAvailable(figure) ? [] : [figure]),
+      ...(fullCombatImageAvailable(atlas.image) ? [] : [atlas.image]),
+      ...(portrait === undefined
+        ? []
+        : portraitAssetUrlsForRecords([portrait]).filter((url) => !stagedRenderAssetAvailable(url))),
+    ];
+  }
+
+  /** 圖像與演出都已備妥，現在就能改成（或放上）這個職業。 */
+  debugClassAvailable(side: 1 | 2, classId: UnitClassId): boolean {
+    return this.debugClassPresentationsReady(side, classId)
+      && this.debugClassMissingAssetUrls(side, classId)?.length === 0;
+  }
+
+  /** EDIT 可以改成的職業：演出已備妥，圖像已備妥或能當場下載。 */
+  debugClassSelectable(side: 1 | 2, classId: UnitClassId): boolean {
+    return this.debugClassPresentationsReady(side, classId)
+      && this.debugClassMissingAssetUrls(side, classId) !== undefined;
+  }
+
+  /** 補下載職業圖像並補進這一關的租約；已備妥或沒有宿主入口時直接完成。 */
+  private async ensureDebugClassAssets(side: 1 | 2, classId: UnitClassId): Promise<void> {
+    const missing = this.debugClassMissingAssetUrls(side, classId) ?? [];
+    if (missing.length === 0 || !this.originalDebugAssetLoader) return;
+    await this.originalDebugAssetLoader(missing);
   }
 
   enemyFigureUrl(classId: UnitClassId): string {
@@ -5432,15 +5494,47 @@ export class GameController {
       this.emit();
       return;
     }
-    const next = steppedDebugClass(unit.classId, delta, (classId) => this.debugClassAvailable(editor.side, classId));
-    if (next === unit.classId) {
-      this.statusMessage = "原版Debug：這場戰鬥沒有更多可改的職業。";
+    const loading = this.debugClassLoading;
+    if (loading) {
+      this.statusMessage = `原版Debug：正在讀取${className(loading.classId)}的圖像，請稍候。`;
       this.emit();
       return;
     }
-    if (this.battle.debugSetUnitClass(unit.id, next)) {
+    const next = steppedDebugClass(unit.classId, delta, (classId) => this.debugClassSelectable(editor.side, classId));
+    if (next === unit.classId) {
+      this.statusMessage = "原版Debug：沒有更多可改的職業。";
+      this.emit();
+      return;
+    }
+    const missing = this.debugClassMissingAssetUrls(editor.side, next) ?? [];
+    const loader = this.originalDebugAssetLoader;
+    if (missing.length === 0 || !loader) {
+      this.applyDebugUnitClass(unit.id, next);
+      return;
+    }
+    // 這一關沒備妥的職業：當場下載棋子與全景戰鬥圖，載好才改（原版直接改職業陣列）。
+    const battle = this.battle;
+    this.debugClassLoading = { unitId: unit.id, classId: next };
+    this.statusMessage = `原版Debug：正在讀取${className(next)}的圖像……`;
+    this.emit();
+    void loader(missing).then(() => {
+      if (this.debugClassLoading?.unitId !== unit.id || this.battle !== battle) return;
+      this.debugClassLoading = undefined;
+      if (this.debugUnitEditor) this.applyDebugUnitClass(unit.id, next);
+      else this.emit();
+    }, () => {
+      if (this.debugClassLoading?.unitId !== unit.id) return;
+      this.debugClassLoading = undefined;
+      this.statusMessage = `原版Debug：${className(next)}的圖像讀取失敗，請檢查網路後再試。`;
+      this.emit();
+    });
+  }
+
+  private applyDebugUnitClass(unitId: string, classId: UnitClassId): void {
+    const unit = this.battle.unit(unitId);
+    if (unit && this.battle.debugSetUnitClass(unitId, classId)) {
       this.debugEditsPending = true;
-      this.statusMessage = `原版Debug：${unitDisplayName(unit)}改為${className(next)}。`;
+      this.statusMessage = `原版Debug：${unitDisplayName(unit)}改為${className(classId)}。`;
     }
     this.emit();
   }
@@ -5589,22 +5683,59 @@ export class GameController {
     }
   }
 
-  /** 放回一個離場單位：只放在空著、這個職業能站的格上。 */
+  /** EDIT 要放上場的敵方模板（沒有本場離場記錄時）。 */
+  private debugPlacementTemplate(unitId: string): BattleUnit | undefined {
+    if (!unitId.startsWith("2:") || this.battle.debugDepartedUnit(unitId)) return undefined;
+    const definition = debugTemplateEnemyDefinition(
+      this.stageRuntime.save,
+      this.battle.stage.nativeStage,
+      Number(unitId.slice(2)),
+    );
+    return definition ? this.battle.debugTemplateEnemy(definition) : undefined;
+  }
+
+  /** 放上一個不在場的單位：只放在空著、這個職業能站的格上；圖像沒備妥時先下載。 */
   placeDebugUnit(position: Position): void {
     const placement = this.debugPlacement;
     if (!placement) return;
-    const record = this.battle.debugDepartedUnit(placement.unitId);
-    if (!record || !this.battle.debugPlaceUnit(placement.unitId, position)) {
-      this.statusMessage = record
-        ? "原版Debug：這一格不能放置；請選空著、可以站立的格，或按右鍵取消。"
-        : "原版Debug：這個單位已經不能放回。";
-      if (!record) this.debugPlacement = undefined;
+    const template = this.debugPlacementTemplate(placement.unitId);
+    const departed = this.battle.debugDepartedUnit(placement.unitId);
+    const record = this.battle.debugPlacementRecord(placement.unitId) ?? template;
+    if (!record) {
+      this.debugPlacement = undefined;
+      this.statusMessage = "原版Debug：這個單位已經不能放上場。";
+      this.emit();
+      return;
+    }
+    if (!this.debugClassAvailable(record.side, record.classId)) {
+      if (!this.debugClassSelectable(record.side, record.classId)) {
+        this.debugPlacement = undefined;
+        this.statusMessage = `原版Debug：這場戰鬥缺少${record.className}的技術演出，不能放上場。`;
+        this.emit();
+        return;
+      }
+      this.statusMessage = `原版Debug：正在讀取${record.className}的圖像，請稍候再點。`;
+      this.emit();
+      void this.ensureDebugClassAssets(record.side, record.classId).then(() => {
+        if (this.debugPlacement?.unitId !== placement.unitId) return;
+        this.statusMessage = `原版Debug：圖像已備妥，點選空格放上${unitDisplayName(record)}；右鍵取消。`;
+        this.emit();
+      }, () => {
+        this.statusMessage = `原版Debug：${record.className}的圖像讀取失敗，請檢查網路後再試。`;
+        this.emit();
+      });
+      return;
+    }
+    if (!this.battle.debugPlaceUnit(placement.unitId, position, template)) {
+      this.statusMessage = "原版Debug：這一格不能放置；請選空著、可以站立的格，或按右鍵取消。";
       this.emit();
       return;
     }
     this.debugPlacement = undefined;
     this.debugEditsPending = true;
-    this.finishOriginalDebugControlChange(`原版Debug：${unitDisplayName(record)}已放回戰場。`);
+    this.finishOriginalDebugControlChange(
+      `原版Debug：${unitDisplayName(record)}${departed ? "已放回戰場" : "已放上戰場"}。`,
+    );
   }
 
   cancelDebugPlacement(): void {

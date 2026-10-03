@@ -109,6 +109,22 @@ export function createDeployedStageRoster(
   });
 }
 
+/**
+ * `REMAKE-174` 原版Debug EDIT 的部署候選：與部署名單同一套建法（名冊的職業與經驗、未動過的
+ * 槽用模板基線），位置未定，由放置時決定。
+ */
+export function createDeployedStageBenchAllies(
+  config: DeployedStageUnitConfig,
+  difficulty: Difficulty,
+  campaignRoster: readonly SaveRosterEntry[],
+): BattleUnit[] {
+  return createFixedStageUnits({
+    alliedUnits: config.alliedUnits.map((definition) => ({ ...definition, position: { x: 0, y: 0 } })),
+    enemyUnits: [],
+    inheritance: config.inheritance,
+  }, difficulty, campaignRoster);
+}
+
 function campaignRosterWithEligibleBaselines(
   config: DeployedStageUnitConfig & { campaignUnitSlots?: readonly number[] },
   difficulty: Difficulty,
@@ -163,6 +179,7 @@ export function createDeployedStageScenario(
         ? entry
         : { ...(baselineBySlot.get(entry.slot) ?? entry) });
     },
+    debugBenchAllies: (difficulty, roster) => createDeployedStageBenchAllies(config, difficulty, roster),
     enemyClassPriority: config.enemyClassPriority,
     alliedBehaviorById: new Map(
       config.alliedUnits.map(({ slot, aiBehavior }) => [`1:${slot}`, aiBehavior]),

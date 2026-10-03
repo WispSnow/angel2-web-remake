@@ -5842,6 +5842,22 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
   });
 
+  it("migrates version-129 saves by identity when the full EDIT adds the debugPlaced flag (REMAKE-174)", () => {
+    // 完整版 EDIT 新增的 `debugPlaced` 只有原版Debug會寫，v129 的存檔裡不會有，所以逐字段保留。
+    for (const current of [stage8BattleSave(), stage3BattleSave(), battleSave(), completedSave()]) {
+      expect(parseSaveData(JSON.stringify({
+        ...current,
+        version: 129,
+        contentVersion: "ice-cast-experience-construction-zone-1",
+      })), `${current.kind} ${current.stageId}`).toEqual(current);
+    }
+    expect(parseSaveData(JSON.stringify({
+      ...battleSave(),
+      version: 129,
+      contentVersion: "original-debug-edits-1",
+    }))).toBeUndefined();
+  });
+
   it("migrates version-128 saves by identity when ice experience and construction ranges change (REMAKE-177/179)", () => {
     // REMAKE-177 的冰雪经验与 REMAKE-179 的构筑控制区都在下一次施法／构筑时从棋盘重算，
     // 不入档，所以 v128 战中档与完成档逐字段保留。

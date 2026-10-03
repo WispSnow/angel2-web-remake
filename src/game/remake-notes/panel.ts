@@ -174,7 +174,7 @@ function renderControls(): string {
           <div class="rn-control-list">
             ${renderControlRows([
               { keys: ["F1"], action: "游標下單位的 AI 行為" },
-              { keys: ["F2"], action: "我／敵 EDIT、兵種、地型", detail: "移出、放回、改職業與行為；改本場的職業與地形數值" },
+              { keys: ["F2"], action: "我／敵 EDIT、兵種、地型", detail: "移出、放上、改職業與行為；改本場的職業與地形數值" },
               { keys: ["F3", "F4"], action: "敵方／我方全體生命", detail: "全滿、全滅或設為 1" },
               { keys: ["F5", "F6"], action: "技術測試", detail: "游標下任一單位施展任何技術；選格中用完回到原來的選格" },
               { keys: ["F10"], action: "我方全員再行動" },

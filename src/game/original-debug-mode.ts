@@ -1,4 +1,7 @@
+import { presentationActionIdsForClass, type BattleActionId } from "./content/actions";
 import { CLASS_IDS } from "./content/class-catalog.generated";
+import { DEBUG_EDITABLE_CLASS_IDS, DEBUG_TECHNIQUE_ACTION_IDS } from "./content/debug-mode-rules";
+import { mapActionAtlasAssetsForActions } from "./content/map-action-assets";
 import { enemyMapUnitAsset } from "./content/map-unit-assets";
 import {
   DEFAULT_DEBUG_PREFERENCES,
@@ -27,15 +30,31 @@ const storage = (): Storage | undefined => {
 };
 
 /**
- * 兵種／地型編輯器照原版用 side 2 棋子圖列出全部 39 條職業（DS:`022D`）。開關打開時由每關的
- * 資源門一併備妥，編輯器才不必在戰場上另發原始素材請求；士兵、騎兵兩張在戰場共用包裡。
- * 戰鬥中途才打開開關時，這一關沒備妥的棋子框留空。
+ * 開關開著進場時一併備妥的地圖技術演出：技術測試的全部技術，加上 EDIT 可改成的職業在兩邊的
+ * 全部動作。戰場場景在進場那一刻按這份清單建好演出（`createBattleScene`），戰鬥中途沒辦法補，
+ * 所以不像棋子與全景戰鬥圖那樣改到時才下載。第 1 關以後的關卡包本來就含全部演出圖。
+ */
+export const ORIGINAL_DEBUG_PRESENTATION_ACTION_IDS: readonly BattleActionId[] = [...new Set<BattleActionId>([
+  ...DEBUG_TECHNIQUE_ACTION_IDS,
+  ...DEBUG_EDITABLE_CLASS_IDS.flatMap((classId) => [1, 2].flatMap((side) =>
+    presentationActionIdsForClass(classId, side as 1 | 2))),
+])];
+
+/**
+ * 開關打開時每關資源門一併備妥的內容：
+ * - 兵種／地型照原版用 side 2 棋子圖列出全部 39 條職業（DS:`022D`）；士兵、騎兵兩張在戰場共用包裡；
+ * - 上面那份地圖技術演出。
+ *
+ * 戰鬥中途才打開開關時，這一關沒備妥的棋子框留空，缺演出的技術與職業不能選。
  */
 export function originalDebugEditorAssetUrls(): readonly string[] {
   if (!originalDebugModeEnabled()) return [];
-  return CLASS_IDS
-    .filter((classId) => classId !== "soldier" && classId !== "cavalry")
-    .map(enemyMapUnitAsset);
+  return [
+    ...CLASS_IDS
+      .filter((classId) => classId !== "soldier" && classId !== "cavalry")
+      .map(enemyMapUnitAsset),
+    ...mapActionAtlasAssetsForActions(ORIGINAL_DEBUG_PRESENTATION_ACTION_IDS),
+  ];
 }
 
 export function originalDebugModeEnabled(): boolean {

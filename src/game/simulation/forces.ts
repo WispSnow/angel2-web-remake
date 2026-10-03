@@ -277,6 +277,17 @@ export class ForceRegistry {
     this.forceIdByUnitId.set(derivedUnitId, sourceForceId);
   }
 
+  /**
+   * `REMAKE-174` 原版Debug EDIT 放上場、關卡沒替它分配部隊的單位：我方歸玩家指揮的部隊，
+   * 敵方歸第一支敵方部隊（按定義順序，讀檔時重算出同一支）。
+   */
+  assignDebugPlacedUnit(unitId: string, side: Side): void {
+    if (!this.hasExplicitDefinitions() || this.forceIdByUnitId.has(unitId)) return;
+    const sameSide = [...this.definitionsById.values()].filter((definition) => definition.side === side);
+    const force = (side === 1 ? sameSide.find(({ control }) => control === "player") : undefined) ?? sameSide[0];
+    if (force) this.forceIdByUnitId.set(unitId, force.id);
+  }
+
   assertKnownUnits(units: readonly BattleUnit[]): void {
     if (!this.hasExplicitDefinitions()) return;
     const seenIds = new Set<string>();

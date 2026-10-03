@@ -1,18 +1,19 @@
 import { CHARACTER_CATALOG } from "./content/character-catalog.generated";
 import { className, genericUnitName, unitDisplayName, type ClassId } from "./content/classes";
-import { DEBUG_AI_BEHAVIOUR_VALUES, DEBUG_EDITABLE_CLASS_IDS } from "./content/debug-mode-rules";
+import { DEBUG_AI_BEHAVIOUR_VALUES, DEBUG_EDITABLE_CLASS_IDS, isDebugEditableClassId } from "./content/debug-mode-rules";
 import { NATIVE_DEBUG_UNIT_EDITOR } from "./content/debug-mode.generated";
 import type { Stage0Battle } from "./simulation/battle";
 import type { StageSaveSchema } from "./stage-runtime";
-import type { BattleUnit, SaveRosterEntry, Side } from "./types";
+import type { BattleUnit, PortraitRecord, SaveRosterEntry, Side } from "./types";
 
 /**
  * `REMAKE-174` 原版Debug我／敵 EDIT（`0000:0ABE`）的清單。原版每方 60 槽、4 頁 × 15 項，按列優先
- * 排列。用戶 2026-10-02 選擇受限版：
+ * 排列，任何不在場的槽都能放上場。用戶 2026-10-03 選擇的完整版：
  *
  * - 在場：可移出、改職業、改行為；
  * - 本場離場（陣亡或被移出）：可放回；
- * - 其餘槽（未出戰的我方成員、尚未登場的敵人）照樣列出，但不能放置。
+ * - 我方：這一關的部署候選可以放上場；其餘具名角色與通用槽照樣列出，但不能放置；
+ * - 敵方：這一關模板裡的敵人（含還沒登場的增援與劇情登場者）可以放上場；女帝、龍、頭、手不行。
  */
 
 export const DEBUG_EDITOR_SLOTS_PER_PAGE = NATIVE_DEBUG_UNIT_EDITOR.layout.grid.columns
@@ -30,6 +31,8 @@ export interface DebugEditorSlot {
   readonly name?: string;
   /** 在場與離場單位的有效行為值；EDIT 的行為框顯示它。 */
   readonly behaviour?: number;
+  /** 不在場的槽能不能放上場（離場記錄、部署候選、敵方模板）。 */
+  readonly placeable?: boolean;
 }
 
 export interface DebugEditorContext {
@@ -38,6 +41,8 @@ export interface DebugEditorContext {
   readonly roster: readonly SaveRosterEntry[];
   readonly save: StageSaveSchema;
   readonly nativeStage: number;
+  /** 這一關的部署候選槽（`Stage0Battle.debugBenchSlots`）。 */
+  readonly benchSlots: ReadonlySet<number>;
 }
 
 /** 列優先：頁 × 15 + 欄 × 5 + 列（`0000:0C5A`）。 */
@@ -46,10 +51,36 @@ export function debugEditorSlotAt(page: number, column: number, row: number): nu
   return page * DEBUG_EDITOR_SLOTS_PER_PAGE + column * rows + row;
 }
 
-function catalogName(side: Side, slot: number, nativeStage: number): string | undefined {
+function catalogEntry(side: Side, slot: number, nativeStage: number) {
   return CHARACTER_CATALOG.find((entry) => (side === 1
     ? entry.allySlot === slot
-    : entry.enemySlot === slot && entry.appearances.some(({ stage }) => stage === nativeStage)))?.name;
+    : entry.enemySlot === slot && entry.appearances.some(({ stage }) => stage === nativeStage)));
+}
+
+function catalogName(side: Side, slot: number, nativeStage: number): string | undefined {
+  return catalogEntry(side, slot, nativeStage)?.name;
+}
+
+/**
+ * EDIT 放上場的敵方模板：職業取本關存檔清單，具名將領的名字與肖像取角色目錄，其餘照職業的
+ * 通用身分。不在清單裡或屬專用腳本職業時回傳 `undefined`。
+ */
+export function debugTemplateEnemyDefinition(
+  save: StageSaveSchema,
+  nativeStage: number,
+  slot: number,
+): { slot: number; classId: ClassId; name: string; portrait?: PortraitRecord } | undefined {
+  const classId = new Map(save.enemyClassById).get(`2:${slot}`);
+  if (!classId || !isDebugEditableClassId(classId)) return undefined;
+  const entry = catalogEntry(2, slot, nativeStage);
+  return entry
+    ? {
+      slot,
+      classId,
+      name: entry.name,
+      ...(entry.portraitRecord === null ? {} : { portrait: entry.portraitRecord as PortraitRecord }),
+    }
+    : { slot, classId, name: className(classId) };
 }
 
 function behaviourFor(battle: Stage0Battle, unit: BattleUnit): number {
@@ -82,6 +113,7 @@ export function debugEditorSlots(context: DebugEditorContext): DebugEditorSlot[]
         classId: departed.classId,
         name: unitDisplayName(departed),
         behaviour: departed.debugAiBehavior ?? 0,
+        placeable: true,
       };
     }
     const classId = side === 1 ? rosterBySlot.get(slot)?.classId : enemyClassById.get(unitId);
@@ -93,6 +125,7 @@ export function debugEditorSlots(context: DebugEditorContext): DebugEditorSlot[]
       classId,
       name: catalogName(side, slot, context.nativeStage)
         ?? (side === 1 ? genericUnitName({ classId, side, slot }) : className(classId)),
+      placeable: side === 1 ? context.benchSlots.has(slot) : isDebugEditableClassId(classId),
     };
   });
 }

@@ -31,6 +31,7 @@ import {
   techniqueActionIdsFor,
 } from "../content/actions";
 import { isDebugAiBehaviourValue, isDebugEditableClassId, isDebugTechniqueAction } from "../content/debug-mode-rules";
+import { createFixedStageEnemy } from "./fixed-stage-battle";
 import {
   withClassDataValue,
   withTerrainDataValue,
@@ -504,6 +505,13 @@ export interface BattleScenario {
   createCampaignRoster: (difficulty: Difficulty) => SaveRosterEntry[];
   /** Restricts which projected side-1 units write back to the campaign roster. */
   campaignUnitSlots?: readonly number[];
+  /**
+   * `REMAKE-174` 原版Debug EDIT：這一關的部署候選，按部署同一套規則（名冊的職業與經驗、
+   * 名字與肖像）建出、位置未定。沒有部署的關卡不提供。
+   */
+  debugBenchAllies?: (difficulty: Difficulty, campaignRoster: readonly SaveRosterEntry[]) => BattleUnit[];
+  /** 敵方入場時的經驗播種，原版Debug EDIT 放上場的模板敵人照它；省略為按難度。 */
+  enemyExperienceSeeding?: "difficulty" | "none" | "difficulty-unless-lawless";
   enemyClassPriority: Readonly<Partial<Record<ClassId, number>>>;
   alliedBehaviorById?: ReadonlyMap<string, number>;
   enemyBehaviorById?: ReadonlyMap<string, number>;
@@ -548,7 +556,7 @@ export class Stage0Battle {
   focusId = "1:0";
   private readonly campaignRoster: SaveRosterEntry[];
   private campaignRecordCounters = Array<number>(75).fill(0);
-  private readonly campaignUnitSlots: ReadonlySet<number>;
+  private readonly campaignUnitSlots: Set<number>;
   protected readonly forces: ForceRegistry;
   private readonly routePulseByActorId: ReadonlyMap<string, RoutePulseDefinition>;
   private readonly escortRouteByActorId: ReadonlyMap<string, EscortRouteDefinition>;
@@ -878,6 +886,12 @@ export class Stage0Battle {
       this.terrainOverrideByPosition.set(positionKey(override), override.kind);
     }
     this.restoreDerivedForceMemberships();
+    // 關卡自己的增援歸隊規則先做；原版Debug EDIT 放上場、關卡沒管到的單位再照放置時的規則歸隊。
+    for (const unit of this.units) {
+      if (!unit.debugPlaced) continue;
+      this.forces.assignDebugPlacedUnit(unit.id, unit.side);
+      this.adoptDebugPlacedCampaignSlot(unit);
+    }
     this.forces.assertKnownUnits(this.units);
     if (campaignRoster) {
       this.campaignRoster.splice(
@@ -1022,7 +1036,10 @@ export class Stage0Battle {
       }
       this.units.splice(index, 1);
     }
-    if (this.unit(pending.after.id) || this.unitAt(pending.after)) {
+    const occupant = this.unit(pending.after.id) ?? this.unitAt(pending.after);
+    // `[SR]` 原版Debug EDIT 先把同一槽或那一格放上場了：替補與形態轉換讓給它（原版會蓋掉棋盤格）。
+    if (occupant?.debugPlaced) return clonePendingUnitTransformation(pending);
+    if (occupant) {
       throw new Error("unit transformation destination is occupied");
     }
     if (pending.forceSourceId && pending.after.id !== pending.before.id) {
@@ -1042,7 +1059,11 @@ export class Stage0Battle {
       const group = groups.get(rootId) ?? [];
       group.push(unit);
       groups.set(rootId, group);
-      if (unit.id !== rootId) this.forces.inheritUnit(rootId, unit.id);
+      if (unit.id !== rootId) {
+        // 原版Debug EDIT 放上場的水戰士：分身繼承部隊之前，母體先照放置時的規則歸隊。
+        if (unit.debugPlaced) this.forces.assignDebugPlacedUnit(rootId, unit.side);
+        this.forces.inheritUnit(rootId, unit.id);
+      }
     }
     for (const [rootId, group] of groups) {
       const root = group.find(({ id }) => id === rootId);
@@ -1867,17 +1888,21 @@ export class Stage0Battle {
     forceInheritance: readonly { sourceUnitId: string; derivedUnitId: string }[] = [],
   ): readonly string[] {
     const existingIds = new Set(this.units.map(({ id }) => id));
+    // `[SR]` 原版Debug EDIT 已經把這一槽放上場：劇情登場跳過它，不再重複寫一個。
+    const debugPlacedIds = new Set(this.units.filter(({ debugPlaced }) => debugPlaced).map(({ id }) => id));
     const appendedIds = new Set<string>();
     for (const unit of units) {
+      if (debugPlacedIds.has(unit.id)) continue;
       if (existingIds.has(unit.id) || appendedIds.has(unit.id)) {
         throw new Error(`duplicate story unit id ${unit.id}`);
       }
       appendedIds.add(unit.id);
     }
     for (const inheritance of forceInheritance) {
+      if (!appendedIds.has(inheritance.derivedUnitId)) continue;
       this.forces.inheritUnit(inheritance.sourceUnitId, inheritance.derivedUnitId);
     }
-    this.units.push(...units.map((unit) => ({
+    this.units.push(...units.filter(({ id }) => appendedIds.has(id)).map((unit) => ({
       ...unit,
       statuses: { ...unit.statuses },
     })));
@@ -4439,13 +4464,63 @@ export class Stage0Battle {
   }
 
   /**
-   * EDIT 名字框（不在場）之後的點格：把離場記錄放回。原版生命回滿、其餘沿用記錄，且不檢查
-   * 佔用、地形或重複；`[SR]` 只放在空著、這個職業能站的格上，冰封與已行動清除。
+   * EDIT 放上場的部署候選照常寫回戰役名冊：這一場沒派出的候選本來不在寫回名單裡。關卡明列寫回
+   * 名單時（來賓不寫回）照關卡。
    */
-  debugPlaceUnit(id: string, position: Position): boolean {
-    const record = this.debugDepartedUnit(id);
+  private adoptDebugPlacedCampaignSlot(unit: BattleUnit): void {
+    if (unit.side !== 1 || this.scenario.campaignUnitSlots !== undefined) return;
+    if (this.debugBenchSlots.includes(unit.slot)) this.campaignUnitSlots.add(unit.slot);
+  }
+
+  /** EDIT 可以放上場的部署候選槽（這一關有部署時）。 */
+  get debugBenchSlots(): readonly number[] {
+    return (this.scenario.debugBenchAllies?.(this.difficulty, this.campaignRoster) ?? []).map(({ slot }) => slot);
+  }
+
+  /**
+   * EDIT 名字框（不在場）可以放上場的我方記錄：本場離場的優先，否則是這一關的部署候選，
+   * 職業與經驗照目前的戰役名冊。原版放的是該槽在記憶體裡的單位記錄。
+   */
+  debugPlacementRecord(id: string): BattleUnit | undefined {
+    if (this.unit(id)) return undefined;
+    const departed = this.debugDepartedUnit(id);
+    if (departed) return departed;
+    if (!id.startsWith("1:")) return undefined;
+    const bench = this.scenario.debugBenchAllies?.(this.difficulty, this.campaignRoster)
+      .find((candidate) => candidate.id === id);
+    return bench ? cloneBattleUnit(bench) : undefined;
+  }
+
+  /**
+   * EDIT 的敵方模板單位：職業、名字與肖像由呼叫端從本關的存檔清單與角色目錄給，經驗照本關
+   * 敵方入場時的播種（原版模組 29 開戰時對全部 side 2 記錄做同一次播種）。
+   */
+  debugTemplateEnemy(definition: {
+    slot: number;
+    classId: ClassId;
+    name: string;
+    portrait?: PortraitRecord;
+  }): BattleUnit {
+    return createFixedStageEnemy(
+      { ...definition, position: { x: 0, y: 0 }, aiBehavior: 0 },
+      this.difficulty,
+      this.scenario.enemyExperienceSeeding,
+    );
+  }
+
+  /**
+   * EDIT 名字框（不在場）之後的點格：把離場記錄、部署候選或敵方模板放上場。原版生命回滿、
+   * 其餘沿用記錄，且不檢查佔用、地形或重複；`[SR]` 只放在空著、這個職業能站的格上，冰封與
+   * 已行動清除。不是放回離場記錄的單位標記 `debugPlaced`，並照放置規則歸隊。
+   */
+  debugPlaceUnit(id: string, position: Position, template?: BattleUnit): boolean {
+    const departed = this.debugDepartedUnit(id);
+    const record = departed
+      ?? (template?.id === id && template.side === 2 ? template : this.debugPlacementRecord(id));
     if (
       !record
+      || this.unit(id)
+      || (!departed && !isDebugEditableClassId(record.classId))
       || this.pendingTransformations.length > 0
       || position.x < 0
       || position.y < 0
@@ -4462,7 +4537,10 @@ export class Stage0Battle {
       acted: false,
       actionDisabled: false,
       statuses: { ...record.statuses },
+      ...(departed ? {} : { debugPlaced: true as const }),
     };
+    this.forces.assignDebugPlacedUnit(unit.id, unit.side);
+    this.adoptDebugPlacedCampaignSlot(unit);
     this.units.push(unit);
     this.debugDepartedUnits.delete(id);
     this.recordCampaignUnit(unit);

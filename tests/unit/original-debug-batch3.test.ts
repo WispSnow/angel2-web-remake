@@ -91,12 +91,18 @@ describe("REMAKE-174 batch 3 content", () => {
     expect(isSelectableDebugTerrainSlot(23)).toBe(false);
   });
 
-  it("prepares every side-2 figure the editors list only while the switch is on", () => {
+  it("prepares every side-2 figure the editors list and every map presentation only while the switch is on", () => {
     expect(originalDebugEditorAssetUrls()).toEqual([]);
     setOriginalDebugModeEnabled(true);
     const urls = originalDebugEditorAssetUrls();
-    expect(urls).toHaveLength(37);
+    expect(urls.filter((url) => url.startsWith("/assets/original/technique-lab/units/"))).toHaveLength(37);
     expect(urls).toContain("/assets/original/technique-lab/units/enemy-hand.png");
+    // 戰場場景只在進場時建地圖演出，所以全部技術演出圖在進場時一併備妥（PNG 與 JSON 成對）。
+    const actionAtlases = urls.filter((url) => url.startsWith("/assets/original/map-action-atlases/"));
+    expect(actionAtlases.length).toBeGreaterThan(0);
+    expect(actionAtlases.filter((url) => url.endsWith(".png"))).toHaveLength(
+      actionAtlases.filter((url) => url.endsWith(".json")).length,
+    );
   });
 });
 

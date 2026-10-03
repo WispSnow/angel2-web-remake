@@ -135,8 +135,8 @@ export const ORIGINAL_DEBUG_UI_MARKUP = `
       <span class="debug-edit-text" data-debug-edit-text="exit"
         style="left:${px(EDIT.exit.text.x - EDIT.exit.x - 1)};top:${px(EDIT.exit.text.y - EDIT.exit.y - 1)}"></span>
     </button>
-    <p class="debug-edit-help" data-testid="debug-edit-help">方向鍵選槽　Enter 移出／放回　－／＋ 職業　［／］ 行為　PageUp／PageDown 換頁　Esc 返回<br>
-      棋子框與行為框：左鍵上一個、右鍵下一個。職業只開放這場戰鬥已備妥圖像的普通職業。</p>
+    <p class="debug-edit-help" data-testid="debug-edit-help">方向鍵選槽　Enter 移出／放上　－／＋ 職業　［／］ 行為　PageUp／PageDown 換頁　Esc 返回<br>
+      棋子框與行為框：左鍵上一個、右鍵下一個。可改成任何普通職業，沒備妥的圖像當場下載。</p>
   </section>
   ${ORIGINAL_DEBUG_DATA_EDITORS_MARKUP}
   <section class="music-box-panel modal-panel" id="music-box" data-testid="music-box"
@@ -172,9 +172,11 @@ const escapeHtml = (text: string): string => text
 const behaviourLabel = (value: number | undefined): string =>
   value === undefined ? "" : NATIVE_DEBUG_BEHAVIOUR_EDITOR.labels[value]?.label ?? String(value);
 
-const stateLabel = (state: string): string => state === "present"
+const stateLabel = (state: string, placeable: boolean): string => state === "present"
   ? "在場"
-  : state === "departed" ? "已離場，可放回" : "不在這場戰鬥";
+  : state === "departed"
+    ? "已離場，可放回"
+    : placeable ? "不在場，可放上" : "不在這場戰鬥";
 
 /** 棋子圖只在這場戰鬥的資源租約裡有它時才顯示，不為除錯介面另發原始素材請求。 */
 function figureSource(controller: GameController, side: 1 | 2, classId: UnitClassId): string | undefined {
@@ -467,6 +469,9 @@ function renderUnitEditor(
     element.dataset.slot = String(slot);
     element.dataset.state = entry?.state ?? "empty";
     element.dataset.classId = entry?.classId ?? "";
+    element.dataset.placeable = String(entry?.placeable === true);
+    // 改到這一關沒備妥的職業時，棋子框在圖像下載期間變暗。
+    element.dataset.loading = String(entry !== undefined && controller.debugClassLoading?.unitId === entry.unitId);
     element.classList.toggle("is-focused", slot === focus);
     const image = element.querySelector<HTMLImageElement>(".debug-edit-figure img");
     if (image) {
@@ -492,7 +497,7 @@ function renderUnitEditor(
         mode: "normal",
         ink: palette(present ? EDIT.name.present.ink : EDIT.name.absent.ink),
         outline: palette(present ? EDIT.name.present.outline : EDIT.name.absent.outline),
-      }, entry?.name ? `${entry.name}（${stateLabel(entry.state)}）` : "空槽");
+      }, entry?.name ? `${entry.name}（${stateLabel(entry.state, entry.placeable === true)}）` : "空槽");
     }
     const behaviour = element.querySelector<HTMLElement>("[data-debug-edit-text=behaviour]");
     if (behaviour) {

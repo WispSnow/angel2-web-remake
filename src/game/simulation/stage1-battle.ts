@@ -23,6 +23,7 @@ import type { DeploymentRosterUnit } from "../deployment-session";
 import { validateDeploymentResult, type DeploymentResult } from "./deployment";
 import { DeterministicRng } from "./rng";
 import {
+  createDeployedStageBenchAllies,
   createDeployedStageRoster,
   createDeployedStageUnits,
   type DeployedStageUnitConfig,
@@ -117,6 +118,8 @@ export class Stage1Battle extends Stage0Battle {
       },
       createUnits: (difficulty) => createStage1Units(difficulty, campaign.roster, deployment),
       createCampaignRoster: () => completeCampaignRoster(campaign.roster),
+      debugBenchAllies: (difficulty, roster) =>
+        createDeployedStageBenchAllies(STAGE1_UNIT_CONFIG, difficulty, roster),
       enemyClassPriority: STAGE1_AI_CLASS_PRIORITY,
       enemyBehaviorById: new Map(
         STAGE1_SEMANTIC_ENEMY_UNITS.map(({ slot, aiBehavior }) => [`2:${slot}`, aiBehavior]),
