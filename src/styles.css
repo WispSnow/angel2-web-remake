@@ -2400,6 +2400,24 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 /* `REMAKE-174`「原版Debug」：宿主開關，開啟時沿用畫面縮放的選中金色，讓玩家一眼看出
    這一局戰鬥的 Caps Lock 熱鍵是活的。 */
 .original-debug-trigger { display: flex; margin-right: 4px; }
+/* 自繪提示：字級用 CSS px，隨頁面縮放（原生 title 不會）；位置由 mountOriginalDebugModeToggle 設定。 */
+.original-debug-tip {
+  position: fixed;
+  z-index: 6000;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(34em, calc(100vw - 16px));
+  padding: 8px 12px;
+  border: 1px solid #d4a62d;
+  color: #fff4c7;
+  background: #160d0eef;
+  font: 14px/1.6 system-ui, sans-serif;
+  text-align: left;
+  pointer-events: none;
+}
+.original-debug-tip[hidden] { display: none; }
+.original-debug-tip p { margin: 0; }
+.original-debug-tip p + p { margin-top: 4px; color: #e7d7ac; }
 .original-debug-trigger > button {
   padding: 3px 10px;
   border: 1px solid #4b3527;

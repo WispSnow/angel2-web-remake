@@ -201,9 +201,15 @@ export const ORIGINAL_DEBUG_HOTKEY_SUMMARY =
 export function mountOriginalDebugModeToggle(host: HTMLElement): () => void {
   const group = document.createElement("div");
   group.className = "original-debug-trigger";
-  group.innerHTML = `<button type="button" data-testid="original-debug-toggle">原版Debug</button>`;
+  // 提示用自繪 DOM 而不用 `title`：原生提示由系統畫、字級固定，不隨頁面縮放。
+  group.innerHTML = `<button type="button" data-testid="original-debug-toggle"
+    aria-describedby="original-debug-tip">原版Debug</button>
+    <div class="original-debug-tip" id="original-debug-tip" data-testid="original-debug-tip"
+      role="tooltip" hidden><p></p><p></p></div>`;
   const button = group.querySelector<HTMLButtonElement>("button");
-  if (!button) return () => undefined;
+  const tip = group.querySelector<HTMLElement>(".original-debug-tip");
+  const tipLines = group.querySelectorAll<HTMLElement>(".original-debug-tip p");
+  if (!button || !tip || tipLines.length !== 2) return () => undefined;
   // 熱鍵要 Caps Lock 開著才生效，而瀏覽器看到的狀態不一定與鍵盤燈一致（輸入法可能吃掉這個鍵），
   // 所以開關開著時把遊戲實際讀到的狀態畫在按鈕自己的外緣（`data-caps-engaged`）並寫進懸浮提示。
   // 不另放標籤：工具列一行放不下時按鈕會折成兩行。
@@ -211,9 +217,30 @@ export function mountOriginalDebugModeToggle(host: HTMLElement): () => void {
   const renderLamp = () => {
     const enabled = originalDebugModeEnabled();
     button.dataset.capsEngaged = String(enabled && capsLockOn);
-    button.title = enabled
-      ? `${capsLockOn ? CAPS_LOCK_ON_TITLE : CAPS_LOCK_OFF_TITLE}\n${ORIGINAL_DEBUG_HOTKEY_SUMMARY}`
-      : `原版Debug模式。${ORIGINAL_DEBUG_HOTKEY_SUMMARY}`;
+    tipLines[0].textContent = enabled
+      ? (capsLockOn ? CAPS_LOCK_ON_TITLE : CAPS_LOCK_OFF_TITLE)
+      : "原版Debug模式。";
+    tipLines[1].textContent = ORIGINAL_DEBUG_HOTKEY_SUMMARY;
+    if (!tip.hidden) placeTip();
+  };
+  // 固定定位、右緣對齊按鈕，再夾進視窗：工具列在頁面底部，窄視窗時提示不能溢出左右邊界。
+  const placeTip = () => {
+    const anchor = button.getBoundingClientRect();
+    const margin = 8;
+    const width = tip.offsetWidth;
+    const left = Math.min(Math.max(margin, anchor.right - width), window.innerWidth - width - margin);
+    tip.style.left = `${Math.max(margin, left)}px`;
+    tip.style.bottom = `${window.innerHeight - anchor.top + 6}px`;
+  };
+  const showTip = () => {
+    tip.hidden = false;
+    placeTip();
+  };
+  // 指標點擊會把焦點還給遊戲（見 click），失焦不能把游標仍停在按鈕上的提示收掉；
+  // 反過來指標離開也不收鍵盤聚焦中的提示。
+  const hideTipUnlessHeld = () => {
+    if (button.matches(":hover") || button.matches(":focus-visible")) return;
+    tip.hidden = true;
   };
   const observe = (event: KeyboardEvent | PointerEvent) => {
     const next = capsLockAfter(event);
@@ -245,7 +272,14 @@ export function mountOriginalDebugModeToggle(host: HTMLElement): () => void {
     if (event.detail > 0) button.blur();
   };
   button.addEventListener("click", click);
-  group.addEventListener("keydown", (event) => event.stopPropagation());
+  button.addEventListener("pointerenter", showTip);
+  button.addEventListener("pointerleave", hideTipUnlessHeld);
+  button.addEventListener("focus", showTip);
+  button.addEventListener("blur", hideTipUnlessHeld);
+  group.addEventListener("keydown", (event) => {
+    event.stopPropagation();
+    if (event.key === "Escape") tip.hidden = true;
+  });
   host.append(group);
   const unsubscribe = onOriginalDebugModeChange(render);
   render(originalDebugModeEnabled());

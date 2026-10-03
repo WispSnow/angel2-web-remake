@@ -114,14 +114,38 @@ test("the 原版Debug switch arms the native Caps Lock menus and survives a relo
   await expect(page.getByTestId("original-debug-toggle")).toHaveAttribute("aria-pressed", "true");
 });
 
+test("the 原版Debug tooltip is a scalable DOM tip that survives the click and hides on leave", async ({ page }) => {
+  await openBattle(page, "stage-00-player");
+  const toggle = page.getByTestId("original-debug-toggle");
+  const tip = page.getByTestId("original-debug-tip");
+  await expect(toggle).not.toHaveAttribute("title", /.+/);
+  await toggle.hover();
+  await expect(tip).toBeVisible();
+  await expect(tip).toContainText("原版Debug模式");
+  // 點擊會把焦點還給遊戲；游標仍在按鈕上，提示留著並換成開啟後的說明。
+  await toggle.click();
+  await expect(tip).toBeVisible();
+  await expect(tip).toContainText("Caps Lock 未開啟");
+  // CSS px 字級才會隨頁面縮放；原生 title 做不到。
+  expect(await tip.evaluate((element) => getComputedStyle(element).fontSize)).toBe("14px");
+  const box = await tip.boundingBox();
+  const viewport = page.viewportSize();
+  expect(box && viewport && box.x >= 0 && box.x + box.width <= viewport.width).toBe(true);
+  await page.mouse.move(2, 2);
+  await expect(tip).toBeHidden();
+});
+
 test("with Caps Lock on, F1–F4 never fall back to the group commands inside a command menu", async ({ page }) => {
   await openDebugBattle(page, "stage-05-player");
   const lamp = page.getByTestId("original-debug-toggle");
   await expect(lamp).toHaveAttribute("data-caps-engaged", "false");
-  await expect(lamp).toHaveAttribute("title", /Caps Lock 未開啟/);
+  await lamp.hover();
+  const tip = page.getByTestId("original-debug-tip");
+  await expect(tip).toBeVisible();
+  await expect(tip).toContainText("Caps Lock 未開啟");
   await page.keyboard.down("CapsLock");
   await expect(lamp).toHaveAttribute("data-caps-engaged", "true");
-  await expect(lamp).toHaveAttribute("title", /Caps Lock 已開啟/);
+  await expect(tip).toContainText("Caps Lock 已開啟");
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await testState(page)).actionMode).toBe("actionMenu");
   // 指令選單開著：F1 不是「全軍休息」，只提示先關閉選單；F4 也不會要求撤退。
