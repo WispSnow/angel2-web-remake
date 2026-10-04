@@ -63,8 +63,11 @@ describe("stage 32 battle simulation", () => {
     expect(battle.forceForUnit("2:6")).toMatchObject({
       id: "feiluyin-fumaroni-alliance", control: "independent-ai",
     });
+    // The empress is never a candidate here; her slot stays in the roster, rebuilt to
+    // full life like every other slot at battle start (`REMAKE-077`).
     expect(battle.campaignSnapshot().roster[23]).toMatchObject({
-      classId: "empress", life: 380,
+      classId: "empress",
+      life: battle.statsFor({ classId: "empress", experience: 0, side: 1 }).maxLife,
     });
     expect(battle.outcome()).toBe("ongoing");
   });

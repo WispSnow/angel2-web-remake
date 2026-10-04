@@ -95,4 +95,32 @@ describe("stage 6 battle simulation", () => {
     expect(battle.campaignSnapshot().roster).toEqual(rosterBefore);
     expect(() => battle.appendStoryUnits([storyUnit])).toThrow("duplicate story unit id");
   });
+
+  /**
+   * The victory tableau writes slots 0–7 back onto the board from the roster, so
+   * a slot's roster life is what the tableau shows. Battle records written before
+   * `REMAKE-077` covered off-board slots could still hold the life a slot ended an
+   * earlier stage with — Kins (slot 7) is never a stage 6 candidate. Only the
+   * slots this battle writes back may differ from the stage-entry rebuild.
+   */
+  it("reads a battle record back with every slot it never wrote refilled", () => {
+    const battle = new Stage6Battle(campaign, deployment);
+    const { units, ...snapshot } = battle.serializableSnapshot();
+    const fellHere = new Map([[2, 0], [7, 0], [14, 5]]);
+    const savedRoster = battle.campaignSnapshot().roster.map((entry) => ({
+      ...entry,
+      life: fellHere.get(entry.slot) ?? entry.life,
+    }));
+    const restored = new Stage6Battle(campaign, deployment);
+    restored.restore({ ...snapshot, units: units.filter(({ id }) => id !== "1:2") }, savedRoster);
+    const life = (slot: number) =>
+      restored.campaignSnapshot().roster.find((entry) => entry.slot === slot)?.life;
+    const maxLife = (slot: number) =>
+      restored.statsFor({ ...savedRoster[slot], side: 1 }).maxLife;
+    // Deployed and fallen in this battle: the tableau keeps the native slot's 0.
+    expect(life(2)).toBe(0);
+    // Never on this board (Kins) or left on the bench: the stage-entry rebuild.
+    expect(life(7)).toBe(maxLife(7));
+    expect(life(14)).toBe(maxLife(14));
+  });
 });

@@ -893,6 +893,34 @@ describe("stage runtime manifest", () => {
   });
 
   /**
+   * `REMAKE-077`: native `0000:536B` rebuilds all side-1 slots and refills their
+   * life when a battle starts, not only the ones the template or deployment puts
+   * on the board. A slot left off the board can still be written in by a story
+   * event — stage 21's scouts, Kins in stage 6's tableau — and it used to arrive
+   * with the life it ended the previous stage with, so the fallen showed 0.
+   */
+  it("enters every stage with each campaign roster slot rebuilt to full life", async () => {
+    const fallen = completeCampaignRoster([]).map((entry) => ({ ...entry, life: 0 }));
+    const stale: string[] = [];
+    for (const difficulty of [0, 3] as const) {
+      for (const stageId of Object.keys(STAGE_RUNTIME_MANIFEST) as StageId[]) {
+        const runtime = await loadStageRuntime(stageId);
+        const battle = runtime.createBattle(
+          { ...campaign, stageId, difficulty, roster: fallen },
+          runtime.preparation?.createInitialResult(),
+        );
+        for (const entry of battle.campaignSnapshot().roster) {
+          const maxLife = battle.statsFor({ ...entry, side: 1 }).maxLife;
+          if (entry.life !== maxLife) {
+            stale.push(`${stageId}@${difficulty} slot ${entry.slot}: ${entry.life}/${maxLife}`);
+          }
+        }
+      }
+    }
+    expect(stale).toEqual([]);
+  });
+
+  /**
    * `BattleScene` preloads map-action atlases once, from the stage manifest.
    * A unit that reaches the board later cannot add one, so an action whose
    * atlas was never listed throws inside the render — the controller's

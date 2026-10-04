@@ -1914,6 +1914,8 @@ export class GameController {
         ?? sourceUnit?.experience
         ?? rosterEntry?.experience
         ?? 0;
+      // A roster slot that has not fought in this battle holds the stage-entry
+      // rebuild (`REMAKE-077`), never the life it ended the previous stage with.
       const inheritedLife = actor.forcedClassId === undefined
         ? sourceUnit?.life ?? rosterEntry?.life
         : undefined;

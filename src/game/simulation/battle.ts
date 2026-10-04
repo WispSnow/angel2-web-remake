@@ -496,6 +496,19 @@ export interface RouteMoveResult {
   reachedExit: boolean;
 }
 
+/**
+ * `REMAKE-077`：原版新战 `0000:536B` 经 `540D` 重建 side 1 全部 57 槽并回满生命，不只是开局
+ * 在场的槽。没上场的槽之后仍可能由剧情写上棋盘（第 21 关四名斥候、第 6 关台阵里的琴斯），
+ * 所以名册生命同样按职业与经验重建；否则上一关阵亡者会以生命 0 出现在下一关的剧情里。
+ */
+function rebuiltCampaignRosterEntry(
+  entry: SaveRosterEntry,
+  difficulty: Difficulty,
+): SaveRosterEntry {
+  const { classId, experience } = entry;
+  return { ...entry, life: statsFor({ classId, experience, side: 1 }, difficulty).maxLife };
+}
+
 export type RestorableBattleSnapshot = Pick<
   SavedBattleState,
   "round" | "focusId" | "units" | "enemyAi"
@@ -622,7 +635,8 @@ export class Stage0Battle {
       escortRouteByActorId.set(definition.actorId, definition);
     }
     this.escortRouteByActorId = escortRouteByActorId;
-    this.campaignRoster = scenario.createCampaignRoster(difficulty);
+    this.campaignRoster = scenario.createCampaignRoster(difficulty)
+      .map((entry) => rebuiltCampaignRosterEntry(entry, difficulty));
     this.campaignUnitSlots = new Set(
       scenario.campaignUnitSlots
         ?? this.units.filter(({ side }) => side === 1).map(({ slot }) => slot),
@@ -830,7 +844,8 @@ export class Stage0Battle {
     battle.campaignRoster.splice(
       0,
       battle.campaignRoster.length,
-      ...completeCampaignRoster(campaign.roster),
+      ...completeCampaignRoster(campaign.roster)
+        .map((entry) => rebuiltCampaignRosterEntry(entry, campaign.difficulty)),
     );
     battle.setCampaignRecordCounters(campaign.recordCounters);
     return battle;
@@ -900,10 +915,15 @@ export class Stage0Battle {
     }
     this.forces.assertKnownUnits(this.units);
     if (campaignRoster) {
+      // 战斗只写回 `campaignUnitSlots`，其余槽始终是入场重建的满血。修复前写出的战中档
+      // 可能还带着上一关的阵亡或残血，读取时按同一规则重建；本关阵亡者的 0 照留。
       this.campaignRoster.splice(
         0,
         this.campaignRoster.length,
-        ...completeCampaignRoster(campaignRoster),
+        ...completeCampaignRoster(campaignRoster).map((entry) =>
+          this.campaignUnitSlots.has(entry.slot)
+            ? entry
+            : rebuiltCampaignRosterEntry(entry, this.difficulty)),
       );
     }
   }
