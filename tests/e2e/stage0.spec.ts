@@ -209,6 +209,23 @@ interface DebugState {
 }
 
 const debugState = (page: Page) => page.evaluate(() => window.__ANGEL2__?.getState() as DebugState);
+// A movement presentation only lives while the unit walks. Waiting for it and
+// then reading `getState()` again can land after the walk ended under suite
+// load, so the snapshot is serialized in the same poll that matched.
+const waitForMovementState = async (
+  page: Page,
+  kind: NonNullable<DebugState["movementPresentation"]>["kind"],
+  unitId: string | null = null,
+): Promise<DebugState & { movementPresentation: NonNullable<DebugState["movementPresentation"]> }> => {
+  const snapshot = await page.waitForFunction(([expectedKind, expectedUnitId]) => {
+    const state = window.__ANGEL2__?.getState() as DebugState | undefined;
+    const movement = state?.movementPresentation;
+    if (movement?.kind !== expectedKind) return false;
+    if (expectedUnitId !== null && movement.unitId !== expectedUnitId) return false;
+    return JSON.stringify(state);
+  }, [kind, unitId] as const);
+  return JSON.parse(await snapshot.jsonValue() as string);
+};
 const waitForPhase = (page: Page, phase: string) => page.waitForFunction((expected) => window.__ANGEL2__?.getState().phase === expected, phase);
 const clickCanvas = (page: Page, x: number, y: number) => page.getByTestId("battle-canvas").click({ position: { x, y } });
 const expectNativeDialogueGeometry = async (page: Page, slot: "upper" | "lower") => {
@@ -606,9 +623,9 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await dialoguePortrait.evaluate((portrait) => { portrait.removeAttribute("data-force-blink-frame"); });
 
   await skipStoryDialogue(page);
-  await page.waitForFunction(() => window.__ANGEL2__?.getState().movementPresentation?.kind === "scripted");
-  const openingMovement = (await debugState(page)).movementPresentation!;
-  expect((await debugState(page)).consumedEventIds).toEqual([
+  const openingMovementState = await waitForMovementState(page, "scripted");
+  const openingMovement = openingMovementState.movementPresentation;
+  expect(openingMovementState.consumedEventIds).toEqual([
     "stage-00-prebattle-story",
     "stage-00-opening-move",
   ]);
@@ -1171,12 +1188,8 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   });
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-all-rest-command-dialogue.png" });
   await finishGroupCommandDialogue(page);
-  await page.waitForFunction(() => {
-    const movement = window.__ANGEL2__?.getState().movementPresentation;
-    return movement?.kind === "enemy" && movement.unitId === "2:15";
-  });
-  const enemyMovementState = await debugState(page);
-  const enemyMovement = enemyMovementState.movementPresentation!;
+  const enemyMovementState = await waitForMovementState(page, "enemy", "2:15");
+  const enemyMovement = enemyMovementState.movementPresentation;
   expect(enemyMovement.unitId).toBe("2:15");
   const enemyDestination = enemyMovement.path.at(-1)!;
   expect(enemyMovementState.cursor).toEqual(enemyDestination);
@@ -1501,8 +1514,7 @@ test("S00-F: named cavalry identity and route evacuation are visible end to end"
   await page.evaluate(() => window.__ANGEL2__?.forceEvacuationSetup());
   expect((await debugState(page)).units.filter((unit) => unit.side === 2)).toHaveLength(1);
   await page.keyboard.press("F1");
-  await page.waitForFunction(() => window.__ANGEL2__?.getState().movementPresentation?.kind === "enemy");
-  const enemyMovement = (await debugState(page)).movementPresentation!;
+  const enemyMovement = (await waitForMovementState(page, "enemy")).movementPresentation;
   expect(enemyMovement.path.length).toBeGreaterThan(1);
   expect(enemyMovement.path.at(-1)).toEqual({ x: 24, y: 47 });
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-enemy-route-movement.png" });
@@ -1719,8 +1731,7 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
   await finishGroupCommandDialogue(page);
   await waitForPhase(page, "allyAuto");
   await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
-  await page.waitForFunction(() => window.__ANGEL2__?.getState().movementPresentation?.kind === "allyAuto");
-  const alliedMovement = (await debugState(page)).movementPresentation!;
+  const alliedMovement = (await waitForMovementState(page, "allyAuto")).movementPresentation;
   expect(alliedMovement.path.length).toBeGreaterThan(1);
   for (let index = 1; index < alliedMovement.path.length; index += 1) {
     expect(Math.abs(alliedMovement.path[index - 1].x - alliedMovement.path[index].x)
