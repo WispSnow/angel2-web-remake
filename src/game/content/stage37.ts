@@ -138,6 +138,11 @@ export const STAGE37_ASSETS = {
     "enemy-head": "/assets/original/technique-lab/units/enemy-head.png",
     "enemy-hand": "/assets/original/technique-lab/units/enemy-hand.png",
   },
+  // Slot 55 stores class 39: stats fall back to record 38 (手), but module 29
+  // keeps 39 in DS:318C as the figure frame, so it draws the right arm A/11/39.
+  unitFiguresById: {
+    "2:55": "/assets/original/technique-lab/units/enemy-hand-right.png",
+  },
   audio: {
     playerEntry: musicAsset("MUSIC", 33),
     playerLoop: musicAsset("MUSIC", 32),

@@ -146,9 +146,42 @@ describe("stage 37 generated content", () => {
       STAGE37_ASSETS.map,
       STAGE37_ASSETS.minimap,
       ...Object.values(STAGE37_ASSETS.unitSprites),
+      ...Object.values(STAGE37_ASSETS.unitFiguresById),
       ...Object.values(STAGE37_ASSETS.audio),
     ]) {
       expect((await readFile(path.join(workspace, "public", source))).length).toBeGreaterThan(0);
     }
+  });
+
+  // Module 29 draws scene-37 side-2 figures from A/11 with frame = stored class
+  // (DS:318C). The A/3 records 37/38 are 24x13 / 16x14 fragments, and slot 55's
+  // stored class 39 picks the right arm even though its stats use record 38.
+  it("draws the head and both arms from their full-size A/11 frames", async () => {
+    const figureSize = async (source: string) => {
+      const png = await readFile(path.join(workspace, "public", source));
+      return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+    };
+    expect(STAGE37_ASSETS.unitFiguresById).toEqual({
+      "2:55": "/assets/original/technique-lab/units/enemy-hand-right.png",
+    });
+    const figures = [
+      STAGE37_ASSETS.unitSprites["enemy-head"],
+      STAGE37_ASSETS.unitSprites["enemy-hand"],
+      STAGE37_ASSETS.unitFiguresById["2:55"],
+    ];
+    for (const source of figures) {
+      expect(await figureSize(source)).toEqual({ width: 40, height: 45 });
+    }
+    expect(new Set(await Promise.all(figures.map(async (source) =>
+      sha256(await readFile(path.join(workspace, "public", source))))))).toHaveProperty("size", 3);
+  });
+
+  it.skipIf(!EVIDENCE_AVAILABLE)("ships the A/11 boss-part frames byte-for-byte", async () => {
+    const planar = (record: number) =>
+      readFile(path.join(workspace, `reverse/renders/planar/A/0011/${record}.png`));
+    const shipped = (source: string) => readFile(path.join(workspace, "public", source));
+    expect(await shipped(STAGE37_ASSETS.unitSprites["enemy-head"])).toEqual(await planar(37));
+    expect(await shipped(STAGE37_ASSETS.unitSprites["enemy-hand"])).toEqual(await planar(38));
+    expect(await shipped(STAGE37_ASSETS.unitFiguresById["2:55"])).toEqual(await planar(39));
   });
 });

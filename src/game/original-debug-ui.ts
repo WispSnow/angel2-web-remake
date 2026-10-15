@@ -428,7 +428,14 @@ function renderBehaviourEditor(
   panel.dataset.unitId = unit.id;
   panel.dataset.current = String(current ?? "");
   // `[DD]` 原版這裡固定取 side 2 圖組（DS:`022D`）；複刻畫單位自己在棋盤上的棋子，不另發素材請求。
-  showFigure(figure, figureSource(controller, unit.side, unit.classId), mapUnitVisualOffset(unit.classId, unit.side));
+  const ownFigure = unit.debugClassEdit === true ? undefined : controller.currentStageAssets?.unitFiguresById?.[unit.id];
+  showFigure(
+    figure,
+    ownFigure && stagedRenderAssetAvailable(ownFigure)
+      ? stagedRenderAssetSource(ownFigure)
+      : figureSource(controller, unit.side, unit.classId),
+    mapUnitVisualOffset(unit.classId, unit.side),
+  );
   highlight.hidden = false;
   highlight.style.top = px(BEHAVIOUR.highlight.yBase + editor.index * BEHAVIOUR.labels.pitch - BEHAVIOUR.panel.y);
   for (const row of panel.querySelectorAll<HTMLElement>(".debug-behaviour-row")) {

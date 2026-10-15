@@ -23,3 +23,19 @@ export function mapUnitVisualOffset(classId: UnitClassId, side: Side): number {
     MAP_UNIT_VISUAL_OFFSETS[classId as keyof typeof MAP_UNIT_VISUAL_OFFSETS];
   return offsets?.[side] ?? 0;
 }
+
+/**
+ * Downward shifts for figures taller than the ordinary 43-row frame. Module 29
+ * draws a figure with its top-left on the cell's top-left; the scene anchors
+ * the bottom at row 43 instead, which only coincides for 43-row frames. The
+ * scene-37 boss parts are 40x45 opaque A/11 frames whose painted wall matches
+ * the stage 37 map pixel-for-pixel at that top-left origin.
+ */
+export const MAP_UNIT_VERTICAL_OFFSETS = {
+  head: 2,
+  hand: 2,
+} as const satisfies Readonly<Partial<Record<UnitClassId, number>>>;
+
+export function mapUnitVerticalOffset(classId: UnitClassId): number {
+  return MAP_UNIT_VERTICAL_OFFSETS[classId as keyof typeof MAP_UNIT_VERTICAL_OFFSETS] ?? 0;
+}

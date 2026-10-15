@@ -656,10 +656,11 @@ for (const [record, classId] of classIds.entries()) {
   const allySource = path.join(planarRoot, "0002", frame);
   // A/0003/36 contains the Dragon's native side-2 colors but stores palette
   // index zero as an opaque background. A/0011/36 has identical visible RGB
-  // and carries the transparent silhouette used on the map. Records 37/38 are
-  // different-sized boss-part resources in A/0011, so keep this correction
-  // specific to record 36.
-  const enemySource = path.join(planarRoot, record === 36 ? "0011" : "0003", frame);
+  // and carries the transparent silhouette used on the map. Records 37/38
+  // only exist as figures in A/0011: module 29 draws every scene-37 side-2
+  // figure from A/11 (descriptor DS:022D), while A/0003/37 and /38 are 24x13
+  // and 16x14 fragments that no map path ever selects.
+  const enemySource = path.join(planarRoot, record >= 36 ? "0011" : "0003", frame);
   const allyOutput = path.join(unitDirectory, allyFilename);
   const enemyOutput = path.join(unitDirectory, enemyFilename);
   const ally = record <= 35
@@ -678,6 +679,10 @@ for (const [record, classId] of classIds.entries()) {
     enemy: `/assets/original/technique-lab/units/${enemyFilename}`,
   };
 }
+// Scene 37 stores class 39 for the second hand (slot 55). Module 29
+// `0000:510C` clamps only the descriptor lookup to record 38 and keeps 39 in
+// DS:318C, which is the figure frame index, so that hand draws A/0011/39.
+await copyFile(path.join(planarRoot, "0011", "39.png"), path.join(unitDirectory, "enemy-hand-right.png"));
 
 const lightningDefinitions = Object.fromEntries(lightningActions.map((presentation) => {
   const tier = lightningTiers.find(({ code }) => code === presentation.code);

@@ -35,8 +35,18 @@ export interface StageRuntimeAssets {
   storyBackground?: string;
   storyBackgrounds?: Readonly<Partial<Record<number, string>>>;
   unitSprites: Readonly<Partial<Record<MapUnitSpriteKey, string>>>;
+  /** 同職業但原版另取棋子幀的單位（鍵為單位 id）；優先於 `unitSprites`。 */
+  unitFiguresById?: Readonly<Record<string, string>>;
   routePulsePresentations?: readonly RoutePulsePresentationDefinition[];
   enemyPhaseTailPresentations?: readonly EnemyPhaseTailPresentationDefinition[];
+}
+
+/** 這一關要預先備妥的全部棋子圖 URL：`unitSprites` 加上逐單位的 `unitFiguresById`。 */
+export function stageFigureUrls(assets: StageRuntimeAssets | undefined): string[] {
+  return [
+    ...Object.values(assets?.unitSprites ?? {}),
+    ...Object.values(assets?.unitFiguresById ?? {}),
+  ];
 }
 
 export interface RoutePulsePresentationDefinition {
@@ -1873,6 +1883,7 @@ async function loadStage37Module(): Promise<StageRuntimeModule> {
       map: content.STAGE37_ASSETS.map,
       minimap: content.STAGE37_ASSETS.minimap,
       unitSprites: content.STAGE37_ASSETS.unitSprites,
+      unitFiguresById: content.STAGE37_ASSETS.unitFiguresById,
     },
     preparation,
     createBattle,

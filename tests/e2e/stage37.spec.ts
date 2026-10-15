@@ -102,6 +102,16 @@ test("S37-A–E: the stage-36 route enters deployment, SAY/0081, and the three-p
 test("S37-F: boss HUD conceals all numeric fields while preserving the gauges", async ({ page }) => {
   await page.goto("/?debugScenario=stage-37-player&difficulty=0&test=1");
   await waitForPhase(page, "player");
+  // Slot 55 stores class 39, so it draws the right arm (A/11/39) rather than
+  // sharing the left hand's frame; all three parts come from the A/11 group.
+  await expect.poll(async () => {
+    const textures = await page.getByTestId("battle-canvas").getAttribute("data-unit-texture-by-id");
+    const byId = JSON.parse(textures ?? "{}") as Record<string, string>;
+    return [byId["2:56"], byId["2:54"], byId["2:55"]];
+  }).toEqual(["enemy-head", "enemy-hand", "unit-figure-2:55"]);
+  await captureVisualAudit(page.getByTestId("battle-canvas"), {
+    path: `${ARTIFACT_DIR}/stage37-goddess-figures.png`,
+  });
   await clickCell(page, 23, 11);
   const detail = page.getByTestId("unit-detail");
   await expect(detail).toHaveAttribute("data-concealed-stats", "true");

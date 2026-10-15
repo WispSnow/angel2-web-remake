@@ -213,6 +213,7 @@ import {
   isPlayableStageId,
   loadStageRuntime,
   STAGE_RUNTIME_MANIFEST,
+  stageFigureUrls,
   stageRuntimeSourceForDestination,
   type LoadedStageRuntime,
 } from "./stage-runtime";
@@ -844,7 +845,7 @@ export class GameController {
 
   /** 目前這一關 `unitSprites` 的原始 URL；資源門要把它們一起備妥。 */
   get stageUnitSpriteUrls(): readonly string[] {
-    return Object.values(this.stageRuntime.assets?.unitSprites ?? {});
+    return stageFigureUrls(this.stageRuntime.assets);
   }
 
   /** 目前這一關是否有部署階段；資源門用它決定要不要一併備妥部署介面模組。 */
@@ -1056,7 +1057,7 @@ export class GameController {
       return {
         allyClassIds,
         encounterClassIds: [...encounterClassIds],
-        unitSpriteUrls: Object.values(runtime.assets?.unitSprites ?? {}),
+        unitSpriteUrls: stageFigureUrls(runtime.assets),
         nativeStage: runtime.definition.nativeStage,
         portraitRecords: [...portraitRecords].sort((left, right) => left - right),
         usesDeploymentSurface: runtime.preparation !== undefined,

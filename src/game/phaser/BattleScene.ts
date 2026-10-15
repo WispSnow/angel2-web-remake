@@ -7,7 +7,7 @@ import {
   actionPresentationCatalog,
 } from "../content/actions";
 import { allyMapUnitAsset, allyMapUnitAssetsForClasses } from "../content/map-unit-assets";
-import { mapUnitVisualOffset } from "../content/map-unit-presentation";
+import { mapUnitVerticalOffset, mapUnitVisualOffset } from "../content/map-unit-presentation";
 import type { GameController } from "../controller";
 import type { BattleUnit, Position } from "../types";
 import { iceFrameAtGlobalIndex, lightningFrameAtMainIndex } from "../map-technique-presentation";
@@ -55,6 +55,7 @@ const TURN_TRANSITION_BUFFER_SOURCE_Y = 200;
 const TURN_TRANSITION_SCREEN_Y = 155;
 const TURN_TRANSITION_BUFFER_HEIGHT = 132;
 const EDGE_PAN_INTERVAL_MS = 110;
+const unitFigureTextureKey = (unitId: string): string => `unit-figure-${unitId}`;
 const MAP_HIT_FRAME_TIMELINE = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
 const NATIVE_CURSOR_SHADOW = 0x000000;
 const NATIVE_CURSOR_HIGHLIGHT = 0xffffff;
@@ -334,6 +335,9 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       Object.entries(stageAssets?.unitSprites ?? {}).forEach(([key, source]) => {
         if (allyFigures.has(key)) return;
         this.load.image(key, stagedRenderAssetSource(source));
+      });
+      Object.entries(stageAssets?.unitFiguresById ?? {}).forEach(([unitId, source]) => {
+        this.load.image(unitFigureTextureKey(unitId), stagedRenderAssetSource(source));
       });
       const battleSpriteSources = [
         ...ASSETS.mapCombat.hit,
@@ -1029,6 +1033,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         if (this.textures.exists(stageKey)) return stageKey;
         return "ally-soldier";
       }
+      // 原版Debug改過職業的單位不再沿用原槽的專屬幀。
+      if (stageAssets?.unitFiguresById?.[unit.id] && unit.debugClassEdit !== true) {
+        return unitFigureTextureKey(unit.id);
+      }
       const stageKey = `enemy-${unit.classId}`;
       if (this.textures.exists(stageKey) || this.pendingAllyFigureKeys.has(stageKey)) return stageKey;
       return "enemy-soldier";
@@ -1044,7 +1052,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
 
     private createUnitView(unit: BattleUnit): UnitView {
       const container = this.add.container(this.unitWorldX(unit), unit.y * TILE_HEIGHT + 43).setDepth(5);
-      const sprite = this.add.image(this.unitVisualOffset(unit), 0, this.textureFor(unit)).setOrigin(0.5, 1);
+      const sprite = this.add.image(this.unitVisualOffset(unit), mapUnitVerticalOffset(unit.classId), this.textureFor(unit))
+        .setOrigin(0.5, 1);
       const iceDisabledOverlay = hasIcePresentation
         ? addMapActionImage(this,
           this.unitWorldX(unit),
@@ -1161,7 +1170,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         const figurePending = !this.textures.exists(texture) && this.pendingAllyFigureKeys.has(texture);
         view.sprite.setTexture(texture);
         renderedTextureByUnitId[unit.id] = view.sprite.texture.key;
-        view.sprite.setX(this.unitVisualOffset(unit));
+        view.sprite.setPosition(this.unitVisualOffset(unit), mapUnitVerticalOffset(unit.classId));
         view.sprite.setAlpha(1);
         view.sprite.clearTint();
         const routePulseDisplayedLife = routePulsePresentation?.displayedLifeByUnitId[unit.id];
