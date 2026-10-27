@@ -31,6 +31,12 @@ export interface EscortRouteDefinition {
   actorId: string;
   width: number;
   movement: number;
+  /**
+   * `REMAKE-183`: below this share of maximum life the actor rests instead of
+   * walking on, unless this turn's landing already boards. Absent means native
+   * behavior 12, which walks whatever its life.
+   */
+  restBelowLifePercent?: number;
   waypoints: readonly EscortRouteWaypoint[];
   victoryMaximumCell: number;
 }
@@ -53,6 +59,11 @@ export function assertEscortRouteDefinition(
     || definition.movement <= 0
     || definition.waypoints.length === 0) {
     throw new Error(`Invalid escort route ${definition.actorId}`);
+  }
+  const { restBelowLifePercent } = definition;
+  if (restBelowLifePercent !== undefined
+    && (!Number.isInteger(restBelowLifePercent) || restBelowLifePercent <= 0 || restBelowLifePercent > 100)) {
+    throw new Error(`Escort route ${definition.actorId} has an invalid rest threshold`);
   }
   const insideBattlefield = ({ x, y }: Position): boolean =>
     x >= 0 && y >= 0 && x < battlefield.width && y < battlefield.height;
@@ -133,6 +144,25 @@ export function planEscortRoutePath(
     if (!best || landsBetter(candidate, best)) best = candidate;
   }
   return best?.path ?? [origin];
+}
+
+/**
+ * `REMAKE-183`: whether the actor rests this turn instead of taking `path`.
+ * Below the threshold she stops so the escort can catch up and heal her, but a
+ * landing that boards ends the stage and is never passed up. A wounded actor
+ * with no progress to make rests rather than standing idle (`REMAKE-143`).
+ */
+export function escortRouteRests(
+  definition: EscortRouteDefinition,
+  actor: BattleUnit,
+  maximumLife: number,
+  path: readonly Position[],
+): boolean {
+  if (definition.restBelowLifePercent === undefined || actor.life >= maximumLife) return false;
+  const landing = path.at(-1) ?? actor;
+  if (landing.y * definition.width + landing.x <= definition.victoryMaximumCell) return false;
+  if (path.length <= 1) return true;
+  return actor.life * 100 < maximumLife * definition.restBelowLifePercent;
 }
 
 /** Least remaining route cost; then an arrival cell; then the cheaper walk. */

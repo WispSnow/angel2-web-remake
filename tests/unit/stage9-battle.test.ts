@@ -45,13 +45,14 @@ describe("stage 9 battle simulation", () => {
       .toMatchObject({ classId: "curse-master", experience: 299 });
   });
 
-  it("moves Dori along the native three-waypoint route with movement seven", () => {
+  it("moves Dori along the native three-waypoint route with movement six (REMAKE-183)", () => {
     const battle = new Stage9Battle(campaign, deployment);
     const action = battle.planAlliedAiAction("1:9");
     expect(action).toMatchObject({ unitId: "1:9", kind: "move" });
     expect(action?.path[0]).toEqual({ x: 16, y: 38 });
     expect(action?.path.at(-1)?.y).toBeLessThan(38);
-    expect(action?.path.length).toBeLessThanOrEqual(7);
+    // Entry cost must stay strictly below the budget, so six allows five open-ground steps.
+    expect(action?.path.length).toBeLessThanOrEqual(6);
   });
 
   /** Ship-side blockade only: the western cluster would otherwise stall her beside a blocker. */
@@ -89,7 +90,9 @@ describe("stage 9 battle simulation", () => {
     expect(final.y).toBeGreaterThanOrEqual(17);
     for (const cell of landings.slice(0, -1)) expect(cell.y * 50 + cell.x).toBeGreaterThan(933);
     expect(landings.some(({ x, y }) => x >= 31 && y >= 22 && y <= 23)).toBe(true);
-    expect(landings.length).toBeLessThanOrEqual(18);
+    // REMAKE-183: at six she crosses the row-23 forest (cost 3) one cell a turn,
+    // in step with six-movement escorts, so the static walk takes 20 turns instead of 13.
+    expect(landings.length).toBeLessThanOrEqual(20);
   });
 
   it("stays on the valley legs at the cells where Manhattan scoring used to turn north", () => {
@@ -108,10 +111,10 @@ describe("stage 9 battle simulation", () => {
     expect(monk).toMatchObject({ x: 34, y: 18 });
     Object.assign(requireDori(battle), { x: 34, y: 19 });
     expect(battle.planAlliedAiAction("1:9")?.path.at(-1)).toEqual({ x: 33, y: 18 });
-    // The debug fixture parks her on cell 983; one independent action must still finish the stage,
-    // and from there the cheaper approach around the monk reaches 883 next to the bow.
+    // The debug fixture parks her on cell 983; one independent action must still finish the stage.
+    // With six movement (REMAKE-183) the step onto 933 beside the monk is the arrival she takes.
     Object.assign(requireDori(battle), { x: 33, y: 19 });
-    expect(battle.planAlliedAiAction("1:9")?.path.at(-1)).toEqual({ x: 33, y: 17 });
+    expect(battle.planAlliedAiAction("1:9")?.path.at(-1)).toEqual({ x: 33, y: 18 });
   });
 
   it("waits instead of wandering when nothing reachable shortens the route", () => {
@@ -124,6 +127,32 @@ describe("stage 9 battle simulation", () => {
       Object.assign(blocker, wall[index]);
     }
     expect(battle.planAlliedAiAction("1:9")).toMatchObject({ kind: "wait", path: [{ x: 34, y: 20 }] });
+    // REMAKE-183: walled in and wounded, she recovers instead of standing idle.
+    const dori = requireDori(battle);
+    dori.life = battle.statsFor(dori).maxLife - 1;
+    expect(battle.planAlliedAiAction("1:9")).toMatchObject({ kind: "rest", path: [{ x: 34, y: 20 }] });
+  });
+
+  it("rests Dori below 40% life instead of walking on (REMAKE-183)", () => {
+    const battle = new Stage9Battle(campaign, deployment);
+    const dori = requireDori(battle);
+    const maxLife = battle.statsFor(dori).maxLife;
+    const boundary = Math.ceil(maxLife * 40 / 100);
+    dori.life = boundary - 1;
+    expect(battle.planAlliedAiAction("1:9")).toMatchObject({ kind: "rest", path: [{ x: 16, y: 38 }] });
+    dori.life = boundary;
+    expect(battle.planAlliedAiAction("1:9")).toMatchObject({ kind: "move" });
+    // The rest is the ordinary 15% recovery and spends her action.
+    dori.life = boundary - 1;
+    expect(battle.rest("1:9")).toBe(Math.floor(maxLife * 15 / 100));
+    expect(dori.acted).toBe(true);
+  });
+
+  it("still boards a wounded Dori, because the arrival cell ends the stage (REMAKE-183)", () => {
+    const battle = shipSideBattle();
+    Object.assign(requireDori(battle), { x: 34, y: 19, life: 1 });
+    expect(battle.planAlliedAiAction("1:9")).toMatchObject({ kind: "move" });
+    expect(battle.planAlliedAiAction("1:9")?.path.at(-1)).toEqual({ x: 33, y: 18 });
   });
 
   it("wins by Dori reaching cell 933 or by elimination, with defeat precedence", () => {

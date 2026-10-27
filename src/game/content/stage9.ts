@@ -141,7 +141,16 @@ export const STAGE9_SEMANTIC_ENEMY_UNITS = STAGE9_ENEMY_UNITS.map((unit) => {
   };
 });
 
-export const STAGE9_ESCORT_ROUTE_DEFINITION = STAGE9_ESCORT_ROUTE satisfies EscortRouteDefinition;
+/**
+ * `REMAKE-183`：生成的 `STAGE9_ESCORT_ROUTE.movement` 保留原版行为 12 的移动覆盖 7。
+ * 复刻的专家 AI 会集火最脆的多莉，7 格只有高阶职业跟得上，所以预算降为 6，
+ * 并在生命低于 40%（与专家 AI 的非首领休息门槛相同）时原地休息等护卫赶上。
+ */
+export const STAGE9_ESCORT_ROUTE_DEFINITION = {
+  ...STAGE9_ESCORT_ROUTE,
+  movement: 6,
+  restBelowLifePercent: 40,
+} satisfies EscortRouteDefinition;
 
 export const STAGE9_ASSETS = {
   map: "/assets/original/stage9-map.png",

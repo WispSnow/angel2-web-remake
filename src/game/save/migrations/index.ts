@@ -771,6 +771,24 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-183 slows stage 9's 多莉 to six movement and lets her rest when
+ * wounded. Her route is replanned from the public board every action and the
+ * budget and threshold come from stage content, so a v131 save only moves to
+ * the current identity.
+ */
+function migrateVersion131Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 131
+    || value.contentVersion !== "stage-03-first-corps-flank-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-182 moves stage 3's slot-47 soldier from 莎第二軍團 into the first
  * corps. Corps membership is rebuilt from stage content and the counterattack
  * event's board condition only shrinks from seven slots to six, so every v130
@@ -3649,6 +3667,8 @@ function migratePreviousSaveData(raw: unknown): SaveData | undefined {
   const value = restoreStage11PursuerIdentity(
     rescaleLinearEnemyExperience(restoreOriginalStageTitle(addStage3CounterattackCompletion(raw))),
   );
+  const migratedVersion131 = migrateVersion131Save(value);
+  if (migratedVersion131) return migratedVersion131;
   const migratedVersion130 = migrateVersion130Save(value);
   if (migratedVersion130) return migratedVersion130;
   const migratedVersion129 = migrateVersion129Save(value);

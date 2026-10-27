@@ -18,6 +18,7 @@ import {
   STAGE9_TERRAIN_TOKENS,
   activateStage9Content,
 } from "../../src/game/content/stage9";
+import { STAGE9_ESCORT_ROUTE } from "../../src/game/content/stage9-runtime.generated";
 import { RUNTIME_STAGE_DEFINITIONS } from "../../src/game/content/stages";
 
 const workspace = path.resolve(import.meta.dirname, "../..");
@@ -67,9 +68,12 @@ describe("stage 9 generated content", () => {
     expect(STAGE9_SEMANTIC_ENEMY_UNITS.find(({ slot }) => slot === 19)).toMatchObject({
       classId: "land-knight", name: "西艾蕾", portrait: 5, position: { x: 17, y: 20 },
     });
+    // REMAKE-183：生成内容保留原版移动覆盖 7，关卡定义改用 6 并在低于 40% 时休息。
+    expect(STAGE9_ESCORT_ROUTE.movement).toBe(7);
     expect(STAGE9_ESCORT_ROUTE_DEFINITION).toEqual({
       actorId: "1:9",
-      movement: 7,
+      movement: 6,
+      restBelowLifePercent: 40,
       width: 50,
       waypoints: [
         {

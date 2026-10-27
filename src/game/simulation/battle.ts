@@ -117,6 +117,7 @@ import {
 } from "./route-pulse";
 import {
   assertEscortRouteDefinition,
+  escortRouteRests,
   planEscortRoutePath,
   type EscortRouteDefinition,
 } from "./escort-route";
@@ -2328,6 +2329,9 @@ export class Stage0Battle {
     const escortRoute = this.escortRouteByActorId.get(id);
     if (escortRoute) {
       const path = planEscortRoutePath(escortRoute, unit, this.units, this.dynamicBattlefield);
+      if (escortRouteRests(escortRoute, unit, this.statsFor(unit).maxLife, path)) {
+        return this.tagLowLifeRest(unit, { unitId: id, kind: "rest", path: [{ x: unit.x, y: unit.y }] });
+      }
       return { unitId: id, kind: path.length > 1 ? "move" : "wait", path };
     }
 

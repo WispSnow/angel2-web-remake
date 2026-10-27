@@ -5842,6 +5842,23 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
   });
 
+  it("migrates version-131 saves by identity when stage 9's 多莉 walks six and rests when wounded (REMAKE-183)", () => {
+    // 多莉的路线每次行动都从棋盘重算，移动预算与休息门槛来自关卡内容，都不入档，
+    // 所以 v131 战中档与完成档逐字段保留。
+    for (const current of [stage9BattleSave(), stage3BattleSave(), battleSave(), completedSave()]) {
+      expect(parseSaveData(JSON.stringify({
+        ...current,
+        version: 131,
+        contentVersion: "stage-03-first-corps-flank-1",
+      })), `${current.kind} ${current.stageId}`).toEqual(current);
+    }
+    expect(parseSaveData(JSON.stringify({
+      ...battleSave(),
+      version: 131,
+      contentVersion: "original-debug-full-edit-1",
+    }))).toBeUndefined();
+  });
+
   it("migrates version-130 saves by identity when stage 3's slot 47 joins the first corps (REMAKE-182)", () => {
     // 军团编组由关卡内容重建、不入档；对白事件的棋盘条件从七个槽缩成六个，带事件的 v130
     // 战中档必然已满足，所以战中档与完成档逐字段保留。

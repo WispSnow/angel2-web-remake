@@ -133,7 +133,8 @@ test("S09-D/E: the corrected objective and Dori route trigger SAY/23 without sta
   const after = await state(page);
   const doriAfter = after.units.find(({ id }) => id === "1:9");
   expect(doriAfter && doriAfter.y * 50 + doriAfter.x).toBeLessThanOrEqual(933);
-  expect(doriAfter).toMatchObject({ x: 33, y: 17 });
+  // REMAKE-183: with six movement she boards on 933, the arrival cell beside the monk.
+  expect(doriAfter).toMatchObject({ x: 33, y: 18 });
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "23");
   await expect(page.getByTestId("dialogue-window-lower")).toContainText("我已經登上飛船了");
   await captureVisualAudit(page.getByTestId("game-screen"), {
