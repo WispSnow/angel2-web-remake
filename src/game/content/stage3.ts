@@ -191,9 +191,12 @@ export const STAGE3_FOURTH_CORPS_NAMED_ACTORS = STAGE3_SEMANTIC_ALLIED_UNITS
 /** Force ids shared by the battle, its REMAKE-172 event and the save schema. */
 export const STAGE3_FOURTH_CORPS_FORCE_ID = "fourth-corps";
 export const STAGE3_SECOND_CORPS_FORCE_ID = "sha-second-corps";
-/** 莎第二军团（阻击救援队）的七个敌方槽，按原版行动顺序。 */
+/**
+ * 莎第二军团（阻击救援队）的六个敌方槽，按原版行动顺序。右翼士兵槽 47 自
+ * `REMAKE-182` 起改编入第一军团，见 `stage3-battle.ts`。
+ */
 export const STAGE3_SECOND_CORPS_UNIT_IDS = [
-  "2:44", "2:45", "2:47", "2:46", "2:50", "2:48", "2:49",
+  "2:44", "2:45", "2:46", "2:50", "2:48", "2:49",
 ] as const;
 
 const stage3Speaker = (slot: number): { portrait: PortraitRecord; speaker: string } => {

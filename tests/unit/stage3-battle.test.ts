@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPromotionEligible } from "../../src/game/content/classes";
+import { isPromotionEligible, promotionTargetsFor } from "../../src/game/content/classes";
 import {
   STAGE3_DEFINITION,
   STAGE3_FOURTH_CORPS_COUNTERATTACK_DIALOGUE,
@@ -10,6 +10,7 @@ import {
 import { NATIVE_FONT_CHARACTERS } from "../../src/game/content/native-font.generated";
 import { STAGE_RUNTIME_MANIFEST } from "../../src/game/stage-runtime";
 import { completeCampaignRoster, initialEnemyExperience } from "../../src/game/content/stage0";
+import type { AlliedAiAction } from "../../src/game/simulation/ai-contracts";
 import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
 import type { CampaignState, UnitClassId } from "../../src/game/types";
 
@@ -52,6 +53,60 @@ const archerFollowerCampaign: CampaignState = {
  */
 const keepAlliesAndDistantInterceptor = (battle: Stage3Battle): void => {
   battle.units = battle.units.filter((unit) => unit.side === 1 || unit.id === "2:49");
+};
+
+/** Commits one planned AI action the way the controller does, minus presentation. */
+const commitAiAction = (battle: Stage3Battle, actorId: string, action: AlliedAiAction | undefined): void => {
+  if (!action) {
+    battle.spendAction(actorId);
+    return;
+  }
+  const steps = action.path.slice(1);
+  for (const [index, step] of steps.entries()) {
+    battle.moveUnitStep(action.unitId, step, index < steps.length - 1);
+  }
+  if (action.kind === "attack" && action.targetId) {
+    battle.attack(action.unitId, action.targetId);
+  } else if (action.kind === "special" && action.actionId && action.targetId) {
+    battle.commitPreparedAction(battle.prepareSpecialAction({
+      actionId: action.actionId,
+      actorId: action.unitId,
+      targetId: action.targetId,
+    }));
+  } else if (action.kind === "rest") {
+    battle.rest(action.unitId);
+  } else {
+    battle.spendAction(action.unitId);
+  }
+  for (const id of battle.promotionQueue()) {
+    const unit = battle.unit(id);
+    if (unit) battle.promote(id, promotionTargetsFor(unit.classId)[0].id);
+  }
+};
+
+/** The fourth corps' automatic phase and the enemy phase; the player force stays put. */
+const runAutomaticRound = (battle: Stage3Battle, idleEnemyIds: ReadonlySet<string>): void => {
+  const allies = new Set(battle.alliedActionOrder(false));
+  while (allies.size > 0) {
+    const selection = battle.selectNextAlliedAiAction([...allies]);
+    if (!selection) break;
+    allies.delete(selection.unitId);
+    commitAiAction(battle, selection.unitId,
+      selection.action ?? battle.planAlliedAiAction(selection.unitId));
+  }
+  battle.clearActionState(1);
+  battle.clearActionDisableState(1);
+  battle.beginEnemyPhase();
+  const enemies = new Set(battle.enemyActionOrder().filter((id) => !idleEnemyIds.has(id)));
+  while (enemies.size > 0) {
+    const selection = battle.selectNextEnemyAiAction([...enemies]);
+    if (!selection) break;
+    enemies.delete(selection.unitId);
+    if (!battle.unit(selection.unitId)) continue;
+    commitAiAction(battle, selection.unitId,
+      selection.action ?? battle.planEnemyAiAction(selection.unitId));
+  }
+  battle.startNextRound();
 };
 
 describe("stage 3 battle construction and stable-remake automation", () => {
@@ -190,6 +245,11 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     });
     expect(battle.forceForUnit("2:44")).toMatchObject({
       tacticLabel: "阻擊救援隊",
+    });
+    // REMAKE-182：右翼士兵槽 47 编入第一军团。
+    expect(battle.forceForUnit("2:47")).toMatchObject({
+      id: "sha-first-corps",
+      tacticLabel: "壓制第四軍團",
     });
     expect(battle.planAlliedAiAction("1:40")).toBeDefined();
   });
@@ -336,7 +396,7 @@ describe("stage 3 battle construction and stable-remake automation", () => {
   });
 
   describe("fourth corps release after the second corps falls (REMAKE-172)", () => {
-    const SECOND_CORPS_IDS = ["2:44", "2:45", "2:47", "2:46", "2:50", "2:48", "2:49"];
+    const SECOND_CORPS_IDS: readonly string[] = STAGE3_SECOND_CORPS_UNIT_IDS;
     const meleeBesideFirstCorps = (survivingSecondCorpsIds: readonly string[]) => {
       const battle = new Stage3Battle(campaign);
       battle.units = battle.units.filter((unit) => !SECOND_CORPS_IDS.includes(unit.id)
@@ -389,6 +449,8 @@ describe("stage 3 battle construction and stable-remake automation", () => {
       expect(battle.releasedForceIds(automaticIds)).toEqual([]);
       battle.units = battle.units.filter((unit) => unit.id !== "2:49");
       expect(battle.releasedForceIds(automaticIds)).toEqual(["fourth-corps"]);
+      // REMAKE-182：槽 47 已归第一军团，它还在场不会拖住解除。
+      expect(battle.unit("2:47")).toBeDefined();
       // 手动救援队从来没有固守教义，不会被报告。
       expect(battle.releasedForceIds(["1:1", "1:40"])).toEqual([]);
     });
@@ -599,13 +661,38 @@ describe("stage 3 battle construction and stable-remake automation", () => {
       expect(battle.isPlayerControllableAlly(action!.targetId!)).toBe(!expectsAutomatic);
     };
 
-    for (const id of ["2:42", "2:41", "2:40", "2:43"]) {
+    for (const id of ["2:42", "2:41", "2:40", "2:43", "2:47"]) {
       assertAssignedTarget(id, true);
     }
-    for (const id of ["2:44", "2:45", "2:47", "2:46", "2:50", "2:48", "2:49"]) {
+    for (const id of STAGE3_SECOND_CORPS_UNIT_IDS) {
       assertAssignedTarget(id, false);
     }
 
+  });
+
+  it("wears down a three-sister fourth corps that nobody comes to rescue (REMAKE-182)", () => {
+    // 玩家反馈：无法无天下黛西三人全转修女，原先五人的第一军团打不倒任何人，救援队可以一直
+    // 不来。这里只留第四军团、第一军团、希蜜与远处一名第二军团（保持固守），即没有援军的围攻。
+    const battle = new Stage3Battle({ ...untouchedCampaign, difficulty: 3 });
+    battle.grantScriptedExperience(STAGE3_FOURTH_CORPS_NAMED_ACTORS, 1);
+    for (const id of battle.promotionQueue()) battle.promote(id, "sister");
+    const fourthCorpsIds = battle.alliedActionOrder(false);
+    battle.units = battle.units.filter((unit) => fourthCorpsIds.includes(unit.id)
+      || unit.id === "1:1"
+      || unit.id === "2:49"
+      || battle.forceForUnit(unit.id)?.id === "sha-first-corps");
+    const idleInterceptor = new Set(["2:49"]);
+
+    let firstLoss: number | undefined;
+    while (battle.round <= 40 && firstLoss === undefined) {
+      if (battle.unit("1:1")) battle.spendAction("1:1");
+      const round = battle.round;
+      runAutomaticRound(battle, idleInterceptor);
+      if (fourthCorpsIds.some((id) => !battle.unit(id))) firstLoss = round;
+    }
+    // 修复前 99 回合无人阵亡；加入槽 47 后在第 25 回合前后开始减员，而非开局即折损。
+    expect(firstLoss, "the fourth corps should start losing members").toBeDefined();
+    expect(firstLoss).toBeGreaterThan(10);
   });
 
   it("keeps a terrain-hold caster in its doctrine instead of forcing pursuit", () => {

@@ -103,7 +103,10 @@ const STAGE3_FORCE_DEFINITIONS = [
     tacticLabel: "壓制第四軍團",
     side: 2,
     control: "independent-ai",
-    unitIds: sideUnitIds(2, [42, 41, 40, 43, 17]),
+    // REMAKE-182：只靠上方三名士兵、修女与莎，三修女的第四军团可以无伤坚守到回合上限，
+    // 救援就失去意义。加入右翼士兵槽 47 后，压力从远离救援队的东侧慢慢累积；不选截图
+    // 里的槽 44，是因为它出生在森林缺口旁，各难度第 3 回合就必然打倒一名 NPC。
+    unitIds: sideUnitIds(2, [42, 41, 40, 43, 17, 47]),
     doctrine: { strategy: "expert" },
     targeting: {
       preferredForceIds: [STAGE3_FOURTH_CORPS_FORCE_ID],

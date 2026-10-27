@@ -771,6 +771,25 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-182 moves stage 3's slot-47 soldier from 莎第二軍團 into the first
+ * corps. Corps membership is rebuilt from stage content and the counterattack
+ * event's board condition only shrinks from seven slots to six, so every v130
+ * save that carried the event still satisfies it; the save moves to the current
+ * identity unchanged.
+ */
+function migrateVersion130Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 130
+    || value.contentVersion !== "original-debug-full-edit-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-174's full EDIT adds the optional unit flag `debugPlaced`, written only by
  * the original debug mode. A v129 save never holds it, so it only moves to the
  * current identity.
@@ -3630,6 +3649,8 @@ function migratePreviousSaveData(raw: unknown): SaveData | undefined {
   const value = restoreStage11PursuerIdentity(
     rescaleLinearEnemyExperience(restoreOriginalStageTitle(addStage3CounterattackCompletion(raw))),
   );
+  const migratedVersion130 = migrateVersion130Save(value);
+  if (migratedVersion130) return migratedVersion130;
   const migratedVersion129 = migrateVersion129Save(value);
   if (migratedVersion129) return migratedVersion129;
   const migratedVersion128 = migrateVersion128Save(value);

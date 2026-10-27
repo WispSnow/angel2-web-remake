@@ -314,8 +314,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 130;
-  contentVersion: "original-debug-full-edit-1";
+  version: 131;
+  contentVersion: "stage-03-first-corps-flank-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

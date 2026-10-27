@@ -2288,10 +2288,11 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-03-player-ready",
         "stage-03-fourth-corps-joined",
       ],
-      // REMAKE-172 announces the fourth corps' release once 莎第二軍團 is gone.
+      // REMAKE-172 announces the fourth corps' release once 莎第二軍團 is gone;
+      // REMAKE-182 moved slot 47 into the first corps, so six slots remain.
       optionalResumeEvents: [{
         eventId: "stage-03-fourth-corps-counterattack",
-        requiresRemovedUnitIds: ["2:44", "2:45", "2:47", "2:46", "2:50", "2:48", "2:49"],
+        requiresRemovedUnitIds: ["2:44", "2:45", "2:46", "2:50", "2:48", "2:49"],
       }],
       defeat: { type: "any-unit-removed", side: 1, slots: [1, 3] },
       alliedUnits: {

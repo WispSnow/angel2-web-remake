@@ -31,8 +31,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 130 as const;
-export const SAVE_CONTENT_VERSION = "original-debug-full-edit-1" as const;
+export const SAVE_VERSION = 131 as const;
+export const SAVE_CONTENT_VERSION = "stage-03-first-corps-flank-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;

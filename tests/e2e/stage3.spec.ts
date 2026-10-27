@@ -215,7 +215,13 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
   });
 
   await page.keyboard.press("Escape");
+  // REMAKE-182：右翼士兵槽 47 编入第一军团。
   await moveCursorTo(page, 33, 20);
+  await page.keyboard.press("Space");
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術壓制第四軍團");
+
+  await page.keyboard.press("Escape");
+  await moveCursorTo(page, 32, 22);
   await page.keyboard.press("Space");
   await expect(page.getByTestId("unit-tactic")).toHaveText("戰術阻擊救援隊");
   const [tacticLabelColor, tacticValueColor, tacticGap] = await Promise.all([
@@ -549,7 +555,9 @@ test("S03-S: rescue allies retain the magician map figure after a deeper promoti
 test("S03-V: the fourth corps counterattacks once the second corps falls, announced once", async ({ page }) => {
   await openStage3(page, "stage-03-second-corps-cleared&difficulty=0&test=1");
   let current = await state(page);
-  expect(current.units.filter(({ side, slot }) => side === 2 && slot >= 44)).toHaveLength(0);
+  // REMAKE-182：右翼士兵槽 47 属第一军团，第二军团全灭后它仍在场，也不拖住解除。
+  expect(current.units.filter(({ side, slot }) => side === 2 && slot >= 44).map(({ slot }) => slot))
+    .toEqual([47]);
 
   // 右栏战术在台词之前就反映棋盘：解除由棋盘判定，不等演出。
   const daisy = current.units.find(({ id }) => id === "1:3")!;

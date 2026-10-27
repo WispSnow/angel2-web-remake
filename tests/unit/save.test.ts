@@ -5842,6 +5842,23 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
   });
 
+  it("migrates version-130 saves by identity when stage 3's slot 47 joins the first corps (REMAKE-182)", () => {
+    // 军团编组由关卡内容重建、不入档；对白事件的棋盘条件从七个槽缩成六个，带事件的 v130
+    // 战中档必然已满足，所以战中档与完成档逐字段保留。
+    for (const current of [stage3BattleSave(), stage8BattleSave(), battleSave(), completedSave()]) {
+      expect(parseSaveData(JSON.stringify({
+        ...current,
+        version: 130,
+        contentVersion: "original-debug-full-edit-1",
+      })), `${current.kind} ${current.stageId}`).toEqual(current);
+    }
+    expect(parseSaveData(JSON.stringify({
+      ...battleSave(),
+      version: 130,
+      contentVersion: "ice-cast-experience-construction-zone-1",
+    }))).toBeUndefined();
+  });
+
   it("migrates version-129 saves by identity when the full EDIT adds the debugPlaced flag (REMAKE-174)", () => {
     // 完整版 EDIT 新增的 `debugPlaced` 只有原版Debug會寫，v129 的存檔裡不會有，所以逐字段保留。
     for (const current of [stage8BattleSave(), stage3BattleSave(), battleSave(), completedSave()]) {
@@ -5932,7 +5949,8 @@ describe("Web save validation", () => {
   });
 
   it("accepts the stage-3 counterattack event only once the second corps has left the board (REMAKE-172)", () => {
-    const secondCorpsIds = new Set(["2:44", "2:45", "2:47", "2:46", "2:50", "2:48", "2:49"]);
+    // REMAKE-182 把右翼士兵槽 47 编入第一军团，第二军团只剩六个槽。
+    const secondCorpsIds = new Set(["2:44", "2:45", "2:46", "2:50", "2:48", "2:49"]);
     const withoutSecondCorps = (save: BattleSaveData, keptId?: string): BattleSaveData => ({
       ...save,
       battle: {
@@ -5951,6 +5969,8 @@ describe("Web save validation", () => {
     // 台词播过之后存档。
     const afterLine = announced(released);
     expect(parseSaveData(JSON.stringify(afterLine))).toEqual(afterLine);
+    // 槽 47 属于第一军团：它还在场不妨碍解除。
+    expect(afterLine.battle.units.some(({ id }) => id === "2:47")).toBe(true);
     // 第二军团还有人在场，就不可能已经宣告解除。
     expect(parseSaveData(JSON.stringify(announced(stage3BattleSave())))).toBeUndefined();
     expect(parseSaveData(JSON.stringify(
