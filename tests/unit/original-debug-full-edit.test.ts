@@ -3,7 +3,7 @@ import { className } from "../../src/game/content/classes";
 import { DEBUG_EDITABLE_CLASS_IDS } from "../../src/game/content/debug-mode-rules";
 import { allyMapUnitAsset } from "../../src/game/content/map-unit-assets";
 import { initialEnemyExperience } from "../../src/game/content/stage0";
-import type { GameController } from "../../src/game/controller";
+import { GameController } from "../../src/game/controller";
 import { createDebugScenarioController } from "../../src/game/debug-scenarios";
 import type { DebugScenarioId } from "../../src/game/debug-scenario-catalog";
 import { debugMenuItems } from "../../src/game/original-debug-menus";
@@ -113,6 +113,9 @@ describe("REMAKE-174 full EDIT: bench allies", () => {
     expect(parseSaveData(JSON.stringify(tampered))).toBeUndefined();
     battle.restore(save.battle, save.roster);
     expect(battle.unit("1:21")?.debugPlaced).toBe(true);
+    // 讀檔重建部署時也不給它出擊位：六人已滿編，再配一格就超出本關出擊位而拋錯。
+    const loaded = await GameController.fromSave(save, 1);
+    expect(loaded.battle.unit("1:21")).toMatchObject({ ...cell, debugPlaced: true });
   });
 });
 

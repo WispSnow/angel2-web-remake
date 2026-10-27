@@ -108,6 +108,66 @@ describe("battle records written from every player-turn fixture", () => {
 });
 
 /**
+ * Each hit a water warrior survives splits off another body onto a free cell, up to
+ * four, and every body keeps its root's slot. Loading rebuilt the deployment from
+ * every ally on an optional slot, so the bodies claimed deployment cells of their own:
+ * a full deployment (stage 13) ran past its open cells and a short one (stage 28)
+ * listed the slot twice. Every record written after the first split passed validation
+ * and then threw on load. Only the root takes a deployment cell now, the rule the
+ * validator already counted by.
+ */
+describe("battle records after an allied water warrior splits", () => {
+  it.each(["stage-13-player", "stage-28-player"] as const)("%s reads back and loads", async (id) => {
+    storage.clear();
+    const controller = await createDebugScenarioController(id, {
+      difficulty: 1,
+      rosterSource: { kind: "profile", id: "representative-growth" },
+      storage,
+    });
+    const battle = controller.battle;
+    const warrior = battle.unit("1:10");
+    const enemy = battle.units.find(({ side, acted, actionDisabled }) =>
+      side === 2 && !acted && !actionDisabled);
+    if (warrior?.classId !== "water-warrior" || !enemy) {
+      throw new Error(`${id} fields 瑪琳 as a water warrior against a ready enemy`);
+    }
+    // A cell the water warrior can stand on whose four neighbours are open to it too:
+    // the enemy takes one, and the hits split bodies onto the other three.
+    const standable = new Set(battle.reachableCells(warrior.id)
+      .filter((cell) => !battle.unitAt(cell))
+      .map(({ x, y }) => `${x},${y}`));
+    const neighbours = ({ x, y }: { x: number; y: number }) =>
+      [{ x, y: y - 1 }, { x, y: y + 1 }, { x: x - 1, y }, { x: x + 1, y }];
+    const cell = battle.reachableCells(warrior.id).find((candidate) =>
+      standable.has(`${candidate.x},${candidate.y}`)
+      && neighbours(candidate).every(({ x, y }) => standable.has(`${x},${y}`)));
+    if (!cell) throw new Error(`${id} gives 瑪琳 no open cross of cells`);
+    Object.assign(warrior, cell);
+    Object.assign(enemy, neighbours(cell)[3]);
+    for (let hit = 0; hit < 3; hit += 1) {
+      // Keep both sides standing and the enemy ready, so every hit lands and splits.
+      for (const body of battle.units.filter(({ slot, side }) => side === 1 && slot === 10)) {
+        body.life = battle.statsFor(body).maxLife;
+      }
+      enemy.life = battle.statsFor(enemy).maxLife;
+      enemy.acted = false;
+      expect(battle.attack(enemy.id, warrior.id).splitCount).toBe(hit + 2);
+    }
+
+    controller.openRecordMenu("save");
+    controller.activateRecordMenuSelection();
+    expect(controller.recordSaveNotice).toBe("");
+    const record = readSaveSlot(storage, 1);
+    if (record.kind !== "valid") throw new Error(`${id}'s split record must read back`);
+    expect(record.save.kind === "battle"
+      && record.save.battle.units.filter(({ side, slot }) => side === 1 && slot === 10))
+      .toHaveLength(4);
+    const restored = await GameController.fromSave(record.save, 1);
+    expect(restored.battle.units).toEqual(battle.units);
+  });
+});
+
+/**
  * Both save paths validate the record exactly as the load path will read it before
  * touching the slot. A refused record writes nothing and spends no save count; the
  * panel stays open with a notice, and the console names the stage and round with the

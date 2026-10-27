@@ -260,3 +260,49 @@ test("S13-F/G: defeat retries SAY/32 and completion enters playable Dragon Tower
     campaignRoute: "stage-14",
   });
 });
+
+test("S13-J: a record written after 瑪琳 split loads with all four bodies on the board", async ({ page }) => {
+  // Regression: a water warrior that survives a hit splits off bodies on its own slot.
+  // Loading rebuilt the deployment from every ally on an optional slot, so the bodies
+  // claimed deployment cells of their own; with all twelve deployed the rebuild ran
+  // out of cells and every record written after the split failed to load. The stored
+  // record below holds 瑪琳 and three split bodies on the cells a real split fills.
+  await page.goto("/?debugScenario=stage-13-player&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  expect((await state(page)).units.filter(({ side }) => side === 1)).toHaveLength(12);
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-save").click();
+  await page.getByTestId("record-slot-1").click();
+  await page.evaluate(() => {
+    const save = JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
+      battle: { units: Array<{ id: string; x: number; y: number }> };
+    };
+    const root = save.battle.units.find(({ id }) => id === "1:10");
+    if (!root) throw new Error("瑪琳 is deployed at stage 13");
+    Object.assign(root, { x: 38, y: 36 });
+    save.battle.units.push(...[{ x: 38, y: 35 }, { x: 38, y: 37 }, { x: 37, y: 36 }]
+      .map((cell, index) => ({ ...root, ...cell, id: `1:10:split-${index + 1}` })));
+    localStorage.setItem("angel2.save.1", JSON.stringify(save));
+  });
+
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-load").click();
+  const record = page.getByTestId("record-slot-1");
+  await expect(record).toContainText("龍塔外");
+  await record.click();
+  await page.waitForFunction(() => {
+    const loaded = window.__ANGEL2__?.getState() as Stage13State | undefined;
+    return loaded?.phase === "player"
+      && loaded.units.filter(({ side, slot }) => side === 1 && slot === 10).length === 4;
+  });
+  await expect(page.getByTestId("record-menu")).toBeHidden();
+  const canvas = page.getByTestId("battle-canvas");
+  for (const id of ["1:10", "1:10:split-1", "1:10:split-2", "1:10:split-3"]) {
+    await expect.poll(async () =>
+      JSON.parse((await canvas.getAttribute("data-unit-texture-by-id")) ?? "{}")[id])
+      .toBe("ally-water-warrior");
+  }
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage13-split-water-warrior-record.png`,
+  });
+});

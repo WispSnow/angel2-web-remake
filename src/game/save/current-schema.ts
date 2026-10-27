@@ -9,6 +9,7 @@ import { isPortraitRecord } from "../content/portrait-catalog.generated";
 import { objectiveConditionSatisfied, STAGE_ROUND_LIMIT } from "../simulation/objectives";
 import { UNIT_STATUS_KEYS } from "../simulation/status";
 import {
+  isDeployedAllyRoot,
   isPlayableStageId,
   stageRuntimeSourceForDestination,
   STAGE_RUNTIME_MANIFEST,
@@ -384,7 +385,7 @@ export function isSavedBattleState(
 
   const allies = units.filter((unit) => unit.side === 1);
   // `REMAKE-174` 原版Debug EDIT 放上場的部署候選不佔部署格數：原版 EDIT 放置不看人數。
-  const alliedRoots = allies.filter((unit) => unit.id === `${unit.side}:${unit.slot}` && unit.debugPlaced !== true);
+  const alliedRoots = allies.filter(isDeployedAllyRoot);
   const debugPlacedAllies = allies.filter((unit) => unit.debugPlaced === true);
   const alliedRule = saveSchema.alliedUnits;
   if (alliedRule.kind === "deployment") {

@@ -259,6 +259,17 @@ const stage0Module: StageRuntimeModule = {
   },
 };
 
+/**
+ * 佔一格部署出擊位的我方單位：部署出場的單位本體。水戰士分身共用本體的槽，原版Debug EDIT
+ * 放上場的候選不算部署（`REMAKE-174`）。讀取校驗數部署人數、讀檔重建部署結果都照這一條；
+ * 兩邊曾各數各的，水戰士一分裂，記錄就通過校驗卻在讀取時拋錯。
+ */
+export function isDeployedAllyRoot(
+  unit: Pick<BattleUnit, "id" | "side" | "slot" | "debugPlaced">,
+): boolean {
+  return unit.side === 1 && unit.id === `${unit.side}:${unit.slot}` && unit.debugPlaced !== true;
+}
+
 function createDeploymentPreparation(
   definition: InteractiveDeploymentDefinition,
   presentation: StageDeploymentPresentation,
@@ -280,8 +291,8 @@ function createDeploymentPreparation(
     }),
     createResultFromSavedUnits: (units) => {
       const optionalPlacements = units
-        .filter(({ side, slot }) => side === 1
-          && definition.optionalSlots.some((optionalSlot) => optionalSlot === slot))
+        .filter((unit) => isDeployedAllyRoot(unit)
+          && definition.optionalSlots.some((optionalSlot) => optionalSlot === unit.slot))
         .map(({ slot }, index) => {
           const position = definition.openCells[index];
           if (!position) throw new Error("saved deployment exceeds its open cells");
