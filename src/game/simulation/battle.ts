@@ -2348,11 +2348,7 @@ export class Stage0Battle {
       return this.planFollowLeaderAction(unit, leader);
     }
 
-    const targetFilter = this.forces.targetFilterFor(id, this.units);
-    return this.planExpertCombatAction(unit, behavior === 1 ? "sentry" : "pursuit", {
-      targetFilter,
-      behavior,
-    });
+    return this.planForceExpertAction(unit, behavior);
   }
 
   routePulseSafeArea(id: string): Position[] {
@@ -2458,11 +2454,26 @@ export class Stage0Battle {
       this.recordExpertDecision(unit, [action], action);
       return action;
     }
-    const targetFilter = this.forces.targetFilterFor(id, this.units);
-    return this.planExpertCombatAction(unit, behavior === 1 ? "sentry" : "pursuit", {
-      targetFilter,
+    return this.planForceExpertAction(unit, behavior);
+  }
+
+  /**
+   * The expert plan under the force's own targeting. REMAKE-184: a hunter
+   * boxed in short of its quarry would otherwise stand still beside the units
+   * holding it, so it fights whoever it can reach instead.
+   */
+  private planForceExpertAction(unit: BattleUnit, behavior: number): AlliedAiAction {
+    const intent = behavior === 1 ? "sentry" : "pursuit";
+    const action = this.planExpertCombatAction(unit, intent, {
+      targetFilter: this.forces.targetFilterFor(unit.id, this.units),
       behavior,
     });
+    if ((action.kind !== "wait" && action.kind !== "rest")
+      || !this.forces.huntedUnitFor(unit.id, this.units)) return action;
+    const engagement = this.planExpertCombatAction(unit, intent, { behavior });
+    if (engagement.kind === "attack" || engagement.kind === "special") return engagement;
+    this.recordExpertDecision(unit, [action], action);
+    return action;
   }
 
   private planTerrainHoldAiAction(
@@ -2666,6 +2677,8 @@ export class Stage0Battle {
       ? keepOut?.landing
       : (position: Position) => positionKey(position) === positionKey(unit);
     const iceIsForbidden = this.onlyIceCapableSideRemains(unit.side);
+    // REMAKE-184: a hunter neither stops to recover nor waits for its escort.
+    const hunting = this.forces.huntedUnitFor(unit.id, this.units) !== undefined;
     const classAction = this.planClassAction(unit, undefined, {
       expertRanking: true,
       actionFilter: (actionId) => !iceIsForbidden || !isIceActionId(actionId),
@@ -2703,7 +2716,8 @@ export class Stage0Battle {
     } else {
       fallbackAction = this.planOrdinaryAiAction(unit, opponentSide, options.behavior, {
         expertRanking: true,
-        namedLeaderLineHold: this.isEnemyNamedLeader(unit),
+        namedLeaderLineHold: this.isEnemyNamedLeader(unit) && !hunting,
+        ...(hunting ? { restThresholdPercent: 0 } : {}),
         targetFilter: options.targetFilter,
         ...(keepOut ? { destinationFilter: keepOut.landing, pathFilter: keepOut.path } : {}),
       });
@@ -2741,7 +2755,7 @@ export class Stage0Battle {
       this.recordExpertDecision(unit, [...candidates, recovery], recovery);
       return recovery;
     }
-    if (selectedUtility.guaranteedKills === 0 && usesEmpressOrDragonAi(unit.classId)) {
+    if (selectedUtility.guaranteedKills === 0 && usesEmpressOrDragonAi(unit.classId) && !hunting) {
       const banded = this.planEmpressOrDragonLifeBand(unit, { ...options, keepOut });
       if (banded) {
         this.recordExpertDecision(unit, [...candidates, banded], banded);
@@ -2755,7 +2769,8 @@ export class Stage0Battle {
     const sentryKeepsActing = intent === "sentry"
       && (selected.kind === "attack" || selected.kind === "special")
       && isEffectiveExpertUtility(selectedUtility);
-    if (unit.life * 100 < maximumLife * expertRestThresholdPercentFor(unit)
+    if (!hunting
+      && unit.life * 100 < maximumLife * expertRestThresholdPercentFor(unit)
       && !sentryKeepsActing
       && selectedUtility.guaranteedKills === 0
       && selectedUtility.wizardHits === 0

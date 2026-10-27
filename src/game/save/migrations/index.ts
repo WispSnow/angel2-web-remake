@@ -771,6 +771,23 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-184 has stage 11's 麗蘭特 hunt 蘇蘭達. Force membership and the hunt
+ * come from stage content and every plan is rebuilt from the public board, so a
+ * v132 save only moves to the current identity.
+ */
+function migrateVersion132Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 132
+    || value.contentVersion !== "stage-09-escort-rest-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-183 slows stage 9's 多莉 to six movement and lets her rest when
  * wounded. Her route is replanned from the public board every action and the
  * budget and threshold come from stage content, so a v131 save only moves to
@@ -3667,6 +3684,8 @@ function migratePreviousSaveData(raw: unknown): SaveData | undefined {
   const value = restoreStage11PursuerIdentity(
     rescaleLinearEnemyExperience(restoreOriginalStageTitle(addStage3CounterattackCompletion(raw))),
   );
+  const migratedVersion132 = migrateVersion132Save(value);
+  if (migratedVersion132) return migratedVersion132;
   const migratedVersion131 = migrateVersion131Save(value);
   if (migratedVersion131) return migratedVersion131;
   const migratedVersion130 = migrateVersion130Save(value);

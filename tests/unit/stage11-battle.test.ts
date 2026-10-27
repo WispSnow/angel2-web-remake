@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { usesClassIdentity } from "../../src/game/content/classes";
 import { completeCampaignRoster, initialEnemyExperience } from "../../src/game/content/stage0";
 import { Stage11Battle, createStage11Units } from "../../src/game/simulation/stage11-battle";
-import type { CampaignState } from "../../src/game/types";
+import { manhattan, movementCostsToNearestTarget, positionKey } from "../../src/game/simulation/grid";
+import type { BattleUnit, CampaignState, Position } from "../../src/game/types";
 
 const campaign: CampaignState = {
   stageId: "stage-11",
@@ -51,7 +52,10 @@ describe("stage 11 battle simulation", () => {
       id: "sulanda-ranger-evacuation", control: "player", doctrine: { strategy: "expert" },
     });
     expect(battle.forceForUnit("2:21")).toMatchObject({
-      id: "pegasus-pursuer", control: "independent-ai", doctrine: { strategy: "expert" },
+      id: "lilante-pursuer",
+      control: "independent-ai",
+      tacticLabel: "追擊蘇蘭達",
+      doctrine: { strategy: "expert", huntUnitId: "1:8" },
     });
   });
 
@@ -97,6 +101,96 @@ describe("stage 11 battle simulation", () => {
   it("gives the lone Pegasus pursuer a legal expert action", () => {
     const battle = new Stage11Battle(campaign);
     expect(battle.planEnemyAiAction("2:21")).toMatchObject({ unitId: "2:21" });
+  });
+
+  /** The opening board after SAY/0026, with every ally but 蘇蘭達 parked out of the way. */
+  function huntBattle(): Stage11Battle {
+    const battle = new Stage11Battle(campaign);
+    battle.removeStoryUnits([{ side: 1, slot: 9 }]);
+    return battle;
+  }
+
+  function place(battle: Stage11Battle, id: string, position: Position, life?: number): BattleUnit {
+    const unit = battle.unit(id);
+    if (!unit) throw new Error(`missing ${id}`);
+    Object.assign(unit, position, life === undefined ? {} : { life });
+    return unit;
+  }
+
+  it("has 麗蘭特 strike 蘇蘭達 even beside a ranger she could finish (REMAKE-184)", () => {
+    const battle = huntBattle();
+    place(battle, "2:21", { x: 30, y: 41 });
+    place(battle, "1:40", { x: 31, y: 41 }, 1);
+    place(battle, "1:8", { x: 28, y: 41 });
+    expect(battle.planEnemyAiAction("2:21")).toMatchObject({ kind: "attack", targetId: "1:8" });
+  });
+
+  it("sends 麗蘭特 after 蘇蘭達 at full stride instead of holding by the reinforcements (REMAKE-184)", () => {
+    const battle = huntBattle();
+    battle.beginEnemyPhase();
+    expect(battle.unit("2:40")).toMatchObject({ x: 32, y: 48 });
+    place(battle, "2:21", { x: 30, y: 46 });
+    place(battle, "1:8", { x: 30, y: 30 });
+    // REMAKE-118 kept the named leader within reach of the cavalry at (32,48),
+    // and every cell nearer 蘇蘭達 left it behind, so she used to wait here.
+    const action = battle.planEnemyAiAction("2:21");
+    expect(action).toMatchObject({ kind: "move", pursuitProgress: 7 });
+    expect(manhattan(action?.path.at(-1) ?? { x: 30, y: 46 }, { x: 32, y: 48 })).toBeGreaterThan(4);
+  });
+
+  it("keeps 麗蘭特 chasing on low life instead of resting (REMAKE-184)", () => {
+    const battle = huntBattle();
+    const lilante = battle.unit("2:21")!;
+    lilante.life = Math.floor(battle.statsFor(lilante).maxLife / 10);
+    expect(battle.planEnemyAiAction("2:21")).toMatchObject({ kind: "move" });
+  });
+
+  it("has a boxed-in 麗蘭特 fight the rangers holding her (REMAKE-184)", () => {
+    const battle = huntBattle();
+    place(battle, "2:21", { x: 30, y: 41 });
+    const wall = [{ x: 30, y: 42 }, { x: 29, y: 41 }, { x: 31, y: 41 }, { x: 30, y: 40 }];
+    for (const [index, id] of ["1:40", "1:41", "1:42", "1:19"].entries()) place(battle, id, wall[index]);
+    const action = battle.planEnemyAiAction("2:21");
+    expect(action).toMatchObject({ kind: "attack" });
+    expect(["1:40", "1:41", "1:42", "1:19"]).toContain(action?.targetId);
+  });
+
+  it("no longer lets a lone 陸戰騎士 蘇蘭達 dash to the ship untouched (REMAKE-184)", () => {
+    // The reported line: 蘇蘭達 runs straight for the boarding cells from round 1
+    // while everyone else stays put. Before REMAKE-184 nobody caught her by round 8.
+    const battle = huntBattle();
+    const boarding: Position[] = [];
+    for (let cell = 0; cell < 280; cell += 1) boarding.push({ x: cell % 50, y: Math.floor(cell / 50) });
+    let lilanteHits = 0;
+    for (let round = 1; round <= 12 && battle.outcome() === "ongoing"; round += 1) {
+      const sulanda = battle.unit("1:8")!;
+      const remaining = movementCostsToNearestTarget(sulanda, boarding, [], {
+        width: 50, height: 50, terrainSlotAt: (position) => battle.terrainSlotAt(position),
+      });
+      const goal = battle.reachableCells("1:8")
+        .sort((left, right) => (remaining.get(positionKey(left)) ?? 999) - (remaining.get(positionKey(right)) ?? 999)
+          || left.y - right.y || left.x - right.x)[0];
+      for (const step of battle.movementPath("1:8", goal).slice(1)) battle.moveUnitStep("1:8", step);
+      if (battle.outcome() !== "ongoing") break;
+      battle.clearActionState(1);
+      battle.beginEnemyPhase();
+      const order = new Set(battle.enemyActionOrder());
+      while (order.size > 0) {
+        const selection = battle.selectNextEnemyAiAction([...order]);
+        if (!selection) break;
+        order.delete(selection.unitId);
+        const action = selection.action ?? battle.planEnemyAiAction(selection.unitId);
+        if (!action) continue;
+        for (const step of action.path.slice(1)) battle.moveUnitStep(action.unitId, step);
+        const before = battle.unit("1:8")?.life ?? 0;
+        if (action.kind === "attack" && action.targetId) battle.attack(action.unitId, action.targetId);
+        else if (action.kind === "rest") battle.rest(action.unitId);
+        else battle.spendAction(action.unitId);
+        if (action.unitId === "2:21" && (battle.unit("1:8")?.life ?? 0) < before) lilanteHits += 1;
+      }
+      battle.startNextRound();
+    }
+    expect(lilanteHits).toBeGreaterThanOrEqual(2);
   });
 
   it("spawns one reinforcement at the lower edge before each enemy phase", () => {

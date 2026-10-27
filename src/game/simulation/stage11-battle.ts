@@ -39,15 +39,32 @@ const STAGE11_FORCE_DEFINITIONS = [
     commanderId: "1:8",
     doctrine: { strategy: "expert" },
   },
+  // The reinforcement pool stays the first side-2 force, so a unit the original
+  // debug EDIT places on the board joins it (REMAKE-174) rather than the hunt.
   {
     id: "pegasus-pursuer",
     label: "追擊增援隊",
     side: 2,
     control: "independent-ai",
-    unitIds: ["2:21"],
+    unitIds: [],
     doctrine: { strategy: "expert" },
   },
+  // REMAKE-184: nothing in the original goes after 蘇蘭達, so once promoted she
+  // rides to the ship alone. 麗蘭特 now hunts her from a force of her own —
+  // attacks and chases only her and never rests — so the player has to bring
+  // her down or box her in; each round's reinforcements keep the expert AI.
+  {
+    id: "lilante-pursuer",
+    label: "麗蘭特",
+    tacticLabel: "追擊蘇蘭達",
+    side: 2,
+    control: "independent-ai",
+    unitIds: ["2:21"],
+    doctrine: { strategy: "expert", huntUnitId: "1:8" },
+  },
 ] as const satisfies readonly ForceDefinition[];
+
+const STAGE11_REINFORCEMENT_FORCE_ID = "pegasus-pursuer";
 
 const STAGE11_UNIT_CONFIG = {
   alliedUnits: STAGE11_SEMANTIC_ALLIED_UNITS,
@@ -120,7 +137,7 @@ export class Stage11Battle extends Stage0Battle {
       name: candidate.name,
       aiBehavior: candidate.aiBehavior,
     }, this.difficulty, "difficulty");
-    this.forces.inheritUnit("2:21", unit.id);
+    this.forces.adoptUnit(STAGE11_REINFORCEMENT_FORCE_ID, unit.id);
     this.units.push(unit);
     return unit;
   }
@@ -148,7 +165,7 @@ export class Stage11Battle extends Stage0Battle {
     for (const unit of this.units) {
       if (unit.side === 2 && STAGE11_SEMANTIC_REINFORCEMENTS.candidates
         .some(({ slot }) => slot === unit.slot)) {
-        this.forces.inheritUnit("2:21", unit.id);
+        this.forces.adoptUnit(STAGE11_REINFORCEMENT_FORCE_ID, unit.id);
       }
     }
   }

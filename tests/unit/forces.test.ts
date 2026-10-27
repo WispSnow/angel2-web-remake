@@ -228,6 +228,43 @@ describe("force registry", () => {
     }
   });
 
+  it("hunts one opposing unit while it stands, and opens an empty pool only for automatic forces (REMAKE-184)", () => {
+    const units = [unit("1:1", 1), unit("1:2", 1), unit("2:1", 2)];
+    const hunter: ForceDefinition = {
+      ...expertForce("hunter", 2, ["2:1"]),
+      doctrine: { strategy: "expert", huntUnitId: "1:2" },
+    };
+    const pool = expertForce("pool", 2, []);
+    const registry = new ForceRegistry([expertForce("party", 1, ["1:1", "1:2"]), pool, hunter], units);
+    expect(registry.huntedUnitFor("2:1", units)?.id).toBe("1:2");
+    const filter = registry.targetFilterFor("2:1", units);
+    expect(filter?.(units[1])).toBe(true);
+    expect(filter?.(units[0])).toBe(false);
+    // Once the quarry has left the board the hunter fights under the plain expert doctrine.
+    const quarryGone = units.filter(({ id }) => id !== "1:2");
+    expect(registry.huntedUnitFor("2:1", quarryGone)).toBeUndefined();
+    expect(registry.targetFilterFor("2:1", quarryGone)).toBeUndefined();
+
+    registry.adoptUnit("pool", "2:40");
+    expect(registry.definitionForUnit("2:40")?.id).toBe("pool");
+    expect(registry.huntedUnitFor("2:40", units)).toBeUndefined();
+    expect(() => registry.adoptUnit("hunter", "2:40")).toThrow(/already belongs to pool/);
+    expect(() => registry.adoptUnit("missing", "2:41")).toThrow(/missing force missing/);
+
+    expect(() => new ForceRegistry([expertForce("party", 1, [])], []))
+      .toThrow(/must contain at least one unit/);
+    expect(() => new ForceRegistry([
+      { ...expertForce("party", 1, ["1:1", "1:2"]), doctrine: { strategy: "expert", huntUnitId: "2:1" } },
+      expertForce("raiders", 2, ["2:1"]),
+    ], units)).toThrow(/Only an independent AI force may hunt a unit: party/);
+    for (const huntUnitId of ["1:9", "2:1"]) {
+      expect(() => new ForceRegistry([
+        expertForce("party", 1, ["1:1", "1:2"]),
+        { ...hunter, doctrine: { strategy: "expert", huntUnitId } },
+      ], units)).toThrow(/hunts a missing or friendly unit/);
+    }
+  });
+
   describe("terrain-hold release (REMAKE-172)", () => {
     const holdDoctrine = (whenForcesEliminated: readonly string[]) => ({
       strategy: "terrain-hold" as const,

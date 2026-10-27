@@ -14,6 +14,14 @@ export interface ExpertForceAiDoctrine {
    * first. Slots are read from the stage map, never from player-built terrain.
    */
   keepOutTerrainSlotsByClass?: Readonly<Partial<Record<ClassId, readonly number[]>>>;
+  /**
+   * REMAKE-184. The force exists to stop one opposing unit getting away.
+   * While that unit is on the board, members attack and close on it alone,
+   * never stop to recover, and a named leader among them no longer waits for
+   * its escort (REMAKE-118). A member boxed in short of it fights whoever it
+   * can reach instead of standing still.
+   */
+  huntUnitId?: string;
 }
 
 /**
@@ -114,7 +122,9 @@ export class ForceRegistry {
       if (definition.tacticLabel !== undefined && definition.tacticLabel.trim().length === 0) {
         throw new Error(`Force ${definition.id} has an empty player-facing tactic`);
       }
-      if (definition.unitIds.length === 0) {
+      // An independent force may open empty when every member joins mid-battle
+      // through `adoptUnit` (stage 11's reinforcements since REMAKE-184).
+      if (definition.unitIds.length === 0 && definition.control !== "independent-ai") {
         throw new Error(`Force ${definition.id} must contain at least one unit`);
       }
       if (definition.control === "player" && definition.side !== 1) {
@@ -132,6 +142,15 @@ export class ForceRegistry {
             || slots.some((slot) => !Number.isInteger(slot) || slot < 0)) {
             throw new Error(`Force ${definition.id} has an invalid ${classId} keep-out terrain list`);
           }
+        }
+      }
+      if (definition.doctrine.strategy === "expert" && definition.doctrine.huntUnitId !== undefined) {
+        if (definition.control !== "independent-ai") {
+          throw new Error(`Only an independent AI force may hunt a unit: ${definition.id}`);
+        }
+        const quarry = initialUnitsById.get(definition.doctrine.huntUnitId);
+        if (!quarry || quarry.side === definition.side) {
+          throw new Error(`Force ${definition.id} hunts a missing or friendly unit`);
         }
       }
       if (definition.doctrine.strategy === "terrain-hold") {
@@ -277,6 +296,26 @@ export class ForceRegistry {
     this.forceIdByUnitId.set(derivedUnitId, sourceForceId);
   }
 
+  /** A unit that joins mid-battle straight into a named force, which may have opened empty. */
+  adoptUnit(forceId: string, unitId: string): void {
+    if (!this.definitionsById.has(forceId)) throw new Error(`Cannot adopt ${unitId} into missing force ${forceId}`);
+    const existingForceId = this.forceIdByUnitId.get(unitId);
+    if (existingForceId && existingForceId !== forceId) {
+      throw new Error(`Unit ${unitId} already belongs to ${existingForceId}`);
+    }
+    this.forceIdByUnitId.set(unitId, forceId);
+  }
+
+  /**
+   * REMAKE-184: the opposing unit this unit's force hunts, while it is still on
+   * the board.
+   */
+  huntedUnitFor(unitId: string, units: readonly BattleUnit[]): BattleUnit | undefined {
+    const doctrine = this.definitionForUnit(unitId)?.doctrine;
+    if (doctrine?.strategy !== "expert" || doctrine.huntUnitId === undefined) return undefined;
+    return units.find(({ id }) => id === doctrine.huntUnitId);
+  }
+
   /**
    * `REMAKE-174` 原版Debug EDIT 放上場、關卡沒替它分配部隊的單位：我方歸玩家指揮的部隊，
    * 敵方歸第一支敵方部隊（按定義順序，讀檔時重算出同一支）。
@@ -317,6 +356,8 @@ export class ForceRegistry {
     units: readonly BattleUnit[],
   ): ((target: BattleUnit) => boolean) | undefined {
     const sourceForce = this.definitionForUnit(unitId);
+    const quarry = this.huntedUnitFor(unitId, units);
+    if (quarry) return (target) => target.id === quarry.id;
     const targeting = sourceForce?.targeting;
     if (!sourceForce || !targeting) return undefined;
 

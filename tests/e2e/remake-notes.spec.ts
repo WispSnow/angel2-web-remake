@@ -376,6 +376,25 @@ test("REMAKE-173 把「營地遭到偷襲 ２」魔術士不進木屋列入 Bug 
   await expect(page.getByTestId("remake-note-REMAKE-173")).toHaveCount(0);
 });
 
+test("REMAKE-184 把「拯救蘇蘭達」無人追擊蘇蘭達列入 Bug 修復", async ({ page }) => {
+  await page.goto("/");
+  // 使用者要求的、與原版不同的關卡改動一律算原版缺陷修復，不歸「平衡性調整」。
+  await openNotes(page, "fixes");
+  const hunt = page.getByTestId("remake-note-REMAKE-184");
+  await expect(hunt).toContainText("「拯救蘇蘭達」的麗蘭特會緊追蘇蘭達");
+  await expect(hunt).toContainText("沒有人專門追趕蘇蘭達");
+  await expect(hunt).toContainText("重傷時也不會停下休息");
+  await expect(hunt).toContainText("戰術欄會顯示「追擊蘇蘭達」");
+  await expect(hunt).toContainText("轉職為飛馬戰士的蘇蘭達仍快得追不上");
+  await expect(hunt.locator(".rn-note-id")).toHaveText("REMAKE-184");
+  await captureVisualAudit(hunt, {
+    path: "artifacts/playwright/remake-notes-stage11-lilante-hunt.png",
+  });
+
+  await page.getByTestId("remake-notes-tab-balance").click();
+  await expect(page.getByTestId("remake-note-REMAKE-184")).toHaveCount(0);
+});
+
 test("REMAKE-176／177／178 把女踏敵我、冰雪經驗與魔弓防魔列入 Bug 修復", async ({ page }) => {
   await page.goto("/");
   // 使用者批准的、與原版不同的規則一律算原版缺陷修復，不歸「平衡性調整」。

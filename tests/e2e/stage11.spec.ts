@@ -152,7 +152,7 @@ test("S11-I/REMAKE-018: Sulanda grants the ranger's class while Nia is absent", 
   });
 });
 
-test("S11-J/REMAKE-164: the opening pursuer shows 麗蘭特's descriptor name and portrait", async ({ page }) => {
+test("S11-J/REMAKE-164/184: the opening pursuer shows 麗蘭特's descriptor name, portrait and hunt", async ({ page }) => {
   await page.goto("/?debugScenario=stage-11-player&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   const opening = await state(page);
@@ -168,6 +168,9 @@ test("S11-J/REMAKE-164: the opening pursuer shows 麗蘭特's descriptor name an
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage11-lilante-hud.png`,
   });
+  // REMAKE-184: she hunts 蘇蘭達 alone, so her preview names that instead of 主動進攻.
+  await page.keyboard.press("Space");
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術追擊蘇蘭達");
 });
 
 test("S11-H: every player-to-enemy transition adds one immediately active lower-edge reinforcement", async ({ page }) => {

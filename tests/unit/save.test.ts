@@ -5842,6 +5842,23 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
   });
 
+  it("migrates version-132 saves by identity when stage 11's 麗蘭特 hunts 蘇蘭達 (REMAKE-184)", () => {
+    // 麗蘭特的编队与追猎目标来自关卡内容，增援的编队在读档时重建，都不入档，
+    // 所以 v132 战中档（含已生成的增援）与完成档逐字段保留。
+    for (const current of [stage11BattleSave(3), stage9BattleSave(), battleSave(), completedSave()]) {
+      expect(parseSaveData(JSON.stringify({
+        ...current,
+        version: 132,
+        contentVersion: "stage-09-escort-rest-1",
+      })), `${current.kind} ${current.stageId}`).toEqual(current);
+    }
+    expect(parseSaveData(JSON.stringify({
+      ...battleSave(),
+      version: 132,
+      contentVersion: "stage-03-first-corps-flank-1",
+    }))).toBeUndefined();
+  });
+
   it("migrates version-131 saves by identity when stage 9's 多莉 walks six and rests when wounded (REMAKE-183)", () => {
     // 多莉的路线每次行动都从棋盘重算，移动预算与休息门槛来自关卡内容，都不入档，
     // 所以 v131 战中档与完成档逐字段保留。
