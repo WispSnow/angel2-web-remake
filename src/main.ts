@@ -20,6 +20,8 @@ import { originalDebugEditorAssetUrls } from "./game/original-debug-mode";
 import { createStage0Units } from "./game/content/stage0";
 import { stageDialoguePortraitRecords } from "./game/content/portrait-assets";
 import { STAGE0_DEFINITION } from "./game/content/stages";
+import { stageRemixMusicUrls } from "./game/content/music-remix";
+import { loadMusicPreferences } from "./game/preferences";
 import type { PortraitRecord } from "./game/types";
 import { STAGE49_ENDING_SUPPLEMENTAL_ASSETS } from "./game/content/stage49-ending";
 import {
@@ -72,7 +74,11 @@ const stageAssetGate: StageAssetGate = (stageId, resolveRequirements) => {
     `讀取 ${stageId} 關卡資料`,
     async () => {
       requirements = await resolveRequirements();
-      return [...classPresentationAssetUrls(requirements), ...originalDebugEditorAssetUrls()];
+      return [
+        ...classPresentationAssetUrls(requirements),
+        ...originalDebugEditorAssetUrls(),
+        ...requirements.musicUrls ?? [],
+      ];
     },
     async () => {
       if (requirements?.usesDeploymentSurface) await loadDeploymentSurfaceModules();
@@ -98,6 +104,7 @@ const controllerAssetRequirements = (controller: GameController): StageAssetRequ
   ])],
   unitSpriteUrls: controller.stageUnitSpriteUrls,
   usesDeploymentSurface: controller.usesDeploymentSurface,
+  musicUrls: stageRemixMusicUrls(controller.battle.stage.music, controller.musicStyle),
 });
 const stage0Units = createStage0Units();
 const stage0PresentationAssets = classPresentationAssetUrls({
@@ -321,6 +328,9 @@ else {
   }).then(() => {
     if (!startupMusic) throw new Error("開場音樂沒有通過資源準備門。");
     mountStartup(root, startGame, startupMusic);
-    resourceLoader.prefetchStage("stage-00", stage0PresentationAssets);
+    resourceLoader.prefetchStage("stage-00", [
+      ...stage0PresentationAssets,
+      ...stageRemixMusicUrls(STAGE0_DEFINITION.music, loadMusicPreferences(localStorage).musicStyle),
+    ]);
   });
 }

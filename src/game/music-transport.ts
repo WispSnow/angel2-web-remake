@@ -24,10 +24,27 @@ export interface IntroLoopMusicProgram {
   crossfadeSeconds: number;
 }
 
-export type MusicProgram = LoopMusicProgram | IntroLoopMusicProgram;
+/**
+ * `REMAKE-181` 交響改編：單一檔案，從 0 播起，到 `loopEnd` 跳回 `loopStart`。接縫已在檔案裡
+ * 做好（尾端交叉淡化到循環起點的同一處音樂），所以這裡只用 Web Audio 原生循環點，不再做
+ * 解碼後的週期化。`entryTrack` 存在時，`loopStart` 之前的部分對應原曲的入場段。
+ */
+export interface RemixLoopMusicProgram {
+  id: string;
+  kind: "remix-loop";
+  entryTrack?: string;
+  loopTrack: string;
+  source: string;
+  loopStartSeconds: number;
+  loopEndSeconds: number;
+}
+
+export type MusicProgram = LoopMusicProgram | IntroLoopMusicProgram | RemixLoopMusicProgram;
 
 export interface MusicTransportState {
   track?: string;
+  /** `remix` 表示正在播 `REMAKE-181` 的交響改編檔。 */
+  source: "original" | "remix";
   part: MusicPart;
   loop: boolean;
   playing: boolean;
@@ -43,6 +60,8 @@ interface ScheduledProgram {
   request: number;
   output: GainNode;
   sources: AudioBufferSourceNode[];
+  /** 只更新可觀測狀態的計時器；節目退場時一併清掉。 */
+  dispose?: () => void;
 }
 
 const SCHEDULE_LEAD_SECONDS = 0.01;
@@ -62,7 +81,9 @@ export class MusicTransport {
   private schedulingRequest?: number;
   private readonly encoded = new Map<string, Promise<ArrayBuffer>>();
   private readonly decoded = new Map<string, Promise<AudioBuffer>>();
+  private fadeOutSeconds = PROGRAM_CROSSFADE_SECONDS;
   private state: MusicTransportState = {
+    source: "original",
     part: "entry",
     loop: false,
     playing: false,
@@ -78,15 +99,26 @@ export class MusicTransport {
     this.gain = initialGain;
   }
 
-  select(program: MusicProgram | undefined, restart = false): void {
+  /**
+   * `fadeOutSeconds` is how long the outgoing program takes to fade once the
+   * incoming one starts (or once silence is selected). The default is the
+   * native-faithful 5 ms cut; `REMAKE-181` passes 0.6 s in orchestral mode.
+   */
+  select(
+    program: MusicProgram | undefined,
+    restart = false,
+    fadeOutSeconds = PROGRAM_CROSSFADE_SECONDS,
+  ): void {
     if (!restart && program?.id === this.desired?.id) return;
     this.desired = program;
+    this.fadeOutSeconds = Math.max(PROGRAM_CROSSFADE_SECONDS, fadeOutSeconds);
     const request = ++this.requestSequence;
     this.schedulingRequest = undefined;
     if (!program) {
       this.fadeOutActive();
       this.updateState({
         track: undefined,
+        source: "original",
         part: "entry",
         loop: false,
         playing: false,
@@ -99,9 +131,14 @@ export class MusicTransport {
     }
 
     this.updateState({
-      track: program.kind === "loop" ? program.track : program.entryTrack,
+      track: program.kind === "loop"
+        ? program.track
+        : program.kind === "intro-loop"
+          ? program.entryTrack
+          : program.entryTrack ?? program.loopTrack,
+      source: program.kind === "remix-loop" ? "remix" : "original",
       part: "entry",
-      loop: program.kind === "loop",
+      loop: program.kind === "loop" || (program.kind === "remix-loop" && !program.entryTrack),
       playing: this.active !== undefined,
       seamlessLoop: false,
       crossfadeMilliseconds: 0,
@@ -205,17 +242,21 @@ export class MusicTransport {
             this.loadBuffer(program.source),
             this.loadBuffer(program.seamlessLoop, true),
           ])
-        : await Promise.all([
-            this.loadBuffer(program.entry),
-            this.loadBuffer(program.seamlessLoop, true),
-          ]);
+        : program.kind === "intro-loop"
+          ? await Promise.all([
+              this.loadBuffer(program.entry),
+              this.loadBuffer(program.seamlessLoop, true),
+            ])
+          : [await this.loadBuffer(program.source)];
       if (request !== this.requestSequence || this.desired?.id !== program.id) return;
       const context = this.ensureContext();
       if (context.state !== "running") return;
       const startAt = context.currentTime + SCHEDULE_LEAD_SECONDS;
       const scheduled = program.kind === "loop"
         ? this.scheduleLoopProgram(program, buffers[0], buffers[1], startAt, request)
-        : this.scheduleIntroLoopProgram(program, buffers[0], buffers[1], startAt, request);
+        : program.kind === "intro-loop"
+          ? this.scheduleIntroLoopProgram(program, buffers[0], buffers[1], startAt, request)
+          : this.scheduleRemixLoopProgram(program, buffers[0], startAt, request);
       const previous = this.active;
       this.active = scheduled;
       if (previous) this.fadeOut(previous, startAt);
@@ -332,6 +373,60 @@ export class MusicTransport {
     return { id: program.id, request, output, sources: [entrySource, loop] };
   }
 
+  private scheduleRemixLoopProgram(
+    program: RemixLoopMusicProgram,
+    buffer: AudioBuffer,
+    startAt: number,
+    request: number,
+  ): ScheduledProgram {
+    const { loopStartSeconds, loopEndSeconds } = program;
+    // One decoded sample of slack: a resampling decoder may round the length.
+    if (!(loopStartSeconds > 0 && loopStartSeconds < loopEndSeconds)
+      || loopEndSeconds > buffer.duration + 1 / buffer.sampleRate) {
+      throw new Error(`remix loop points fall outside the decoded buffer: ${program.source}`);
+    }
+    const context = this.ensureContext();
+    const output = this.createProgramOutput(startAt);
+    const source = this.createSource(buffer, output);
+    source.loop = true;
+    source.loopStart = loopStartSeconds;
+    source.loopEnd = Math.min(loopEndSeconds, buffer.duration);
+    source.start(startAt);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // There is no event at the loop point, so the debug state polls the
+    // context clock. A suspended context simply re-arms the timer; nothing
+    // here touches playback.
+    const announceLoop = () => {
+      timer = undefined;
+      if (request !== this.requestSequence || this.desired?.id !== program.id) return;
+      const remaining = startAt + loopStartSeconds - context.currentTime;
+      if (remaining > 0.01) {
+        timer = setTimeout(announceLoop, remaining * 1000 + 20);
+        return;
+      }
+      this.updateState({ track: program.loopTrack, part: "loop", loop: true, playing: true });
+    };
+    if (program.entryTrack) timer = setTimeout(announceLoop, loopStartSeconds * 1000);
+    this.updateState({
+      track: program.entryTrack ?? program.loopTrack,
+      source: "remix",
+      part: program.entryTrack ? "entry" : "loop",
+      loop: !program.entryTrack,
+      seamlessLoop: true,
+      crossfadeMilliseconds: 0,
+      boundaryDbfs: undefined,
+    });
+    return {
+      id: program.id,
+      request,
+      output,
+      sources: [source],
+      dispose: () => {
+        if (timer !== undefined) clearTimeout(timer);
+      },
+    };
+  }
+
   private createSource(buffer: AudioBuffer, destination: AudioNode): AudioBufferSourceNode {
     const source = this.ensureContext().createBufferSource();
     source.buffer = buffer;
@@ -414,7 +509,8 @@ export class MusicTransport {
   }
 
   private fadeOut(active: ScheduledProgram, startAt: number): void {
-    const stopAt = startAt + PROGRAM_CROSSFADE_SECONDS;
+    active.dispose?.();
+    const stopAt = startAt + this.fadeOutSeconds;
     active.output.gain.cancelAndHoldAtTime(startAt);
     active.output.gain.linearRampToValueAtTime(0, stopAt);
     for (const source of active.sources) {

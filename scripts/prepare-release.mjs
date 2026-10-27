@@ -206,6 +206,19 @@ for (const track of musicManifest.tracks) {
     throw new Error(`release music differs from the development asset: ${relativeOutput}`);
   }
 }
+// `REMAKE-181`: the orchestral remixes are fetched on demand, so a missing or
+// stale file would only surface when a player picks 交響.
+const remixManifestPath = path.join(releaseDirectory, "assets/original/music/remix/remix-manifest.json");
+if (!(await pathExists(remixManifestPath))) {
+  throw new Error("release build is missing the orchestral remix manifest");
+}
+const remixManifest = JSON.parse(await readFile(remixManifestPath, "utf8"));
+for (const track of remixManifest.tracks) {
+  const released = await readFile(path.join(releaseDirectory, "assets/original", track.output));
+  if (createHash("sha256").update(released).digest("hex") !== track.sha256) {
+    throw new Error(`release remix differs from its manifest: ${track.output}`);
+  }
+}
 const legacyMusic = files.filter((file) => {
   const relative = path.relative(releaseDirectory, file);
   return /(?:^|\/)(?:story-stage\d+(?:-loop-seamless)?|battle-stage\d+-(?:player|enemy)-(?:entry|loop)(?:-seamless)?)\.wav$/u.test(relative)

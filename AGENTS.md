@@ -227,6 +227,11 @@ pnpm exec playwright install ffmpeg
   `DS:F8BA = 選單左緣 + 0x38 - 8`、`DS:F8BC = 選單上緣 + 0x14 + 0x18n`），四字列因此
   看起来是「置中略偏右 9 px」，不要改成真正的居中或靠左。复刻自己新增的提示、说明与工具文字留在现代字体，
   这条分层与字库覆盖检查的要求见 `design/remake-gdd/07-ui-ux-and-presentation.md#字体分层`。
+- `src/game/content/music-remix.generated.ts` 由 `scripts/generate-music-remix.mjs` 从素材包
+  `music/remix/remix-manifest.json` 生成（`REMAKE-181` 交响改编）。素材包里的清单是真值：剪好的循环用
+  `pnpm content:music-remix -- --import <Suno 工作区>` 导入，之后再跑 `pnpm content:resource-manifest`，
+  并把素材包推到 `WispSnow/angel2-assets`。Suno 原始版本、参考音频和剪辑工具都不进仓库。改编按原曲
+  （或入场／循环曲对）对应，不要按关卡另登记。
 - `src/game/content/objective-panel.generated.ts` 由 `scripts/generate-objective-panel.mjs` 生成，
   来源是模组 29 映像、`reverse/parsed/dialogue/` 以及 `A/0006` 的平面渲染与遮罩流；同一个脚本还写出
   `public/assets/original/objective-panel-edge-top.png`、`-edge-bottom.png` 与 `-corner.png`，

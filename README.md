@@ -534,6 +534,7 @@ pnpm content:characters  # 角色目录
 pnpm content:portraits   # 肖像、头像框与文字窗
 pnpm content:font        # 原版 16×15 点阵字与码表
 pnpm content:music       # 从逆向 RIX WAV 生成去重 OGG 与哈希清单
+pnpm content:music-remix # 交响改编目录（REMAKE-181）；加 -- --import <工作区> 先从 Suno 工作区导入素材包
 pnpm assets:audit        # 按字节哈希审计图片重复内容与可回收体积
 ```
 

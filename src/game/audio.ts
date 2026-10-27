@@ -1,6 +1,7 @@
 import { ASSETS, SPEECH_RECORD_BY_CHARACTER } from "./content/stage0";
 import { BATTLE_ACTION_AUDIO_ASSETS } from "./content/actions";
 import { musicProgramFor } from "./content/music";
+import { ORCHESTRAL_TRANSITION_FADE_SECONDS, styledMusicProgram } from "./content/music-remix";
 import type { GameController } from "./controller";
 import {
   MusicTransport,
@@ -58,6 +59,8 @@ export class AudioManager {
   private previousBattleMusicSide?: BattleMusicSide;
   private previousCueSequence = 0;
   private selectedMusic?: MusicProgram;
+  /** `selectedMusic` before the `REMAKE-181` style mapping; phase-restart checks compare this. */
+  private selectedBaseMusic?: MusicProgram;
   private musicBoxSequence = 0;
   private musicBoxBase?: { id: string | undefined; expired: boolean };
   private readonly music: MusicTransport;
@@ -209,7 +212,7 @@ export class AudioManager {
       ? this.controller.turnTransitionPresentation.side
       : battleMusicSide(this.controller.phase);
     const previousSide = this.previousBattleMusicSide;
-    let desired = this.selectedMusic;
+    let desired = this.selectedBaseMusic;
     let restart = false;
     if (this.controller.phase === "ending") {
       const ending = this.controller.stage49Ending;
@@ -252,7 +255,7 @@ export class AudioManager {
       );
       // Module 29 restarts the incoming side's program at the phase boundary
       // even when both sides share one record; a mid-phase re-derive must not.
-      restart = side !== previousSide && desired?.id === this.selectedMusic?.id;
+      restart = side !== previousSide && desired?.id === this.selectedBaseMusic?.id;
     }
     else if (this.controller.phase === "credits") {
       desired = CREDITS_MUSIC_PROGRAM;
@@ -265,10 +268,20 @@ export class AudioManager {
 
     ({ desired, restart } = this.applyMusicBoxPlayback(desired, restart));
 
-    if (desired?.id !== this.selectedMusic?.id || restart) {
-      this.selectedMusic = desired;
-      this.music.select(desired, restart);
+    // `REMAKE-181`: the style only swaps which file plays. Selection, phase
+    // restarts and the music box all run on the original programs above.
+    const style = this.controller.musicStyle;
+    const styled = styledMusicProgram(desired, style);
+    if (styled?.id !== this.selectedMusic?.id || restart) {
+      // A remix leaving after the player switched back to 原版 still fades.
+      const fadeOutSeconds = style === "orchestral" || this.selectedMusic?.kind === "remix-loop"
+        ? ORCHESTRAL_TRANSITION_FADE_SECONDS
+        : undefined;
+      this.selectedMusic = styled;
+      this.selectedBaseMusic = desired;
+      this.music.select(styled, restart, fadeOutSeconds);
     }
+    if (this.controller.isTestMode) this.root.dataset.musicStyle = style;
     this.previousBattleMusicSide = side;
   }
 
@@ -312,6 +325,7 @@ export class AudioManager {
   private updateMusicDebugState(state: MusicTransportState): void {
     if (!this.controller.isTestMode) return;
     this.root.dataset.musicTrack = state.track ?? "none";
+    this.root.dataset.musicSource = state.source;
     this.root.dataset.musicPlaying = String(state.playing);
     this.root.dataset.musicLoop = String(state.loop);
     this.root.dataset.musicPart = state.part;

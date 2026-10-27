@@ -1,5 +1,11 @@
 import type { GameController } from "./controller";
-import { musicBoxSourceLabel, nativeMusicBoxLine } from "./content/music-box";
+import {
+  musicBoxProgram,
+  musicBoxSourceLabel,
+  nativeMusicBoxLine,
+  type MusicBoxTrack,
+} from "./content/music-box";
+import { musicRemixFor } from "./content/music-remix";
 import {
   NATIVE_DEBUG_BEHAVIOUR_EDITOR,
   NATIVE_DEBUG_CELL_READOUT,
@@ -220,13 +226,18 @@ export function mountOriginalDebugUi(
       : track.group === "extra" && controller.musicBoxTracks[index - 1]?.group !== "extra"
         ? `<span class="music-box-heading" role="presentation">原版未收錄</span>`
         : "";
+    // `REMAKE-181`：已有交響改編的曲目在 `交響` 模式下標出來；試聽時同樣播改編版。
+    const remixTag = musicRemixFor(musicBoxProgram(track))
+      ? `<span class="music-box-remix-tag" data-testid="music-box-remix-${track.id}" hidden>交響</span>`
+      : "";
     return `${groupHeading}<button type="button" role="option" class="music-box-track"
       data-music-box-index="${index}" data-testid="music-box-track-${track.id}" data-track-group="${track.group}">
       <span class="music-box-native">${escapeHtml(nativeLine)}</span>
-      <span class="music-box-usage">${escapeHtml(track.usage)}</span>
+      <span class="music-box-usage">${remixTag}${escapeHtml(track.usage)}</span>
     </button>`;
   }).join("");
   const trackButtons = [...musicList.querySelectorAll<HTMLButtonElement>("[data-music-box-index]")];
+  const remixTags = [...musicList.querySelectorAll<HTMLElement>(".music-box-remix-tag")];
   const editSlots = [...unitEditor.querySelectorAll<HTMLElement>("[data-debug-edit-index]")];
 
   const editSlotFor = (target: Element): number | undefined => {
@@ -372,12 +383,16 @@ export function mountOriginalDebugUi(
         trackButtons[controller.musicBoxIndex]?.scrollIntoView({ block: "nearest" });
         previousMusicIndex = controller.musicBoxIndex;
       }
+      const orchestral = controller.musicStyle === "orchestral";
+      for (const tag of remixTags) tag.hidden = !orchestral;
       const selectedTrack = controller.musicBoxTracks[controller.musicBoxIndex];
       const playingTrack = controller.musicBoxTracks.find(({ id }) => id === playingId);
+      const remixNote = (track: MusicBoxTrack) =>
+        orchestral && musicRemixFor(musicBoxProgram(track)) ? "・交響改編" : "";
       musicDetail.textContent = playingTrack
-        ? `試聽中：${playingTrack.legacyName ?? musicBoxSourceLabel(playingTrack)}（${musicBoxSourceLabel(playingTrack)}）。關閉後繼續播放，直到遊戲下一次換曲。`
+        ? `試聽中：${playingTrack.legacyName ?? musicBoxSourceLabel(playingTrack)}（${musicBoxSourceLabel(playingTrack)}${remixNote(playingTrack)}）。關閉後繼續播放，直到遊戲下一次換曲。`
         : selectedTrack
-          ? `${musicBoxSourceLabel(selectedTrack)}・${selectedTrack.kind === "loop" ? "單曲循環" : "入場段接循環段"}`
+          ? `${musicBoxSourceLabel(selectedTrack)}・${selectedTrack.kind === "loop" ? "單曲循環" : "入場段接循環段"}${remixNote(selectedTrack)}`
           : "";
       restoreButton.disabled = playingId === undefined;
     } else {

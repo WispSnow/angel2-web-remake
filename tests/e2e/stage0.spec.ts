@@ -3259,6 +3259,7 @@ test("RHP-06: music desk object selects five persistent levels without restartin
 
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.preferences.music.v1") ?? "null"))).toEqual({
     musicVolume: 3,
+    musicStyle: "original",
   });
   await page.reload();
   await waitForPhase(page, "prebattleStory");
@@ -4523,4 +4524,92 @@ test("S00-P: stage zero uses native entry-to-loop music pairs and preserves them
   await expect(app).toHaveAttribute("data-music-loop", "false");
   expect(battleRequests.has("0005.ogg")).toBe(true);
   expect(battleRequests.has("stage0-enemy-seamless.ogg")).toBe(true);
+});
+
+test("REMAKE-181: 交響 swaps stage zero music for single-file remixes and persists beside the volume", async ({ page }) => {
+  const app = page.locator("#app");
+  const remixRequests: string[] = [];
+  page.on("request", (request) => {
+    const match = request.url().match(/\/assets\/original\/music\/remix\/([^?]+\.ogg)/u);
+    if (match) remixRequests.push(match[1]);
+  });
+
+  await page.goto("/?test=1&skipStartup=1");
+  await page.evaluate(() => localStorage.removeItem("angel2.preferences.music.v1"));
+  await page.reload();
+  await waitForPhase(page, "prebattleStory");
+  await expect(app).toHaveAttribute("data-music-style", "original");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "openingStory");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "player");
+  await expect(app).toHaveAttribute("data-music-source", "original");
+  await expect(app).toHaveAttribute("data-music-playing", "true");
+  // 原版 players never download a remix.
+  expect(remixRequests).toEqual([]);
+
+  const baseline = await debugState(page);
+  await page.keyboard.press("m");
+  await expect(page.getByTestId("music-settings-menu")).toBeVisible();
+  await expect(page.getByTestId("music-style-original")).toHaveAttribute("aria-checked", "true");
+  await page.getByTestId("music-style-orchestral").click();
+  await expect(page.getByTestId("music-style-orchestral")).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("music-style-original")).toHaveAttribute("aria-checked", "false");
+  await expect(app).toHaveAttribute("data-music-style", "orchestral");
+  await expect(app).toHaveAttribute("data-music-source", "remix");
+  await expect(app).toHaveAttribute("data-music-track", "MUSIC/7");
+  await expect(app).toHaveAttribute("data-music-playing", "true", { timeout: 15_000 });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-music-style-orchestral.png",
+  });
+  expect(remixRequests).toContain("MUSIC-07-06.ogg");
+  const afterSwitch = await debugState(page);
+  expect(afterSwitch.musicStyle).toBe("orchestral");
+  expect(afterSwitch.units).toEqual(baseline.units);
+  expect(afterSwitch.rngState).toBe(baseline.rngState);
+
+  await page.getByTestId("open-music-box").click();
+  const box = page.getByTestId("music-box");
+  await expect(box).toBeVisible();
+  await expect(box.locator(".music-box-remix-tag:visible")).toHaveCount(3);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("music-settings-menu")).toBeHidden();
+
+  // The remix's intro stands in for MUSIC/7 until the file reaches its loop start.
+  await expect(app).toHaveAttribute("data-music-track", "MUSIC/6", { timeout: 15_000 });
+  await expect(app).toHaveAttribute("data-music-part", "loop");
+
+  const playRequests = Number(await app.getAttribute("data-music-play-request-count"));
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-allRest").click();
+  await waitForPhase(page, "enemy");
+  await expect(app).toHaveAttribute("data-music-track", "MUSIC/5");
+  await expect(app).toHaveAttribute("data-music-source", "remix");
+  await expect.poll(async () => Number(await app.getAttribute("data-music-play-request-count")))
+    .toBeGreaterThan(playRequests);
+  expect(remixRequests).toContain("MUSIC-05-04.ogg");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.preferences.music.v1") ?? "null"))).toEqual({
+    musicVolume: 4,
+    musicStyle: "orchestral",
+  });
+
+  // A reload keeps the style; the stage gate fetches the story remix up front.
+  await page.reload();
+  await waitForPhase(page, "prebattleStory");
+  expect(remixRequests).toContain("MAGIC-73.ogg");
+  await page.getByTestId("game-screen").click({ position: { x: 620, y: 340 } });
+  await expect(app).toHaveAttribute("data-music-style", "orchestral");
+  await expect(app).toHaveAttribute("data-music-source", "remix");
+  await expect(app).toHaveAttribute("data-music-track", "MAGIC/73");
+  await expect(app).toHaveAttribute("data-music-playing", "true");
+
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "openingStory");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "player");
+  await page.keyboard.press("m");
+  await page.getByTestId("music-style-original").click();
+  await expect(app).toHaveAttribute("data-music-source", "original");
+  await expect(app).toHaveAttribute("data-music-track", "MUSIC/7");
 });

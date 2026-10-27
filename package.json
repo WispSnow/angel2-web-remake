@@ -99,6 +99,7 @@
     "content:ai-dialogue": "node scripts/generate-ai-technique-dialogue.mjs",
     "content:technique-lab": "node scripts/generate-technique-lab.mjs",
     "content:music": "node scripts/generate-music-assets.mjs",
+    "content:music-remix": "node scripts/generate-music-remix.mjs",
     "assets:audit": "node scripts/audit-image-assets.mjs"
   },
   "dependencies": {

@@ -52,6 +52,7 @@ const generators = [
   "generate-ai-technique-dialogue.mjs",
   "generate-technique-lab.mjs",
   "generate-music-assets.mjs",
+  "generate-music-remix.mjs",
   "generate-credits-runtime.mjs",
   "generate-resource-manifest.mjs",
 ];

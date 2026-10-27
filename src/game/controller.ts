@@ -52,6 +52,7 @@ import { setBattleDataEditsSource, withNativeBattleData } from "./content/battle
 import { stagedRenderAssetAvailable } from "./staged-render-asset-cache";
 import { fullCombatImageAvailable } from "./full-combat-image-cache";
 import { MUSIC_BOX_TRACKS, musicBoxProgram } from "./content/music-box";
+import { stageRemixMusicUrls } from "./content/music-remix";
 import type { MusicProgram } from "./music-transport";
 import {
   originalDebugHotkeyRefusal,
@@ -186,6 +187,7 @@ import type {
   SpecialActionResult,
 } from "./simulation/actions/types";
 import {
+  isMusicStyle,
   isMusicVolume,
   isSoundEffectVolume,
   loadMusicPreferences,
@@ -194,6 +196,7 @@ import {
   saveMusicPreferences,
   savePresentationPreferences,
   saveSoundPreferences,
+  type MusicStyle,
   type MusicVolume,
   type SoundEffectVolume,
 } from "./preferences";
@@ -239,6 +242,11 @@ export interface StageAssetRequirements {
    * 資源門一併備妥；否則慢速連線會在階段切過去之後才開始抓，而那時已經沒有載入頁了。
    */
   usesDeploymentSurface: boolean;
+  /**
+   * `REMAKE-181` 這一關要預載的交響改編檔；`原版` 模式為空。改編不放進關卡資源包本身，
+   * 只在玩家選了 `交響` 時隨資源門下載。
+   */
+  musicUrls?: readonly string[];
 }
 
 /**
@@ -677,6 +685,8 @@ export class GameController {
   portraitsEnabled: boolean;
   aiDialogueEnabled: boolean;
   musicVolume: MusicVolume;
+  /** `REMAKE-181` 音樂風格；只改表現，不進存檔。 */
+  musicStyle: MusicStyle;
   soundEffectVolume: SoundEffectVolume;
   speechEnabled: boolean;
   movementSoundEnabled: boolean;
@@ -788,7 +798,9 @@ export class GameController {
     this.edgeScrollEnabled = preferences.edgeScrollEnabled;
     this.portraitsEnabled = preferences.portraitsEnabled;
     this.aiDialogueEnabled = preferences.aiDialogueEnabled;
-    this.musicVolume = loadMusicPreferences(localStorage).musicVolume;
+    const musicPreferences = loadMusicPreferences(localStorage);
+    this.musicVolume = musicPreferences.musicVolume;
+    this.musicStyle = musicPreferences.musicStyle;
     const soundPreferences = loadSoundPreferences(localStorage);
     this.soundEffectVolume = soundPreferences.soundEffectVolume;
     this.speechEnabled = soundPreferences.speechEnabled;
@@ -1061,6 +1073,7 @@ export class GameController {
         nativeStage: runtime.definition.nativeStage,
         portraitRecords: [...portraitRecords].sort((left, right) => left - right),
         usesDeploymentSurface: runtime.preparation !== undefined,
+        musicUrls: stageRemixMusicUrls(runtime.definition.music, this.musicStyle),
       };
     };
     if (this.stageAssetGate) await this.stageAssetGate(stageId, resolveRequirements);
@@ -6337,6 +6350,13 @@ export class GameController {
     this.emit();
   }
 
+  setMusicStyle(style: unknown): void {
+    if (!isMusicStyle(style) || style === this.musicStyle) return;
+    this.musicStyle = style;
+    this.persistMusicPreferences();
+    this.emit();
+  }
+
   setSoundEffectVolume(volume: number): void {
     if (!isSoundEffectVolume(volume) || volume === this.soundEffectVolume) return;
     this.soundEffectVolume = volume;
@@ -7840,6 +7860,7 @@ export class GameController {
       promotionSelectionIndex: this.promotionSelectionIndex,
       promotionTargets: this.promotionTargets.map((target) => ({ ...target })),
       musicVolume: this.musicVolume,
+      musicStyle: this.musicStyle,
       soundEffectVolume: this.soundEffectVolume,
       speechEnabled: this.speechEnabled,
       movementSoundEnabled: this.movementSoundEnabled,
@@ -8132,7 +8153,10 @@ export class GameController {
   }
 
   private persistMusicPreferences(): void {
-    saveMusicPreferences(localStorage, { musicVolume: this.musicVolume });
+    saveMusicPreferences(localStorage, {
+      musicVolume: this.musicVolume,
+      musicStyle: this.musicStyle,
+    });
   }
 
   private async moveSelectedUnit(destination: Position): Promise<void> {

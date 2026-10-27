@@ -17,6 +17,11 @@ export interface SoundPreferences {
 export type VolumeLevel = 0 | 1 | 2 | 3 | 4;
 export type MusicVolume = VolumeLevel;
 export type SoundEffectVolume = VolumeLevel;
+/**
+ * `REMAKE-181` 音樂風格：`orchestral` 把已有交響改編的曲目換成 `music/remix/` 的單檔循環，
+ * 其餘曲目照播原版。只改表現，不進存檔。
+ */
+export type MusicStyle = "original" | "orchestral";
 
 /**
  * How the 640x350 logical screen is resampled on its way to the host display.
@@ -46,6 +51,7 @@ export interface DisplayPreferences {
 
 export interface MusicPreferences {
   musicVolume: MusicVolume;
+  musicStyle: MusicStyle;
 }
 
 export interface PreferenceStorage {
@@ -76,6 +82,7 @@ export const DEFAULT_SOUND_PREFERENCES: Readonly<SoundPreferences> = {
 
 export const DEFAULT_MUSIC_PREFERENCES: Readonly<MusicPreferences> = {
   musicVolume: 4,
+  musicStyle: "original",
 };
 
 export const DEFAULT_DISPLAY_PREFERENCES: Readonly<DisplayPreferences> = {
@@ -93,6 +100,9 @@ const isVolumeLevel = (value: unknown): value is VolumeLevel =>
   Number.isInteger(value) && typeof value === "number" && value >= 0 && value <= 4;
 
 export const isMusicVolume = (value: unknown): value is MusicVolume => isVolumeLevel(value);
+
+export const isMusicStyle = (value: unknown): value is MusicStyle =>
+  value === "original" || value === "orchestral";
 
 export const isSoundEffectVolume = (value: unknown): value is SoundEffectVolume =>
   isVolumeLevel(value);
@@ -174,6 +184,9 @@ export function loadMusicPreferences(storage: PreferenceStorage): MusicPreferenc
       musicVolume: isMusicVolume(candidate.musicVolume)
         ? candidate.musicVolume
         : DEFAULT_MUSIC_PREFERENCES.musicVolume,
+      musicStyle: isMusicStyle(candidate.musicStyle)
+        ? candidate.musicStyle
+        : DEFAULT_MUSIC_PREFERENCES.musicStyle,
     };
   } catch {
     return { ...DEFAULT_MUSIC_PREFERENCES };

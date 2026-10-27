@@ -138,9 +138,23 @@ describe("music preferences", () => {
   test("round-trips each one-of-five music selection", () => {
     const storage = new MemoryStorage();
     for (const musicVolume of [0, 1, 2, 3, 4] as const) {
-      saveMusicPreferences(storage, { musicVolume });
-      expect(loadMusicPreferences(storage)).toEqual({ musicVolume });
+      saveMusicPreferences(storage, { musicVolume, musicStyle: "original" });
+      expect(loadMusicPreferences(storage)).toEqual({ musicVolume, musicStyle: "original" });
     }
+  });
+
+  test("defaults the REMAKE-181 style to 原版 and keeps it beside the volume", () => {
+    const storage = new MemoryStorage();
+    expect(DEFAULT_MUSIC_PREFERENCES.musicStyle).toBe("original");
+    // A payload written before the style existed keeps its volume.
+    storage.setItem(MUSIC_PREFERENCES_KEY, JSON.stringify({ musicVolume: 2 }));
+    expect(loadMusicPreferences(storage)).toEqual({ musicVolume: 2, musicStyle: "original" });
+    for (const invalid of ["symphonic", 1, null, ""]) {
+      storage.setItem(MUSIC_PREFERENCES_KEY, JSON.stringify({ musicVolume: 3, musicStyle: invalid }));
+      expect(loadMusicPreferences(storage)).toEqual({ musicVolume: 3, musicStyle: "original" });
+    }
+    saveMusicPreferences(storage, { musicVolume: 1, musicStyle: "orchestral" });
+    expect(loadMusicPreferences(storage)).toEqual({ musicVolume: 1, musicStyle: "orchestral" });
   });
 });
 

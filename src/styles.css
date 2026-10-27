@@ -924,11 +924,20 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .music-settings-menu { position: absolute; z-index: 15; left: 304px; top: 45px; width: 170px; padding: 12px 16px 14px; }
 .music-settings-menu h2 { margin: 3px 0 8px; color: #f3d466; font-size: 18px; }
 .music-settings-list { display: grid; grid-template-columns: 1fr; gap: 3px; }
-.music-settings-list > button { min-width: 0; padding: 4px 8px; font-size: 12px; }
+.music-volume-group { display: grid; grid-template-columns: 1fr; gap: 3px; }
+/*
+ * `REMAKE-181`：面板從 y=45 起剛好佔滿到畫面底邊。音量鍵原本寫的 4px 內距一直被後面的
+ * `.modal-panel button` 蓋掉，這裡提高權重讓它生效（與底列按鈕同高），省下的高度給風格列，
+ * 面板總高不變，「返回」仍留在畫面內。
+ */
+.music-settings-menu .music-volume-group > button { min-width: 0; padding: 4px 8px; font-size: 12px; }
+.music-style-group { display: grid; grid-template-columns: auto 1fr 1fr; align-items: center; gap: 3px; }
+.music-style-label { color: #f3d466; font-size: 11px; white-space: nowrap; }
+.music-settings-menu .music-style-group > button { min-width: 0; padding: 4px 4px; font-size: 12px; }
 /* `REMAKE-174`：「音樂盒」與「返回」並排在同一列，面板高度不因新入口而增加，返回鍵留在畫面內。 */
 .music-settings-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
 .music-settings-menu .music-settings-footer > button { min-width: 0; padding: 4px 4px; font-size: 12px; }
-.music-settings-list > button[role="radio"].is-selected {
+.music-settings-list button[role="radio"].is-selected {
   color: #fff;
   background: #8d342f;
   box-shadow: inset 0 0 0 1px #f4d34b;
@@ -1217,6 +1226,8 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .music-box-native { font: 12px/1.4 ui-monospace, "SFMono-Regular", Menlo, monospace; white-space: pre; }
 .music-box-usage { overflow: hidden; color: #cdb995; font-size: 11px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
 .music-box-panel .music-box-track.is-selected .music-box-usage { white-space: normal; }
+/* `REMAKE-181`：`交響` 模式下標出已有交響改編的曲目。 */
+.music-box-remix-tag { margin-right: 5px; padding: 0 3px; border: 1px solid #d4a62d; border-radius: 2px; color: #f4d34b; font-size: 10px; }
 .music-box-detail { min-height: 16px; margin: 6px 0; color: #e7d6b2; font-size: 11px; line-height: 1.45; }
 .music-box-actions { display: flex; justify-content: center; gap: 8px; }
 .music-box-panel .music-box-actions > button { min-width: 0; padding: 4px 14px; font-size: 12px; }

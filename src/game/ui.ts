@@ -229,10 +229,19 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             <section class="music-settings-menu modal-panel" id="music-settings-menu"
               data-testid="music-settings-menu" role="dialog" aria-label="音樂開關" hidden>
               <span class="panel-kicker">MUSIC</span><h2>音樂開關</h2>
-              <div class="music-settings-list" role="radiogroup" aria-label="音樂音量">
-                ${["無聲", "1", "2", "3", "最大"].map((label, level) =>
-                  `<button role="radio" data-action="music-volume" data-music-level="${level}"
-                    data-testid="music-volume-${level}">${label}</button>`).join("")}
+              <div class="music-settings-list">
+                <div class="music-volume-group" role="radiogroup" aria-label="音樂音量">
+                  ${["無聲", "1", "2", "3", "最大"].map((label, level) =>
+                    `<button role="radio" data-action="music-volume" data-music-level="${level}"
+                      data-testid="music-volume-${level}">${label}</button>`).join("")}
+                </div>
+                <div class="music-style-group" role="radiogroup" aria-labelledby="music-style-label">
+                  <span class="music-style-label" id="music-style-label">音樂風格</span>
+                  <button role="radio" data-action="music-style" data-music-style="original"
+                    data-testid="music-style-original">原版</button>
+                  <button role="radio" data-action="music-style" data-music-style="orchestral"
+                    data-testid="music-style-orchestral">交響</button>
+                </div>
                 <div class="music-settings-footer">
                   <button data-debug-action="open-music-box" data-testid="open-music-box">音樂盒</button>
                   <button data-action="close-music-settings" data-testid="close-music-settings">返回</button>
@@ -1018,6 +1027,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "close-music-settings") controller.closeMusicSettings();
     else if (action === "close-terrain-inspection") controller.closeTerrainInspection();
     else if (action === "music-volume") controller.setMusicVolume(Number(button.dataset.musicLevel));
+    else if (action === "music-style") controller.setMusicStyle(button.dataset.musicStyle);
     else if (action === "record-slot") {
       controller.selectRecordMenuSlot(Number(button.dataset.recordIndex));
       controller.activateRecordMenuSelection();
@@ -1609,6 +1619,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     for (const button of root.querySelectorAll<HTMLButtonElement>("[data-music-level]")) {
       const selected = Number(button.dataset.musicLevel) === controller.musicVolume;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-checked", String(selected));
+    }
+    for (const button of root.querySelectorAll<HTMLButtonElement>("[data-music-style]")) {
+      const selected = button.dataset.musicStyle === controller.musicStyle;
       button.classList.toggle("is-selected", selected);
       button.setAttribute("aria-checked", String(selected));
     }
