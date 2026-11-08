@@ -190,6 +190,15 @@ export class ResourcePackLoader {
   }
 
   /**
+   * `REMAKE-186` 載入面板選了交響時要的改編曲不屬於任何開場資源包，但仍走同一條
+   * Cache Storage 與編碼資料路徑，下次啟動不必重抓。
+   */
+  async ensureMusic(urls: readonly string[]): Promise<void> {
+    const manifest = await this.loadManifest();
+    await this.loadUrls(manifest, [...new Set(urls)]);
+  }
+
+  /**
    * 原版Debug EDIT 改到這一關沒備妥的職業：不顯示載入頁，下載它的棋子、全景戰鬥圖與通用肖像，
    * 補進目前這一關的租約。下一次換關照常整份換掉。
    */

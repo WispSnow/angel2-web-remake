@@ -117,7 +117,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 
 .startup-screen { color: #fff; background: #000; }
-/* 標題、按鈕、狀態三段由上而下等距排列；方框只要裝得下這三段，就不必再撐出
+/* 標題、音樂風格、狀態、按鈕由上而下等距排列；方框只要裝得下這幾段，就不必再撐出
    一段說明文字的高度。狀態行永遠保留一行，準備中、解鎖中與失敗訊息共用它。 */
 .startup-activation {
   position: absolute;
@@ -181,6 +181,29 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 .startup-activation button:disabled { opacity: .55; cursor: wait; }
 .startup-activation button:focus-visible { outline: 2px solid #f3dcad; outline-offset: 3px; }
+.startup-music-style {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  align-items: center;
+  gap: 6px;
+  color: #f3d466;
+  font-size: 12px;
+}
+.startup-activation .startup-music-style button {
+  justify-self: stretch;
+  min-width: 0;
+  padding: 4px 0;
+  border-color: #5d4a6b;
+  color: #b9a9c0;
+  background: #1a1124;
+  font-size: 12px;
+  letter-spacing: .1em;
+}
+.startup-activation .startup-music-style button[aria-checked="true"] {
+  border-color: #f3dcad;
+  color: #fff2ca;
+  background: #6a3d7d;
+}
 /* Both layers now only carry hidden narration, the menu frames and the menus;
  * the canvas underneath paints every startup pixel. */
 .startup-intro,

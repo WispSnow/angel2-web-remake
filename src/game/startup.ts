@@ -50,6 +50,12 @@ import {
 } from "./save";
 import type { Difficulty, SaveData } from "./types";
 import type { PreparedStartupMusic } from "./startup-music";
+import {
+  loadMusicPreferences,
+  saveMusicPreferences,
+  type MusicStyle,
+} from "./preferences";
+import { isTauriDesktopRuntime } from "./desktop-runtime";
 import { isProgramPaused, onProgramPauseChange, programNow } from "./program-clock";
 
 /**
@@ -146,6 +152,7 @@ export function mountStartup(
   root: HTMLElement,
   startGame: (selection: StartupSelection) => void,
   startupMusic: PreparedStartupMusic,
+  onOrchestralSelected: () => void,
 ): () => void {
   applyStagedNativeUiAssets(root);
   const testMode = new URLSearchParams(location.search).has("test");
@@ -179,6 +186,7 @@ export function mountStartup(
   let disposed = false;
   let startupAssetsReady = false;
   let activationPending = false;
+  let musicStyle: MusicStyle = loadMusicPreferences(localStorage).musicStyle;
   const loadedImages = new Map<string, HTMLImageElement>();
 
   root.innerHTML = `
@@ -193,6 +201,17 @@ export function mountStartup(
               aria-labelledby="startup-activation-title" aria-describedby="startup-activation-detail">
               <p class="startup-activation-kicker">ANGEL2 · WEB REMAKE</p>
               <h1 id="startup-activation-title">開場準備完成</h1>
+              <div class="startup-music-style" role="radiogroup" aria-labelledby="startup-music-style-label">
+                <span id="startup-music-style-label">音樂風格</span>
+                <button type="button" role="radio" data-startup-action="music-style" data-music-style="original"
+                  data-testid="startup-music-style-original">原版</button>
+                <button type="button" role="radio" data-startup-action="music-style" data-music-style="orchestral"
+                  data-testid="startup-music-style-orchestral">交響</button>
+              </div>
+              <p data-testid="startup-music-style-hint">${
+                isTauriDesktopRuntime() ? "交響為 AI 改編版。" : "交響為 AI 改編版，需額外下載。"
+              }<br>遊戲中可在「音樂開關」隨時切換。</p>
+              <span class="visually-hidden" aria-live="polite" data-testid="startup-music-style-status"></span>
               <!-- 就緒後這一行留空：標題與按鈕已經說明要做什麼，說明文字只是佔位。
                    它仍然承載準備中、解鎖中與失敗訊息，所以保留一行高度，避免方框
                    在玩家按下按鈕的當下抖動。 -->
@@ -296,6 +315,8 @@ export function mountStartup(
   const activation = required<HTMLElement>(root, ".startup-activation");
   const activationDetail = required<HTMLElement>(root, "[data-testid=startup-activation-detail]");
   const activationButton = required<HTMLButtonElement>(root, "[data-testid=startup-enter]");
+  const musicStyleButtons = root.querySelectorAll<HTMLButtonElement>("[data-startup-action=music-style]");
+  const musicStyleStatus = required<HTMLElement>(root, "[data-testid=startup-music-style-status]");
   const stopScaling = configureGameScaling(viewport, screen);
   /**
    * [OF] `REMAKE-114` withdrew the loop `REMAKE-112` had inferred: MUSIC/1 plays
@@ -318,6 +339,28 @@ export function mountStartup(
     screen.dataset.titleMusicPlaying = String(startupMusic.titlePlaying);
     screen.dataset.titleMusicPlayCount = String(titleMusicPlays);
     screen.dataset.titleMusicLoop = "false";
+    screen.dataset.startupMusicSource = startupMusic.source;
+  };
+  const updateMusicStyleControls = () => {
+    for (const button of musicStyleButtons) {
+      button.setAttribute("aria-checked", String(button.dataset.musicStyle === musicStyle));
+      button.disabled = activationPending;
+    }
+  };
+  /**
+   * `REMAKE-186`: the style is a device preference, so choosing here is the same
+   * write as the 音樂開關 panel. Focus stays on 進入遊戲 so Enter keeps its meaning.
+   */
+  const chooseMusicStyle = (style: MusicStyle) => {
+    if (activationPending || style === musicStyle) return;
+    musicStyle = style;
+    saveMusicPreferences(localStorage, { ...loadMusicPreferences(localStorage), musicStyle });
+    updateMusicStyleControls();
+    musicStyleStatus.textContent = style === "orchestral" ? "音樂風格：交響" : "音樂風格：原版";
+    if (style === "orchestral") {
+      startupMusic.prepareRemix();
+      onOrchestralSelected();
+    }
   };
   const startTitleMusic = () => {
     titleMusicPlays += 1;
@@ -485,10 +528,14 @@ export function mountStartup(
     if (phase !== "ready" || !startupAssetsReady || activationPending) return;
     activationPending = true;
     activationButton.disabled = true;
+    updateMusicStyleControls();
     activationDetail.textContent = "正在開啟音樂……";
     // resume() is invoked synchronously inside the gesture handler. Awaiting it
     // only delays the native clocks until the browser confirms audible output.
-    void startupMusic.unlock().then(() => {
+    void startupMusic.unlock().then(async () => {
+      if (disposed) return;
+      if (musicStyle === "orchestral") activationDetail.textContent = "正在準備交響開場音樂……";
+      await startupMusic.selectStyle(musicStyle);
       if (disposed) return;
       activation.hidden = true;
       phase = "pretitle";
@@ -500,6 +547,7 @@ export function mountStartup(
       if (disposed) return;
       activationPending = false;
       activationButton.disabled = false;
+      updateMusicStyleControls();
       activationDetail.textContent = error instanceof Error
         ? `${error.message} 請再確認一次。`
         : "瀏覽器未允許音樂播放，請再確認一次。";
@@ -709,7 +757,9 @@ export function mountStartup(
     idleSince = programNow();
     if (phase === "ready") {
       event.preventDefault();
-      activateStartup();
+      const stepX = keyboardDirection(event.key)?.x;
+      if (stepX) chooseMusicStyle(stepX < 0 ? "original" : "orchestral");
+      else activateStartup();
       return;
     }
     if (phase === "pretitle") {
@@ -807,6 +857,11 @@ export function mountStartup(
     if (!button) return;
     if (button.dataset.startupAction === "activate") {
       activateStartup();
+      return;
+    }
+    if (button.dataset.startupAction === "music-style") {
+      chooseMusicStyle(button.dataset.musicStyle === "orchestral" ? "orchestral" : "original");
+      if (!activationButton.disabled) activationButton.focus({ preventScroll: true });
       return;
     }
     if (saveBackupUi.handleClick(button)) return;
@@ -1000,6 +1055,8 @@ export function mountStartup(
   root.addEventListener("pointerdown", onPointerDown);
   root.addEventListener("contextmenu", onContextMenu);
   updateMenuSelection();
+  updateMusicStyleControls();
+  if (musicStyle === "orchestral") startupMusic.prepareRemix();
   screen.dataset.startupAssetsReady = "false";
   updateStartupMusicDebugState();
   const unsubscribeProgramPause = onProgramPauseChange((paused) => startupMusic.setPaused(paused));

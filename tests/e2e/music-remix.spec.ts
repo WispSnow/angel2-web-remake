@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { captureVisualAudit } from "./visual-audit";
 
 /**
  * `REMAKE-185`: in 交響 mode every surface's resource gate fetches the remixes
@@ -99,4 +100,98 @@ test("REMAKE-185: the credits gate fetches UN/55's remix before the roll appears
   await expect(page.getByTestId("credits-screen")).toBeVisible({ timeout: 60_000 });
   await expectRemixPlaying(page, "UN/55");
   expect(credits.requests()).toBe(1);
+});
+
+/**
+ * `REMAKE-186`: the entry panel is the one surface every launch passes through,
+ * so the style lives there and the opening follows it. Holding the two startup
+ * remixes separates "waited for them" from "started on the originals".
+ */
+const startupPhase = (page: Page) => page.getByTestId("startup-screen");
+const openEntryPanel = async (page: Page) => {
+  await page.goto("/?test=1");
+  await expect(page.getByTestId("startup-enter")).toBeEnabled({ timeout: 15_000 });
+};
+const startupRemixRequests = (page: Page) => {
+  const seen: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/music/remix/MUSIC-14.ogg") || request.url().includes("/music/remix/MUSIC-01.ogg")) {
+      seen.push(request.url());
+    }
+  });
+  return seen;
+};
+
+test("REMAKE-186: the entry panel defaults to 原版 and stores the choice without entering", async ({ page }) => {
+  const remixes = startupRemixRequests(page);
+  await openEntryPanel(page);
+  const original = page.getByTestId("startup-music-style-original");
+  const orchestral = page.getByTestId("startup-music-style-orchestral");
+  const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem("angel2.preferences.music.v1") ?? "{}").musicStyle);
+  await expect(original).toHaveAttribute("aria-checked", "true");
+  await expect(orchestral).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByTestId("startup-music-style-hint")).toContainText("音樂開關");
+  await captureVisualAudit(page.getByTestId("startup-screen"), { path: "artifacts/playwright/startup-music-style.png" });
+
+  await page.keyboard.press("ArrowRight");
+  await expect(orchestral).toHaveAttribute("aria-checked", "true");
+  expect(await stored()).toBe("orchestral");
+  await page.keyboard.press("ArrowLeft");
+  await expect(original).toHaveAttribute("aria-checked", "true");
+  expect(await stored()).toBe("original");
+
+  await orchestral.click();
+  await expect(orchestral).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("startup-enter")).toBeFocused();
+  await expect(startupPhase(page)).toHaveAttribute("data-startup-phase", "ready");
+  await expect.poll(() => remixes.length).toBe(2);
+});
+
+test("REMAKE-186: 原版 enters without requesting a startup remix", async ({ page }) => {
+  const remixes = startupRemixRequests(page);
+  await openEntryPanel(page);
+  await page.keyboard.press("Enter");
+  await expect(startupPhase(page)).toHaveAttribute("data-startup-phase", "pretitle");
+  await expect(startupPhase(page)).toHaveAttribute("data-startup-music-source", "original");
+  expect(remixes).toEqual([]);
+});
+
+test("REMAKE-186: entering with 交響 waits for the remixes and the opening plays them", async ({ page }) => {
+  const intro = await holdRemix(page, "MUSIC-14.ogg");
+  const title = await holdRemix(page, "MUSIC-01.ogg");
+  await openEntryPanel(page);
+  await page.getByTestId("startup-music-style-orchestral").click();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("startup-activation-detail")).toHaveText("正在準備交響開場音樂……");
+  await expect(startupPhase(page)).toHaveAttribute("data-startup-phase", "ready");
+  await expect(page.getByTestId("startup-music-style-original")).toBeDisabled();
+
+  intro.release();
+  title.release();
+  await expect(startupPhase(page)).toHaveAttribute("data-startup-phase", /pretitle|intro/, { timeout: 15_000 });
+  await expect(startupPhase(page)).toHaveAttribute("data-startup-music-source", "remix");
+  await expect(startupPhase(page)).toHaveAttribute("data-intro-music-playing", "true", { timeout: 15_000 });
+  await page.keyboard.press("x");
+  await expect(page.getByTestId("title-menu")).toBeVisible({ timeout: 30_000 });
+  await expect(startupPhase(page)).toHaveAttribute("data-title-music-play-count", "1");
+  expect(intro.requests()).toBe(1);
+  expect(title.requests()).toBe(1);
+});
+
+test("REMAKE-186: a saved 交響 starts fetching as soon as the panel appears", async ({ page }) => {
+  await useOrchestralStyle(page);
+  const remixes = startupRemixRequests(page);
+  await openEntryPanel(page);
+  await expect(page.getByTestId("startup-music-style-orchestral")).toHaveAttribute("aria-checked", "true");
+  await expect.poll(() => remixes.length).toBe(2);
+});
+
+test("REMAKE-186: a failed remix download opens on the originals and keeps the preference", async ({ page }) => {
+  await page.route("**/assets/original/music/remix/MUSIC-14.ogg", (route) => route.abort());
+  await useOrchestralStyle(page);
+  await openEntryPanel(page);
+  await page.keyboard.press("Enter");
+  await expect(startupPhase(page)).toHaveAttribute("data-startup-phase", /pretitle|intro/, { timeout: 15_000 });
+  await expect(startupPhase(page)).toHaveAttribute("data-startup-music-source", "original");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.preferences.music.v1") ?? "{}").musicStyle)).toBe("orchestral");
 });

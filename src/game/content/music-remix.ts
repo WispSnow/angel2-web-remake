@@ -41,6 +41,14 @@ export function musicRemixFor(program: MusicProgram | undefined): MusicRemixTrac
   return key === undefined ? undefined : REMIX_BY_KEY.get(key);
 }
 
+/** `REMAKE-186` 開場播放器用的兩首改編：捲動開場 `MUSIC/14` 與標題 `MUSIC/1`。 */
+export function startupRemixUrls(): { readonly intro: string; readonly title: string } {
+  const intro = REMIX_BY_KEY.get("MUSIC/14");
+  const title = REMIX_BY_KEY.get("MUSIC/1");
+  if (!intro || !title) throw new Error("開場曲缺少交響改編。");
+  return { intro: intro.source, title: title.source };
+}
+
 /** 依風格換成交響改編；沒有改編或已經是改編時原樣傳回。 */
 export function styledMusicProgram(
   program: MusicProgram | undefined,
