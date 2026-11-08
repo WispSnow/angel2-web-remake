@@ -107,6 +107,7 @@ describe("versioned resource manifest", () => {
         if (!musicId) continue;
         const program = musicProgramFor(musicId);
         if (!program) throw new Error(`${stageId} does not register ${musicId}`);
+        if (program.kind === "remix-loop") throw new Error(`${stageId} ${musicId} must register an original program`);
         const urls = program.kind === "loop"
           ? [program.source, program.seamlessLoop]
           : [program.entry, program.seamlessLoop];
