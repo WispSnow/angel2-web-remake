@@ -20,10 +20,15 @@ import { originalDebugEditorAssetUrls } from "./game/original-debug-mode";
 import { createStage0Units } from "./game/content/stage0";
 import { stageDialoguePortraitRecords } from "./game/content/portrait-assets";
 import { STAGE0_DEFINITION } from "./game/content/stages";
-import { stageRemixMusicUrls } from "./game/content/music-remix";
+import { remixMusicUrls, stageRemixMusicUrls } from "./game/content/music-remix";
+import { CREDITS_MUSIC_PROGRAM } from "./game/content/credits";
 import { loadMusicPreferences } from "./game/preferences";
 import type { PortraitRecord } from "./game/types";
-import { STAGE49_ENDING_SUPPLEMENTAL_ASSETS } from "./game/content/stage49-ending";
+import {
+  STAGE49_ENDING_MUSIC,
+  STAGE49_ENDING_SUPPLEMENTAL_ASSETS,
+  STAGE49_EPILOGUE_MUSIC_BY_SELECTOR,
+} from "./game/content/stage49-ending";
 import {
   prepareStartupMusic,
   type PreparedStartupMusic,
@@ -104,7 +109,11 @@ const controllerAssetRequirements = (controller: GameController): StageAssetRequ
   ])],
   unitSpriteUrls: controller.stageUnitSpriteUrls,
   usesDeploymentSurface: controller.usesDeploymentSurface,
-  musicUrls: stageRemixMusicUrls(controller.battle.stage.music, controller.musicStyle),
+  musicUrls: stageRemixMusicUrls(
+    controller.battle.stage.music,
+    controller.musicStyle,
+    controller.usesDeploymentSurface ? controller.battle.stage.nativeStage : undefined,
+  ),
 });
 const stage0Units = createStage0Units();
 const stage0PresentationAssets = classPresentationAssetUrls({
@@ -204,10 +213,19 @@ const mountController = (
     if (controller.phase === "ending") {
       destroySurface = () => undefined;
       const mount = async () => {
+        // `交響` 模式下結局三段曲的改編與原曲一樣在路由門內備妥；收尾曲只取這次戰績選到的那首。
+        const ending = controller.stage49Ending;
         await stagedResources?.ensureRoute(
           "ending",
           "讀取主線結局資料",
-          STAGE49_ENDING_SUPPLEMENTAL_ASSETS,
+          [
+            ...STAGE49_ENDING_SUPPLEMENTAL_ASSETS,
+            ...remixMusicUrls([
+              STAGE49_ENDING_MUSIC.story,
+              STAGE49_ENDING_MUSIC.roster,
+              ending ? STAGE49_EPILOGUE_MUSIC_BY_SELECTOR[ending.epilogueMusicSelector] : undefined,
+            ], controller.musicStyle),
+          ],
         );
         if (generation !== surfaceGeneration || controller.phase !== "ending") return;
         destroySurface = mountStage49EndingUi(root, controller);
@@ -218,7 +236,11 @@ const mountController = (
     if (controller.phase === "credits") {
       destroySurface = () => undefined;
       const mount = async () => {
-        await stagedResources?.ensureRoute("credits", "讀取製作人員表資料");
+        await stagedResources?.ensureRoute(
+          "credits",
+          "讀取製作人員表資料",
+          remixMusicUrls([CREDITS_MUSIC_PROGRAM], controller.musicStyle),
+        );
         if (generation !== surfaceGeneration || controller.phase !== "credits") return;
         destroySurface = mountCreditsUi(root, controller);
       };

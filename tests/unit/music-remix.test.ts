@@ -5,14 +5,18 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { STAGE_MUSIC_PROGRAMS } from "../../src/game/content/music";
 import { MUSIC_BOX_TRACKS, musicBoxProgram } from "../../src/game/content/music-box";
+import { CREDITS_MUSIC_PROGRAM } from "../../src/game/content/credits";
+import { DEPLOYMENT_MUSIC_PROGRAMS } from "../../src/game/content/deployment-music";
 import {
   ORCHESTRAL_TRANSITION_FADE_SECONDS,
   musicRemixFor,
+  remixMusicUrls,
   stageRemixMusicUrls,
   styledMusicProgram,
 } from "../../src/game/content/music-remix";
 import { MUSIC_REMIX_TRACKS } from "../../src/game/content/music-remix.generated";
 import { STAGE17_MUSIC_PROGRAMS } from "../../src/game/content/stage17";
+import { STAGE49_ENDING_MUSIC } from "../../src/game/content/stage49-ending";
 import { STAGE4_MUSIC_PROGRAMS } from "../../src/game/content/stage4";
 import { STAGE0_DEFINITION } from "../../src/game/content/stages";
 import {
@@ -36,6 +40,8 @@ interface RemixManifest {
     frames: number;
     loopStartFrame: number;
     loopEndFrame: number;
+    entryTrack?: string;
+    seam: { kind?: string };
   }>;
 }
 
@@ -59,20 +65,31 @@ describe("REMAKE-181 remix catalog", () => {
         loopStartFrame: track.loopStartFrame,
         loopEndFrame: track.loopEndFrame,
       });
-      expect(track.loopStartFrame).toBeGreaterThan(0);
-      expect(track.loopEndFrame).toBeLessThanOrEqual(track.frames);
+      if (track.seam.kind === "whole-take") {
+        // A whole-take loop wraps from the file end to its first frame.
+        expect(track.entryTrack).toBeUndefined();
+        expect(track.loopStartFrame).toBe(0);
+        expect(track.loopEndFrame).toBe(track.frames);
+      } else {
+        expect(track.loopStartFrame).toBeGreaterThan(0);
+        expect(track.loopEndFrame).toBeLessThanOrEqual(track.frames);
+      }
       const bytes = await readFile(path.join(root, "public/assets/original", track.output));
       expect(bytes.toString("ascii", 0, 4)).toBe("OggS");
       expect(sha256(bytes)).toBe(track.sha256);
     }
   });
 
-  test("covers the three stage 0 pilot tracks", () => {
-    expect(MUSIC_REMIX_TRACKS.map(({ key }) => key).sort()).toEqual([
-      "MAGIC/73",
-      "MUSIC/5→MUSIC/4",
-      "MUSIC/7→MUSIC/6",
-    ]);
+  test("covers every track the music box lists, each exactly once", () => {
+    const keys = MUSIC_BOX_TRACKS.map((track) => musicRemixFor(musicBoxProgram(track))?.key);
+    expect(keys).not.toContain(undefined);
+    expect(new Set(keys).size).toBe(MUSIC_REMIX_TRACKS.length);
+  });
+
+  test("loops MUSIC/14 whole, like the original, and every other remix after its intro", () => {
+    const whole = MUSIC_REMIX_TRACKS.filter(({ loopStartFrame }) => loopStartFrame === 0);
+    expect(whole.map(({ key }) => key)).toEqual(["MUSIC/14"]);
+    expect(whole[0].loopEndFrame).toBe(whole[0].frames);
   });
 });
 
@@ -116,28 +133,53 @@ describe("REMAKE-181 style mapping", () => {
     // Stage 17's player phase plays MUSIC/7→6, stage 4's enemy phase MUSIC/5→4.
     expect(musicRemixFor(STAGE17_MUSIC_PROGRAMS["stage-17-player-phase-music"])?.key).toBe("MUSIC/7→MUSIC/6");
     expect(musicRemixFor(STAGE4_MUSIC_PROGRAMS["stage-04-enemy-phase-music"])?.key).toBe("MUSIC/5→MUSIC/4");
-    const stage4Story = STAGE4_MUSIC_PROGRAMS["stage-04-story-music"];
-    expect(musicRemixFor(stage4Story)).toBeUndefined();
-    expect(styledMusicProgram(stage4Story, "orchestral")).toBe(stage4Story);
+    // Every shipped track has a remix now; a program without one still plays as is.
+    const unremixed: MusicProgram = {
+      id: "test-unremixed",
+      kind: "intro-loop",
+      entryTrack: "MUSIC/5",
+      loopTrack: "MUSIC/6",
+      entry: "/entry.ogg",
+      seamlessLoop: "/loop.ogg",
+      crossfadeSeconds: 0,
+    };
+    expect(musicRemixFor(unremixed)).toBeUndefined();
+    expect(styledMusicProgram(unremixed, "orchestral")).toBe(unremixed);
     // An already styled program is not styled twice.
     const styled = styledMusicProgram(stage0["stage-00-story-music"], "orchestral");
     expect(styledMusicProgram(styled, "orchestral")).toBe(styled);
   });
 
-  test("lets the music box tag exactly the remixed tracks", () => {
-    const remixed = MUSIC_BOX_TRACKS
-      .filter((track) => musicRemixFor(musicBoxProgram(track)))
-      .map((track) => `${track.container}/${track.record}`)
-      .sort();
-    expect(remixed).toEqual(["MAGIC/73", "MUSIC/4", "MUSIC/6"]);
+  test("styles the deployment, ending and credits loops too", () => {
+    expect(musicRemixFor(DEPLOYMENT_MUSIC_PROGRAMS.earlyScenes)?.key).toBe("MUSIC/16");
+    expect(musicRemixFor(DEPLOYMENT_MUSIC_PROGRAMS.lateScenes)?.key).toBe("MUSIC/17");
+    expect(Object.values(STAGE49_ENDING_MUSIC).map((program) => musicRemixFor(program)?.key))
+      .toEqual(["MAGIC/77", "UN/6", "MUSIC/40", "UN/49"]);
+    expect(musicRemixFor(CREDITS_MUSIC_PROGRAM)?.key).toBe("UN/55");
   });
 
   test("lists a stage's remix files for the resource gate only in 交響 mode", () => {
     expect(stageRemixMusicUrls(STAGE0_DEFINITION.music, "original")).toEqual([]);
-    expect([...stageRemixMusicUrls(STAGE0_DEFINITION.music, "orchestral")].sort()).toEqual([
+    expect(stageRemixMusicUrls(STAGE0_DEFINITION.music, "original", 3)).toEqual([]);
+    const stage0 = [
       "/assets/original/music/remix/MAGIC-73.ogg",
       "/assets/original/music/remix/MUSIC-05-04.ogg",
       "/assets/original/music/remix/MUSIC-07-06.ogg",
+    ];
+    expect([...stageRemixMusicUrls(STAGE0_DEFINITION.music, "orchestral")].sort()).toEqual(stage0);
+    // A stage with a 出擊準備 screen also gets module 27's deployment loop for its scene.
+    expect([...stageRemixMusicUrls(STAGE0_DEFINITION.music, "orchestral", 5)].sort())
+      .toEqual([...stage0, "/assets/original/music/remix/MUSIC-16.ogg"].sort());
+    expect(stageRemixMusicUrls(STAGE0_DEFINITION.music, "orchestral", 6))
+      .toContain("/assets/original/music/remix/MUSIC-17.ogg");
+  });
+
+  test("lists route remix files once, skipping missing programs, only in 交響 mode", () => {
+    const programs = [STAGE49_ENDING_MUSIC.story, STAGE49_ENDING_MUSIC.story, undefined, CREDITS_MUSIC_PROGRAM];
+    expect(remixMusicUrls(programs, "original")).toEqual([]);
+    expect(remixMusicUrls(programs, "orchestral")).toEqual([
+      "/assets/original/music/remix/MAGIC-77.ogg",
+      "/assets/original/music/remix/UN-55.ogg",
     ]);
   });
 });
@@ -247,6 +289,24 @@ describe("REMAKE-181 single-file loop transport", () => {
       part: "entry",
       playing: true,
     });
+    transport.select(undefined);
+  });
+
+  test("loops a whole-take remix from its first frame, announcing the loop at once", async () => {
+    const { transport, states } = startTransport({ "/whole.ogg": 164.807 });
+    transport.select({
+      id: "test-whole",
+      kind: "remix-loop",
+      loopTrack: "MUSIC/14",
+      source: "/whole.ogg",
+      loopStartSeconds: 0,
+      loopEndSeconds: 164.807,
+    });
+    await flush();
+    const [source] = FakeAudioContext.instances[0].sources;
+    expect(source).toMatchObject({ loop: true, loopStart: 0 });
+    expect(source.loopEnd).toBeCloseTo(164.807, 3);
+    expect(states.at(-1)).toMatchObject({ track: "MUSIC/14", source: "remix", part: "loop", loop: true, playing: true });
     transport.select(undefined);
   });
 

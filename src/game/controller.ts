@@ -1073,7 +1073,11 @@ export class GameController {
         nativeStage: runtime.definition.nativeStage,
         portraitRecords: [...portraitRecords].sort((left, right) => left - right),
         usesDeploymentSurface: runtime.preparation !== undefined,
-        musicUrls: stageRemixMusicUrls(runtime.definition.music, this.musicStyle),
+        musicUrls: stageRemixMusicUrls(
+          runtime.definition.music,
+          this.musicStyle,
+          runtime.preparation ? runtime.definition.nativeStage : undefined,
+        ),
       };
     };
     if (this.stageAssetGate) await this.stageAssetGate(stageId, resolveRequirements);

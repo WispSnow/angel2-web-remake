@@ -8,6 +8,11 @@
 // (one folder per track holding layout.json and loop/<id>.{ogg,json}, as made
 // by its make-loop tool) into the asset pack and rewrites the manifest. The
 // workbench itself never ships and is not needed afterwards.
+//
+// A loop starts after the take's intro (loopStartFrame > 0), except a
+// whole-take loop (seam.kind "whole-take", from make-whole-loop): a single
+// track whose original also loops whole, so the file wraps from its end to
+// frame 0. MUSIC/14 is one (user's call, 2026-11-08).
 
 import { createHash } from "node:crypto";
 import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
@@ -66,11 +71,13 @@ async function importWorkbench(workbench) {
       loopStartFrame: loop.loopStartFrame,
       loopEndFrame: loop.loopEndFrame,
       sourceTakeSha256: loop.takeSha256,
-      seam: {
-        crossfadeSeconds: loop.seam.crossfadeSeconds,
-        onsetCorrelation: loop.seam.onsetCorrelation,
-        chromaSimilarity: loop.seam.chromaSimilarity,
-      },
+      seam: loop.seam.kind === "whole-take"
+        ? { kind: "whole-take" }
+        : {
+          crossfadeSeconds: loop.seam.crossfadeSeconds,
+          onsetCorrelation: loop.seam.onsetCorrelation,
+          chromaSimilarity: loop.seam.chromaSimilarity,
+        },
     });
   }
   if (tracks.length === 0) throw new Error(`no finished loops under ${workbench}`);
@@ -98,8 +105,13 @@ function validate(manifest) {
     if (track.key !== (track.entryTrack ? `${track.entryTrack}→${track.loopTrack}` : track.loopTrack)) {
       throw new Error(`${track.key}: key does not match its tracks`);
     }
-    if (!(track.loopStartFrame > 0 && track.loopStartFrame < track.loopEndFrame && track.loopEndFrame <= track.frames)) {
+    if (!(track.loopStartFrame >= 0 && track.loopStartFrame < track.loopEndFrame && track.loopEndFrame <= track.frames)) {
       throw new Error(`${track.key}: loop points out of range`);
+    }
+    const wholeTake = track.seam?.kind === "whole-take";
+    if (wholeTake !== (track.loopStartFrame === 0)
+      || (wholeTake && (track.entryTrack || track.loopEndFrame !== track.frames))) {
+      throw new Error(`${track.key}: only a whole-take loop of a single track may loop from frame 0, and it loops the whole file`);
     }
   }
 }

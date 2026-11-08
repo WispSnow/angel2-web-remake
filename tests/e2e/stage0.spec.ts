@@ -4571,7 +4571,10 @@ test("REMAKE-181: 交響 swaps stage zero music for single-file remixes and pers
   await page.getByTestId("open-music-box").click();
   const box = page.getByTestId("music-box");
   await expect(box).toBeVisible();
-  await expect(box.locator(".music-box-remix-tag:visible")).toHaveCount(3);
+  // Since the full import every track the box lists has a remix, so each carries the tag.
+  const boxTracks = await box.locator(".music-box-track").count();
+  expect(boxTracks).toBeGreaterThan(30);
+  await expect(box.locator(".music-box-remix-tag:visible")).toHaveCount(boxTracks);
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("music-settings-menu")).toBeHidden();

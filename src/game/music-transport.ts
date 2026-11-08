@@ -27,7 +27,8 @@ export interface IntroLoopMusicProgram {
 /**
  * `REMAKE-181` 交響改編：單一檔案，從 0 播起，到 `loopEnd` 跳回 `loopStart`。接縫已在檔案裡
  * 做好（尾端交叉淡化到循環起點的同一處音樂），所以這裡只用 Web Audio 原生循環點，不再做
- * 解碼後的週期化。`entryTrack` 存在時，`loopStart` 之前的部分對應原曲的入場段。
+ * 解碼後的週期化。`entryTrack` 存在時，`loopStart` 之前的部分對應原曲的入場段。原曲本身
+ * 整首循環、沒有入場段的曲目（`MUSIC/14`）可以整首循環：`loopStart` 為 0、`loopEnd` 為檔尾。
  */
 export interface RemixLoopMusicProgram {
   id: string;
@@ -381,7 +382,8 @@ export class MusicTransport {
   ): ScheduledProgram {
     const { loopStartSeconds, loopEndSeconds } = program;
     // One decoded sample of slack: a resampling decoder may round the length.
-    if (!(loopStartSeconds > 0 && loopStartSeconds < loopEndSeconds)
+    // A loop start of 0 is a whole-take loop (MUSIC/14), which wraps to the top.
+    if (!(loopStartSeconds >= 0 && loopStartSeconds < loopEndSeconds)
       || loopEndSeconds > buffer.duration + 1 / buffer.sampleRate) {
       throw new Error(`remix loop points fall outside the decoded buffer: ${program.source}`);
     }
