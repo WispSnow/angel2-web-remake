@@ -346,17 +346,16 @@ else {
   let startupMusic: PreparedStartupMusic | undefined;
   void resourceLoader.ensureBoot(async () => {
     startupMusic?.dispose();
-    startupMusic = await prepareStartupMusic((urls) => resourceLoader.ensureMusic(urls));
+    startupMusic = await prepareStartupMusic((urls, onPercent) => resourceLoader.ensureMusic(urls, onPercent));
   }).then(() => {
     if (!startupMusic) throw new Error("開場音樂沒有通過資源準備門。");
+    // Waits for the entry gesture: started with the panel, this pack took the
+    // connection from the two startup remixes.
     mountStartup(root, startGame, startupMusic, () => {
-      // Only a head start: the stage gate still fetches whatever this did not finish.
-      void resourceLoader.ensureMusic(stageRemixMusicUrls(STAGE0_DEFINITION.music, "orchestral"))
-        .catch(() => undefined);
+      resourceLoader.prefetchStage("stage-00", [
+        ...stage0PresentationAssets,
+        ...stageRemixMusicUrls(STAGE0_DEFINITION.music, loadMusicPreferences(localStorage).musicStyle),
+      ]);
     });
-    resourceLoader.prefetchStage("stage-00", [
-      ...stage0PresentationAssets,
-      ...stageRemixMusicUrls(STAGE0_DEFINITION.music, loadMusicPreferences(localStorage).musicStyle),
-    ]);
   });
 }

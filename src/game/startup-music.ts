@@ -3,7 +3,7 @@ import {
   ORCHESTRAL_TRANSITION_FADE_SECONDS,
   startupRemixUrls,
 } from "./content/music-remix";
-import { loadEncodedMusic, releaseEncodedMusic } from "./music-resource-cache";
+import { discardEncodedMusic, loadEncodedMusic, releaseEncodedMusic } from "./music-resource-cache";
 import type { MusicStyle } from "./preferences";
 
 export interface PreparedStartupMusic {
@@ -12,10 +12,17 @@ export interface PreparedStartupMusic {
   readonly titlePlaying: boolean;
   readonly source: "original" | "remix";
   unlock(): Promise<void>;
+  /** Starts fetching the two remixes, leaving the bytes undecoded. */
+  downloadRemix(): void;
   /** Starts fetching and decoding the two remixes without waiting for them. */
   prepareRemix(): void;
-  /** Never rejects: a remix that cannot be readied leaves the originals in place. */
-  selectStyle(style: MusicStyle): Promise<void>;
+  /**
+   * Never rejects and has no time limit. Resolves true once the style is what
+   * will play. False means 交響 failed or a later selection replaced this one:
+   * the originals stay in place and the caller has to tell the player, because
+   * the two versions are otherwise easy to mistake for each other.
+   */
+  selectStyle(style: MusicStyle, onProgress?: (percent: number) => void): Promise<boolean>;
   playIntro(): void;
   stopIntro(): void;
   playTitle(onEnded: () => void): void;
@@ -25,7 +32,10 @@ export interface PreparedStartupMusic {
 }
 
 /** Delivers the listed files through the resource gate so `loadEncodedMusic` can reuse them. */
-export type FetchStartupRemixes = (urls: readonly string[]) => Promise<void>;
+export type FetchStartupRemixes = (
+  urls: readonly string[],
+  onPercent: (percent: number) => void,
+) => Promise<void>;
 
 interface StartupTracks {
   readonly source: PreparedStartupMusic["source"];
@@ -40,12 +50,6 @@ interface PlayingTrack {
 }
 
 const STARTUP_GAIN = 0.32;
-/**
- * `REMAKE-186`: the remixes are an option and the originals are already decoded,
- * so a stalled download gives way instead of holding the first screen. The fetch
- * keeps running and the stage gates still honour the chosen style.
- */
-export const STARTUP_REMIX_WAIT_MS = 20_000;
 
 const decodeCachedMusic = async (
   context: AudioContext,
@@ -82,7 +86,12 @@ export async function prepareStartupMusic(
     output.gain.setValueAtTime(STARTUP_GAIN, context.currentTime);
     output.connect(context.destination);
     let tracks = originals;
+    const remixUrls = startupRemixUrls();
+    let remixDownload: Promise<void> | undefined;
     let remixRequest: Promise<StartupTracks | undefined> | undefined;
+    let remixPercent = 0;
+    let onRemixPercent: ((percent: number) => void) | undefined;
+    let styleSelection = 0;
     let introTrack: PlayingTrack | undefined;
     let titleTrack: PlayingTrack | undefined;
     let fadesEndAt = 0;
@@ -121,14 +130,33 @@ export async function prepareStartupMusic(
       source.start();
       return { source, level };
     };
+    /** A player who never picks 交響 must not keep these bytes after the opening. */
+    const discardUndecodedRemixes = () => {
+      discardEncodedMusic(remixUrls.intro);
+      discardEncodedMusic(remixUrls.title);
+    };
+    const downloadRemix = (): Promise<void> => {
+      remixDownload ??= fetchRemixes([remixUrls.intro, remixUrls.title], (percent) => {
+        if (percent === remixPercent) return;
+        remixPercent = percent;
+        onRemixPercent?.(percent);
+      }).then(() => {
+        if (disposed) discardUndecodedRemixes();
+      }, (error: unknown) => {
+        // Forget the failure so choosing 交響 again can retry.
+        remixDownload = undefined;
+        remixPercent = 0;
+        throw error;
+      });
+      return remixDownload;
+    };
     const loadRemix = (): Promise<StartupTracks | undefined> => {
       remixRequest ??= (async () => {
-        const urls = startupRemixUrls();
         try {
-          await fetchRemixes([urls.intro, urls.title]);
+          await downloadRemix();
           const [remixIntro, remixTitle] = await Promise.all([
-            decodeCachedMusic(context, urls.intro),
-            decodeCachedMusic(context, urls.title),
+            decodeCachedMusic(context, remixUrls.intro),
+            decodeCachedMusic(context, remixUrls.title),
           ]);
           return {
             source: "remix",
@@ -137,7 +165,6 @@ export async function prepareStartupMusic(
             fadeSeconds: ORCHESTRAL_TRANSITION_FADE_SECONDS,
           } satisfies StartupTracks;
         } catch (error) {
-          // Forget the failure so choosing 交響 again can retry.
           remixRequest = undefined;
           console.warn("orchestral startup music is unavailable", error);
           return undefined;
@@ -159,20 +186,28 @@ export async function prepareStartupMusic(
         if (paused) return;
         if (context.state !== "running") throw new Error("瀏覽器未允許播放開場音樂。");
       },
+      downloadRemix: () => {
+        void downloadRemix().catch((error: unknown) => {
+          console.warn("orchestral startup music did not finish downloading", error);
+        });
+      },
       prepareRemix: () => {
         void loadRemix();
       },
-      selectStyle: async (style) => {
+      selectStyle: async (style, onProgress) => {
+        styleSelection += 1;
+        const selection = styleSelection;
         tracks = originals;
-        if (style !== "orchestral") return;
-        const remix = await new Promise<StartupTracks | undefined>((resolve) => {
-          const giveUp = setTimeout(() => resolve(undefined), STARTUP_REMIX_WAIT_MS);
-          void loadRemix().then((loaded) => {
-            clearTimeout(giveUp);
-            resolve(loaded);
-          });
-        });
-        if (remix) tracks = remix;
+        onRemixPercent = undefined;
+        if (style !== "orchestral") return true;
+        onRemixPercent = onProgress;
+        onProgress?.(remixPercent);
+        const remix = await loadRemix();
+        if (selection !== styleSelection) return false;
+        onRemixPercent = undefined;
+        if (!remix) return false;
+        tracks = remix;
+        return true;
       },
       playIntro: () => {
         if (disposed) return;
@@ -213,6 +248,7 @@ export async function prepareStartupMusic(
       dispose: () => {
         if (disposed) return;
         disposed = true;
+        discardUndecodedRemixes();
         stop(introTrack, tracks.fadeSeconds);
         stop(titleTrack, tracks.fadeSeconds);
         introTrack = undefined;

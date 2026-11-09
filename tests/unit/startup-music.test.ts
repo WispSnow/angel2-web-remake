@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ORCHESTRAL_TRANSITION_FADE_SECONDS, startupRemixUrls } from "../../src/game/content/music-remix";
 import { STARTUP_ASSETS } from "../../src/game/content/startup";
-import { primeEncodedMusic } from "../../src/game/music-resource-cache";
+import { loadEncodedMusic, primeEncodedMusic, releaseEncodedMusic } from "../../src/game/music-resource-cache";
 import {
   prepareStartupMusic,
-  STARTUP_REMIX_WAIT_MS,
   type FetchStartupRemixes,
 } from "../../src/game/startup-music";
 
@@ -81,7 +80,7 @@ describe("REMAKE-186 startup music style", () => {
   test("原版 fetches no remix and keeps the hard stop", async () => {
     const fetchRemixes = vi.fn(deliverRemixes);
     const music = await prepare(fetchRemixes);
-    await music.selectStyle("original");
+    await expect(music.selectStyle("original")).resolves.toBe(true);
     music.playIntro();
     expect(music.source).toBe("original");
     expect(playedUrl()).toBe(original.intro);
@@ -92,7 +91,7 @@ describe("REMAKE-186 startup music style", () => {
 
   test("交響 plays both remixes once and fades them out", async () => {
     const music = await prepare();
-    await music.selectStyle("orchestral");
+    await expect(music.selectStyle("orchestral")).resolves.toBe(true);
     expect(music.source).toBe("remix");
     music.playIntro();
     expect(playedUrl()).toBe(remix.intro);
@@ -118,27 +117,87 @@ describe("REMAKE-186 startup music style", () => {
     expect(fetchRemixes).toHaveBeenCalledOnce();
   });
 
-  test("a failed download keeps the originals and a later selection retries", async () => {
+  test("the background download fetches without decoding, and 交響 reuses it", async () => {
+    const fetchRemixes = vi.fn(deliverRemixes);
+    const music = await prepare(fetchRemixes);
+    const decode = vi.spyOn(FakeContext.last, "decodeAudioData");
+    music.downloadRemix();
+    await vi.waitFor(() => expect(fetchRemixes).toHaveBeenCalledOnce());
+    await Promise.resolve();
+    expect(decode).not.toHaveBeenCalled();
+    await expect(music.selectStyle("orchestral")).resolves.toBe(true);
+    expect(fetchRemixes).toHaveBeenCalledOnce();
+    expect(decode).toHaveBeenCalledTimes(2);
+  });
+
+  test("REMAKE-187: a failed download reports false, keeps the originals and can retry", async () => {
     const fetchRemixes = vi.fn<FetchStartupRemixes>()
       .mockRejectedValueOnce(new Error("offline"))
       .mockImplementation(deliverRemixes);
     const music = await prepare(fetchRemixes);
-    await expect(music.selectStyle("orchestral")).resolves.toBeUndefined();
+    await expect(music.selectStyle("orchestral")).resolves.toBe(false);
     expect(music.source).toBe("original");
-    await music.selectStyle("orchestral");
+    await expect(music.selectStyle("orchestral")).resolves.toBe(true);
     expect(music.source).toBe("remix");
   });
 
-  test("a stalled download gives way after the wait limit", async () => {
+  test("REMAKE-187: 交響 has no time limit and reports where the download stands", async () => {
     vi.useFakeTimers();
-    const music = await prepare(() => new Promise<void>(() => undefined));
+    let report: (percent: number) => void = () => undefined;
+    let finish = () => undefined as void;
+    const music = await prepare((urls, onPercent) => new Promise<void>((resolve) => {
+      report = onPercent;
+      finish = () => {
+        for (const url of urls) primeEncodedMusic(url, encode(url));
+        resolve();
+      };
+    }));
+    music.downloadRemix();
+    report(40);
+    const seen: number[] = [];
     let settled = false;
-    void music.selectStyle("orchestral").then(() => { settled = true; });
-    await vi.advanceTimersByTimeAsync(STARTUP_REMIX_WAIT_MS - 1);
+    void music.selectStyle("orchestral", (percent) => seen.push(percent)).then(() => { settled = true; });
+    report(40);
+    report(70);
+    await vi.advanceTimersByTimeAsync(600_000);
     expect(settled).toBe(false);
-    await vi.advanceTimersByTimeAsync(1);
+    expect(seen).toEqual([40, 70]);
+    finish();
+    await vi.advanceTimersByTimeAsync(0);
     expect(settled).toBe(true);
+    expect(music.source).toBe("remix");
+  });
+
+  test("REMAKE-187: choosing 原版 during the wait keeps a late download from taking over", async () => {
+    let finish = () => undefined as void;
+    const music = await prepare((urls) => new Promise<void>((resolve) => {
+      finish = () => {
+        for (const url of urls) primeEncodedMusic(url, encode(url));
+        resolve();
+      };
+    }));
+    const waited = music.selectStyle("orchestral");
+    await expect(music.selectStyle("original")).resolves.toBe(true);
+    finish();
+    await expect(waited).resolves.toBe(false);
     expect(music.source).toBe("original");
+  });
+
+  test("REMAKE-187: bytes nobody decoded leave with the opening", async () => {
+    const music = await prepare();
+    music.downloadRemix();
+    await vi.waitFor(async () => {
+      const fetchMusic = vi.fn<typeof fetch>();
+      const request = loadEncodedMusic(remix.intro, fetchMusic);
+      expect(fetchMusic).not.toHaveBeenCalled();
+      await request;
+    });
+    music.dispose();
+    const fetchMusic = vi.fn<typeof fetch>(async () => new Response(encode(remix.intro)));
+    const request = loadEncodedMusic(remix.intro, fetchMusic);
+    expect(fetchMusic).toHaveBeenCalledOnce();
+    await request;
+    releaseEncodedMusic(remix.intro, request);
   });
 
   test("dispose lets a running fade finish before closing the context", async () => {

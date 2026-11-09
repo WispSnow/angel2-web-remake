@@ -113,6 +113,9 @@ export function parseResourceManifest(value: unknown): ResourceManifest {
   return candidate as ResourceManifest;
 }
 
+const assetsByUrl = (manifest: ResourceManifest): ReadonlyMap<string, ResourceManifestAsset> =>
+  new Map(manifest.assets.map((asset) => [asset.url, asset]));
+
 const formatBytes = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
@@ -134,6 +137,7 @@ export class ResourcePackLoader {
   private stagedRenderAssetLease?: StagedRenderAssetLease;
   private stagedRenderAssetUrls = new Set<string>();
   private readonly prefetchedRenderUrls = new Map<string, ReadonlySet<string>>();
+  private readonly progressListeners = new Set<() => void>();
   private readonly persistentCachePromise: Promise<PersistentResourceCache | undefined>;
 
   constructor(
@@ -191,11 +195,21 @@ export class ResourcePackLoader {
 
   /**
    * `REMAKE-186` 載入面板選了交響時要的改編曲不屬於任何開場資源包，但仍走同一條
-   * Cache Storage 與編碼資料路徑，下次啟動不必重抓。
+   * Cache Storage 與編碼資料路徑，下次啟動不必重抓。`onPercent` 只在數值可能變動時回報
+   * （`REMAKE-187`：玩家等待時，載入面板要顯示進度）。
    */
-  async ensureMusic(urls: readonly string[]): Promise<void> {
+  async ensureMusic(urls: readonly string[], onPercent?: (percent: number) => void): Promise<void> {
     const manifest = await this.loadManifest();
-    await this.loadUrls(manifest, [...new Set(urls)]);
+    const unique = [...new Set(urls)];
+    const assets = assetsByUrl(manifest);
+    const report = () => onPercent?.(this.byteProgress(assets, unique).percentage);
+    this.progressListeners.add(report);
+    try {
+      report();
+      await this.loadUrls(manifest, unique);
+    } finally {
+      this.progressListeners.delete(report);
+    }
   }
 
   /**
@@ -564,11 +578,22 @@ export class ResourcePackLoader {
   }
 
   private renderProgress(manifest: ResourceManifest): void {
+    for (const listener of this.progressListeners) listener();
     if (!this.overlay || this.overlay.hidden || this.overlayFailed || this.activeUrls.length === 0) return;
-    const assets = new Map(manifest.assets.map((asset) => [asset.url, asset]));
+    const { loadedBytes, totalBytes, percentage } = this.byteProgress(assetsByUrl(manifest), this.activeUrls);
+    if (this.progress) this.progress.value = percentage;
+    if (this.detail) {
+      this.detail.textContent = `${percentage}%　${formatBytes(loadedBytes)}／${formatBytes(totalBytes)}`;
+    }
+  }
+
+  private byteProgress(
+    assets: ReadonlyMap<string, ResourceManifestAsset>,
+    urls: readonly string[],
+  ): { loadedBytes: number; totalBytes: number; percentage: number } {
     let totalBytes = 0;
     let loadedBytes = 0;
-    for (const url of this.activeUrls) {
+    for (const url of urls) {
       const asset = assets.get(url);
       if (!asset) continue;
       totalBytes += asset.bytes;
@@ -576,10 +601,7 @@ export class ResourcePackLoader {
       loadedBytes += state?.complete ? asset.bytes : Math.min(asset.bytes, state?.loadedBytes ?? 0);
     }
     const percentage = totalBytes === 0 ? 100 : Math.floor(loadedBytes * 100 / totalBytes);
-    if (this.progress) this.progress.value = percentage;
-    if (this.detail) {
-      this.detail.textContent = `${percentage}%　${formatBytes(loadedBytes)}／${formatBytes(totalBytes)}`;
-    }
+    return { loadedBytes, totalBytes, percentage };
   }
 
   private renderError(error: unknown, retry: () => Promise<void>): void {

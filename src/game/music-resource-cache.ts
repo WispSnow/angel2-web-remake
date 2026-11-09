@@ -37,3 +37,8 @@ export function loadEncodedMusic(
 export function releaseEncodedMusic(url: string, request: Promise<ArrayBuffer>): void {
   if (encodedMusic.get(url) === request) encodedMusic.delete(url);
 }
+
+/** Drops bytes the resource gate primed for a track that will never be decoded. */
+export function discardEncodedMusic(url: string): void {
+  encodedMusic.delete(url);
+}

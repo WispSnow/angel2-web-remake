@@ -69,6 +69,8 @@ const RULESET_LABELS: Record<SaveData["ruleset"], string> = {
 
 type StartupPhase = "ready" | "pretitle" | "intro" | "title" | "difficulty" | "records";
 
+const ENTRY_PANEL_TITLE = "開場準備完成";
+
 export interface NewGameSelection {
   kind: "new";
   difficulty: Difficulty;
@@ -152,7 +154,7 @@ export function mountStartup(
   root: HTMLElement,
   startGame: (selection: StartupSelection) => void,
   startupMusic: PreparedStartupMusic,
-  onOrchestralSelected: () => void,
+  onEntered: () => void,
 ): () => void {
   applyStagedNativeUiAssets(root);
   const testMode = new URLSearchParams(location.search).has("test");
@@ -186,6 +188,10 @@ export function mountStartup(
   let disposed = false;
   let startupAssetsReady = false;
   let activationPending = false;
+  /** `REMAKE-187`: 進入遊戲 is waiting on the remixes, with 原版 as the way out. */
+  let awaitingRemix = false;
+  /** Bumped when an entry attempt is given up, so its late result cannot start the opening. */
+  let activationAttempt = 0;
   let musicStyle: MusicStyle = loadMusicPreferences(localStorage).musicStyle;
   const loadedImages = new Map<string, HTMLImageElement>();
 
@@ -200,7 +206,7 @@ export function mountStartup(
             <section class="startup-activation" data-testid="startup-activation" role="dialog"
               aria-labelledby="startup-activation-title" aria-describedby="startup-activation-detail">
               <p class="startup-activation-kicker">ANGEL2 · WEB REMAKE</p>
-              <h1 id="startup-activation-title">開場準備完成</h1>
+              <h1 id="startup-activation-title">${ENTRY_PANEL_TITLE}</h1>
               <div class="startup-music-style" role="radiogroup" aria-labelledby="startup-music-style-label">
                 <span id="startup-music-style-label">音樂風格</span>
                 <button type="button" role="radio" data-startup-action="music-style" data-music-style="original"
@@ -313,6 +319,7 @@ export function mountStartup(
   const recordDetail = required<HTMLParagraphElement>(root, ".startup-record-detail");
   const titleStatus = required<HTMLParagraphElement>(root, ".startup-menu-status");
   const activation = required<HTMLElement>(root, ".startup-activation");
+  const activationTitle = required<HTMLElement>(root, "#startup-activation-title");
   const activationDetail = required<HTMLElement>(root, "[data-testid=startup-activation-detail]");
   const activationButton = required<HTMLButtonElement>(root, "[data-testid=startup-enter]");
   const musicStyleButtons = root.querySelectorAll<HTMLButtonElement>("[data-startup-action=music-style]");
@@ -344,7 +351,7 @@ export function mountStartup(
   const updateMusicStyleControls = () => {
     for (const button of musicStyleButtons) {
       button.setAttribute("aria-checked", String(button.dataset.musicStyle === musicStyle));
-      button.disabled = activationPending;
+      button.disabled = activationPending && !awaitingRemix;
     }
   };
   /**
@@ -352,15 +359,13 @@ export function mountStartup(
    * write as the 音樂開關 panel. Focus stays on 進入遊戲 so Enter keeps its meaning.
    */
   const chooseMusicStyle = (style: MusicStyle) => {
-    if (activationPending || style === musicStyle) return;
+    if ((activationPending && !awaitingRemix) || style === musicStyle) return;
     musicStyle = style;
     saveMusicPreferences(localStorage, { ...loadMusicPreferences(localStorage), musicStyle });
+    if (awaitingRemix) returnToEntryPanel("");
     updateMusicStyleControls();
     musicStyleStatus.textContent = style === "orchestral" ? "音樂風格：交響" : "音樂風格：原版";
-    if (style === "orchestral") {
-      startupMusic.prepareRemix();
-      onOrchestralSelected();
-    }
+    if (style === "orchestral") startupMusic.prepareRemix();
   };
   const startTitleMusic = () => {
     titleMusicPlays += 1;
@@ -524,19 +529,48 @@ export function mountStartup(
     titleMenu.hidden = true;
   };
 
+  const returnToEntryPanel = (message: string) => {
+    activationAttempt += 1;
+    activationPending = false;
+    awaitingRemix = false;
+    activationTitle.textContent = ENTRY_PANEL_TITLE;
+    activationButton.disabled = false;
+    updateMusicStyleControls();
+    activationDetail.textContent = message;
+    activationButton.focus({ preventScroll: true });
+  };
+
   const activateStartup = () => {
     if (phase !== "ready" || !startupAssetsReady || activationPending) return;
     activationPending = true;
     activationButton.disabled = true;
     updateMusicStyleControls();
     activationDetail.textContent = "正在開啟音樂……";
+    activationAttempt += 1;
+    const attempt = activationAttempt;
+    const abandoned = () => disposed || attempt !== activationAttempt;
     // resume() is invoked synchronously inside the gesture handler. Awaiting it
     // only delays the native clocks until the browser confirms audible output.
     void startupMusic.unlock().then(async () => {
-      if (disposed) return;
-      if (musicStyle === "orchestral") activationDetail.textContent = "正在準備交響開場音樂……";
-      await startupMusic.selectStyle(musicStyle);
-      if (disposed) return;
+      if (abandoned()) return;
+      if (musicStyle === "orchestral") {
+        awaitingRemix = true;
+        updateMusicStyleControls();
+      }
+      // `REMAKE-187`: no time limit and no quiet substitution. The player who
+      // asked for 交響 either hears it or is told why not.
+      const ready = await startupMusic.selectStyle(musicStyle, (percent) => {
+        if (abandoned()) return;
+        activationTitle.textContent = "正在載入交響音樂";
+        activationDetail.textContent = `${percent}%　改選原版可不等待`;
+      });
+      if (abandoned()) return;
+      if (!ready) {
+        returnToEntryPanel("交響音樂下載失敗。按「進入遊戲」重試，或改選原版。");
+        return;
+      }
+      awaitingRemix = false;
+      onEntered();
       activation.hidden = true;
       phase = "pretitle";
       screen.dataset.startupPhase = phase;
@@ -544,14 +578,10 @@ export function mountStartup(
       phaseStartedAt = programNow();
       animationFrame = requestAnimationFrame(animate);
     }).catch((error: unknown) => {
-      if (disposed) return;
-      activationPending = false;
-      activationButton.disabled = false;
-      updateMusicStyleControls();
-      activationDetail.textContent = error instanceof Error
+      if (abandoned()) return;
+      returnToEntryPanel(error instanceof Error
         ? `${error.message} 請再確認一次。`
-        : "瀏覽器未允許音樂播放，請再確認一次。";
-      activationButton.focus({ preventScroll: true });
+        : "瀏覽器未允許音樂播放，請再確認一次。");
     });
   };
 
@@ -1056,7 +1086,10 @@ export function mountStartup(
   root.addEventListener("contextmenu", onContextMenu);
   updateMenuSelection();
   updateMusicStyleControls();
+  // `REMAKE-187`: fetched for both styles so 交響 is ready, or close to it, by
+  // the time the player picks it. Only a player who chose it pays for the decode.
   if (musicStyle === "orchestral") startupMusic.prepareRemix();
+  else startupMusic.downloadRemix();
   screen.dataset.startupAssetsReady = "false";
   updateStartupMusicDebugState();
   const unsubscribeProgramPause = onProgramPauseChange((paused) => startupMusic.setPaused(paused));

@@ -44,6 +44,10 @@ test("boot shows only opening resources while stage 0 warms in the background", 
 
   await page.goto("/?test=1");
   await expect(page.getByTestId("startup-screen")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("startup-enter")).toBeEnabled({ timeout: 15_000 });
+  // `REMAKE-186`: the entry panel leaves the connection to the opening remixes.
+  expect(requested.has("/assets/original/stage0-map.png")).toBe(false);
+  await activateStartup(page);
   await expect.poll(() => requested.has("/assets/original/stage0-map.png"), {
     timeout: 15_000,
   }).toBe(true);
