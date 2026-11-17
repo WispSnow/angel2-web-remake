@@ -52,7 +52,9 @@ import type { Difficulty, SaveData } from "./types";
 import type { PreparedStartupMusic } from "./startup-music";
 import {
   loadMusicPreferences,
+  loadVoicePreferences,
   saveMusicPreferences,
+  saveVoicePreferences,
   type MusicStyle,
 } from "./preferences";
 import { isTauriDesktopRuntime } from "./desktop-runtime";
@@ -193,6 +195,10 @@ export function mountStartup(
   /** Bumped when an entry attempt is given up, so its late result cannot start the opening. */
   let activationAttempt = 0;
   let musicStyle: MusicStyle = loadMusicPreferences(localStorage).musicStyle;
+  /** `REMAKE-188`：方框裡的「劇情語音」只分開關；開啟時沿用面板上已選的音量檔。 */
+  let voiceEnabled = loadVoicePreferences(localStorage).voiceVolume > 0;
+  /** 左右方向鍵切換的那一列；上下方向鍵在兩列之間移動。 */
+  let entryRow: "music" | "voice" = "music";
   const loadedImages = new Map<string, HTMLImageElement>();
 
   root.innerHTML = `
@@ -217,6 +223,17 @@ export function mountStartup(
               <p data-testid="startup-music-style-hint">${
                 isTauriDesktopRuntime() ? "交響為 AI 改編版。" : "交響為 AI 改編版，需額外下載。"
               }<br>遊戲中可在「音樂開關」隨時切換。</p>
+              <div class="startup-music-style startup-voice" role="radiogroup" aria-labelledby="startup-voice-label"
+                data-testid="startup-voice-row">
+                <span id="startup-voice-label">劇情語音</span>
+                <button type="button" role="radio" data-startup-action="voice" data-voice="off"
+                  data-testid="startup-voice-off">關</button>
+                <button type="button" role="radio" data-startup-action="voice" data-voice="on"
+                  data-testid="startup-voice-on">開</button>
+              </div>
+              <p data-testid="startup-voice-hint">${
+                isTauriDesktopRuntime() ? "劇情語音為 AI 合成。" : "劇情語音為 AI 合成，需額外下載。"
+              }<br>遊戲中可在「音效開關」隨時調整。</p>
               <span class="visually-hidden" aria-live="polite" data-testid="startup-music-style-status"></span>
               <!-- 就緒後這一行留空：標題與按鈕已經說明要做什麼，說明文字只是佔位。
                    它仍然承載準備中、解鎖中與失敗訊息，所以保留一行高度，避免方框
@@ -324,6 +341,9 @@ export function mountStartup(
   const activationButton = required<HTMLButtonElement>(root, "[data-testid=startup-enter]");
   const musicStyleButtons = root.querySelectorAll<HTMLButtonElement>("[data-startup-action=music-style]");
   const musicStyleStatus = required<HTMLElement>(root, "[data-testid=startup-music-style-status]");
+  const voiceButtons = root.querySelectorAll<HTMLButtonElement>("[data-startup-action=voice]");
+  const musicStyleRow = required<HTMLElement>(root, ".startup-music-style:not(.startup-voice)");
+  const voiceRow = required<HTMLElement>(root, "[data-testid=startup-voice-row]");
   const stopScaling = configureGameScaling(viewport, screen);
   /**
    * [OF] `REMAKE-114` withdrew the loop `REMAKE-112` had inferred: MUSIC/1 plays
@@ -353,6 +373,27 @@ export function mountStartup(
       button.setAttribute("aria-checked", String(button.dataset.musicStyle === musicStyle));
       button.disabled = activationPending && !awaitingRemix;
     }
+    for (const button of voiceButtons) {
+      button.setAttribute("aria-checked", String((button.dataset.voice === "on") === voiceEnabled));
+      button.disabled = activationPending && !awaitingRemix;
+    }
+    musicStyleRow.dataset.rowSelected = String(entryRow === "music");
+    voiceRow.dataset.rowSelected = String(entryRow === "voice");
+  };
+  /**
+   * `REMAKE-188`: the same device preference as the 音效開關 panel. Turning it on
+   * keeps a volume the player already chose there, otherwise takes 最大.
+   */
+  const chooseVoice = (enabled: boolean) => {
+    if ((activationPending && !awaitingRemix) || enabled === voiceEnabled) return;
+    voiceEnabled = enabled;
+    const current = loadVoicePreferences(localStorage);
+    saveVoicePreferences(localStorage, {
+      ...current,
+      voiceVolume: enabled ? (current.voiceVolume === 0 ? 4 : current.voiceVolume) : 0,
+    });
+    updateMusicStyleControls();
+    musicStyleStatus.textContent = enabled ? "劇情語音：開" : "劇情語音：關";
   };
   /**
    * `REMAKE-186`: the style is a device preference, so choosing here is the same
@@ -787,8 +828,12 @@ export function mountStartup(
     idleSince = programNow();
     if (phase === "ready") {
       event.preventDefault();
-      const stepX = keyboardDirection(event.key)?.x;
-      if (stepX) chooseMusicStyle(stepX < 0 ? "original" : "orchestral");
+      const direction = keyboardDirection(event.key);
+      if (direction?.y) {
+        entryRow = entryRow === "music" ? "voice" : "music";
+        updateMusicStyleControls();
+      } else if (direction?.x && entryRow === "voice") chooseVoice(direction.x > 0);
+      else if (direction?.x) chooseMusicStyle(direction.x < 0 ? "original" : "orchestral");
       else activateStartup();
       return;
     }
@@ -890,7 +935,16 @@ export function mountStartup(
       return;
     }
     if (button.dataset.startupAction === "music-style") {
+      entryRow = "music";
       chooseMusicStyle(button.dataset.musicStyle === "orchestral" ? "orchestral" : "original");
+      updateMusicStyleControls();
+      if (!activationButton.disabled) activationButton.focus({ preventScroll: true });
+      return;
+    }
+    if (button.dataset.startupAction === "voice") {
+      entryRow = "voice";
+      chooseVoice(button.dataset.voice === "on");
+      updateMusicStyleControls();
       if (!activationButton.disabled) activationButton.focus({ preventScroll: true });
       return;
     }

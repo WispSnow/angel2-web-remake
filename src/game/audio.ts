@@ -28,6 +28,7 @@ import {
 import { CREDITS_MUSIC_PROGRAM } from "./content/credits";
 import { deploymentMusicProgramFor } from "./content/deployment-music";
 import { isProgramPaused, onProgramPauseChange } from "./program-clock";
+import { VoiceDirector, type VoiceUrlLoader } from "./voice";
 
 type BattleMusicSide = "player" | "enemy";
 
@@ -80,12 +81,16 @@ export class AudioManager {
   private walkEffect?: SoundEffectPlayback;
   private readonly releasingWalkEffects = new Set<SoundEffectPlayback>();
   private readonly activeEffects = new Set<SoundEffectPlayback>();
+  /** `REMAKE-188` 劇情語音；對白層透過它開頁、切斷與判斷是否靜音逐字聲。 */
+  readonly voice: VoiceDirector;
   constructor(
     private readonly controller: GameController,
     private readonly root: HTMLElement,
     initiallyUnlocked = false,
+    voiceLoader?: VoiceUrlLoader,
   ) {
     this.unlocked = initiallyUnlocked;
+    this.voice = new VoiceDirector(controller, root, voiceLoader);
     this.previousBattleMusicSide = battleMusicSide(controller.phase);
     this.music = new MusicTransport(
       MUSIC_GAIN_BY_VOLUME[controller.musicVolume],
@@ -112,7 +117,9 @@ export class AudioManager {
     if (this.unlocked) {
       this.music.unlock();
       this.effects.unlock();
+      this.voice.unlock();
     }
+    this.voice.sync();
   }
 
   destroy(): void {
@@ -120,6 +127,7 @@ export class AudioManager {
     this.unsubscribe();
     this.unsubscribeProgramPause();
     this.effects.destroy();
+    this.voice.destroy();
     this.walkEffect = undefined;
     this.releasingWalkEffects.clear();
     this.activeEffects.clear();
@@ -129,6 +137,7 @@ export class AudioManager {
   private setProgramPaused(paused: boolean): void {
     this.music.setSuspended(paused);
     this.effects.setSuspended(paused);
+    this.voice?.setSuspended(paused);
   }
 
   playSpeechCharacter(character: string): void {
@@ -142,11 +151,13 @@ export class AudioManager {
     this.unlocked = true;
     this.music.unlock();
     this.effects.unlock();
+    this.voice.unlock();
   }
 
   private sync(): void {
     this.syncMusic();
     this.applySoundEffectVolume();
+    this.voice.sync();
     const cue = this.controller.audioCue;
     if (cue && cue.sequence !== this.previousCueSequence) {
       this.previousCueSequence = cue.sequence;

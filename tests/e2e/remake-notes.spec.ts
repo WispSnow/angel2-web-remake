@@ -196,6 +196,11 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
     .toContainText("本聲明未向任何第三方");
   await expect(page.getByTestId("remake-disclaimer-contact"))
     .toContainText("RoadMap");
+  // REMAKE-188: the story voices name both synthesis services.
+  await expect(page.getByTestId("remake-disclaimer-ai-voice"))
+    .toContainText("MiniMax");
+  await expect(page.getByTestId("remake-disclaimer-ai-voice"))
+    .toContainText("ElevenLabs");
   await expect(page.getByTestId("remake-note-REMAKE-100")).toHaveCount(0);
   await captureVisualAudit(page.locator(".rn-dialog"), {
     path: "artifacts/playwright/remake-disclaimer-desktop.png",

@@ -4,18 +4,22 @@ import {
   DEFAULT_MUSIC_PREFERENCES,
   DEFAULT_PRESENTATION_PREFERENCES,
   DEFAULT_SOUND_PREFERENCES,
+  DEFAULT_VOICE_PREFERENCES,
   DISPLAY_PREFERENCES_KEY,
   loadDisplayPreferences,
   loadMusicPreferences,
   loadPresentationPreferences,
   loadSoundPreferences,
+  loadVoicePreferences,
   MUSIC_PREFERENCES_KEY,
   PRESENTATION_PREFERENCES_KEY,
   saveDisplayPreferences,
   saveMusicPreferences,
   savePresentationPreferences,
   saveSoundPreferences,
+  saveVoicePreferences,
   SOUND_PREFERENCES_KEY,
+  VOICE_PREFERENCES_KEY,
   type PreferenceStorage,
 } from "../../src/game/preferences";
 
@@ -155,6 +159,28 @@ describe("music preferences", () => {
     }
     saveMusicPreferences(storage, { musicVolume: 1, musicStyle: "orchestral" });
     expect(loadMusicPreferences(storage)).toEqual({ musicVolume: 1, musicStyle: "orchestral" });
+  });
+});
+
+describe("REMAKE-188 voice preferences", () => {
+  test("default to 關 without auto-advance and live in their own device key", () => {
+    const storage = new MemoryStorage();
+    expect(VOICE_PREFERENCES_KEY).toBe("angel2.preferences.voice.v1");
+    expect(DEFAULT_VOICE_PREFERENCES).toEqual({ voiceVolume: 0, autoAdvance: false });
+    expect(loadVoicePreferences(storage)).toEqual(DEFAULT_VOICE_PREFERENCES);
+    for (const invalid of [5, -1, 2.5, "4", null]) {
+      storage.setItem(VOICE_PREFERENCES_KEY, JSON.stringify({ voiceVolume: invalid, autoAdvance: true }));
+      expect(loadVoicePreferences(storage)).toEqual({ voiceVolume: 0, autoAdvance: true });
+    }
+    storage.setItem(VOICE_PREFERENCES_KEY, JSON.stringify({ voiceVolume: 3, autoAdvance: "yes" }));
+    expect(loadVoicePreferences(storage)).toEqual({ voiceVolume: 3, autoAdvance: false });
+    storage.setItem(VOICE_PREFERENCES_KEY, "{");
+    expect(loadVoicePreferences(storage)).toEqual(DEFAULT_VOICE_PREFERENCES);
+    saveVoicePreferences(storage, { voiceVolume: 4, autoAdvance: true });
+    expect(loadVoicePreferences(storage)).toEqual({ voiceVolume: 4, autoAdvance: true });
+    // The sound and music payloads are untouched by the voice preference.
+    expect(storage.getItem(SOUND_PREFERENCES_KEY)).toBeNull();
+    expect(storage.getItem(MUSIC_PREFERENCES_KEY)).toBeNull();
   });
 });
 

@@ -21,6 +21,7 @@ import { createStage0Units } from "./game/content/stage0";
 import { stageDialoguePortraitRecords } from "./game/content/portrait-assets";
 import { STAGE0_DEFINITION } from "./game/content/stages";
 import { remixMusicUrls, stageRemixMusicUrls } from "./game/content/music-remix";
+import { gateVoiceUrls } from "./game/content/voice-catalog";
 import { CREDITS_MUSIC_PROGRAM } from "./game/content/credits";
 import { loadMusicPreferences } from "./game/preferences";
 import type { PortraitRecord } from "./game/types";
@@ -72,6 +73,13 @@ const loadDeploymentSurfaceModules = (): Promise<DeploymentSurfaceModules> => {
   return deploymentSurfaceModules;
 };
 
+const preloadVoice = async (urls: readonly string[] | undefined): Promise<void> => {
+  if (!urls?.length) return;
+  await resourceLoader.ensureVoice(urls).catch((error: unknown) => {
+    console.warn("voice preload failed", error);
+  });
+};
+
 const stageAssetGate: StageAssetGate = (stageId, resolveRequirements) => {
   let requirements: StageAssetRequirements | undefined;
   return resourceLoader.ensureStage(
@@ -87,6 +95,9 @@ const stageAssetGate: StageAssetGate = (stageId, resolveRequirements) => {
     },
     async () => {
       if (requirements?.usesDeploymentSurface) await loadDeploymentSurfaceModules();
+      // `REMAKE-188`：語音片段在載入頁收起前一併下載，但失敗不擋進關——對應頁面只會
+      // 變成無語音頁，由語音層在播到時提示一次。
+      await preloadVoice(requirements?.voiceUrls);
     },
   );
 };
@@ -114,6 +125,7 @@ const controllerAssetRequirements = (controller: GameController): StageAssetRequ
     controller.musicStyle,
     controller.usesDeploymentSurface ? controller.battle.stage.nativeStage : undefined,
   ),
+  voiceUrls: gateVoiceUrls(controller.battle.stage.id, controller.voiceVolume),
 });
 const stage0Units = createStage0Units();
 const stage0PresentationAssets = classPresentationAssetUrls({
@@ -132,7 +144,12 @@ const mountController = (
   userActivated: boolean,
   stagedResources?: ResourcePackLoader,
 ) => {
-  const audio = new AudioManager(controller, root, userActivated);
+  const audio = new AudioManager(
+    controller,
+    root,
+    userActivated,
+    stagedResources ? (urls) => stagedResources.ensureVoice(urls) : undefined,
+  );
   // `REMAKE-174` 原版Debug EDIT 改到這一關沒備妥的職業時，補下載它的圖像進目前的租約。
   if (stagedResources) {
     controller.setOriginalDebugAssetLoader((urls) => stagedResources.extendActiveStage(urls));
@@ -226,9 +243,10 @@ const mountController = (
               ending ? STAGE49_EPILOGUE_MUSIC_BY_SELECTOR[ending.epilogueMusicSelector] : undefined,
             ], controller.musicStyle),
           ],
+          () => preloadVoice(gateVoiceUrls("ending", controller.voiceVolume)),
         );
         if (generation !== surfaceGeneration || controller.phase !== "ending") return;
-        destroySurface = mountStage49EndingUi(root, controller);
+        destroySurface = mountStage49EndingUi(root, controller, audio);
       };
       void mount();
       return;

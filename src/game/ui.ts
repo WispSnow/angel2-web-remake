@@ -58,6 +58,7 @@ import type {
 import type { TerrainInspection } from "./terrain-inspection";
 import type { AudioManager } from "./audio";
 import { renderNativeDialogueText } from "./dialogue-text";
+import { VOICE_AUTO_ADVANCE_DELAY_MS } from "./content/voice-catalog";
 import { dialoguePortraitAfterTicks, dialoguePortraitAfterTyping } from "./dialogue-portrait-cues";
 import {
   dialogueWindowOpenAnimation,
@@ -223,7 +224,23 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 <button data-action="toggle-sound-movement" data-testid="sound-movement-button">移動 開</button>
                 <button data-action="toggle-sound-combat" data-testid="sound-combat-button">戰鬥 開</button>
                 <button data-action="toggle-sound-key" data-testid="sound-key-button">按鍵 開</button>
-                <button data-action="close-sound-settings" data-testid="close-sound-settings">返回</button>
+                <div class="voice-settings-row" role="radiogroup" aria-labelledby="voice-volume-label"
+                  data-testid="voice-volume-group">
+                  <span class="voice-settings-label" id="voice-volume-label">語音</span>
+                  ${["關", "1", "2", "3", "最大"].map((label, level) =>
+                    `<button role="radio" data-action="voice-volume" data-voice-level="${level}"
+                      data-testid="voice-volume-${level}" aria-label="語音音量 ${label}">${label}</button>`).join("")}
+                </div>
+                <div class="voice-settings-row voice-auto-advance-row" role="radiogroup"
+                  aria-labelledby="voice-auto-advance-label" data-testid="voice-auto-advance-group">
+                  <span class="voice-settings-label" id="voice-auto-advance-label">自動翻頁</span>
+                  <button role="radio" data-action="voice-auto-advance" data-voice-auto-advance="false"
+                    data-testid="voice-auto-advance-off">關</button>
+                  <button role="radio" data-action="voice-auto-advance" data-voice-auto-advance="true"
+                    data-testid="voice-auto-advance-on">開</button>
+                </div>
+                <button class="sound-settings-close" data-action="close-sound-settings"
+                  data-testid="close-sound-settings">返回</button>
               </div>
             </section>
             <section class="music-settings-menu modal-panel" id="music-settings-menu"
@@ -561,6 +578,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let pendingDialogueFastForward = false;
   /** 本頁逐字是否已經起跑。只有還沒起跑的那一段才把主操作記到緩衝裡。 */
   let dialogueRevealStarted = false;
+  /** `REMAKE-188` 本頁開頁時已有語音片段：整頁不提交「說話」逐字聲。 */
+  let dialogueVoiced = false;
+  /** `REMAKE-188` 自動翻頁：玩家在本頁按過主操作就取消，計時走程式時鐘、隨暫停凍結。 */
+  let voiceAutoAdvanceTimer: ProgramTimeout | undefined;
+  let voiceAutoAdvanceCancelled = false;
   // 肖像分層還沒解碼完時主操作只能被吃掉：那一段連字都還沒有，補完等於把整頁跳過去。
   // 窗體展開不走這條——展開中的主操作照樣是「補完本頁」，只是要先讓窗體到位。
   let activeDialoguePortraitReady = true;
@@ -671,7 +693,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     const tickMilliseconds = controller.presentationFast ? 2.5 : 10;
     const startedAt = programNow();
     const schedule = (index: number) => {
-      if (index >= ticks.length) return;
+      if (index >= ticks.length) {
+        scheduleVoiceAutoAdvance(key);
+        return;
+      }
       dialogueTimedPortraitTimer = setProgramTimeout(() => {
         dialogueTimedPortraitTimer = undefined;
         if (activeDialogueKey !== key) return;
@@ -685,6 +710,42 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       }, startedAt + ticks[index] * tickMilliseconds - programNow());
     };
     schedule(0);
+  };
+  const cancelVoiceAutoAdvance = () => {
+    if (voiceAutoAdvanceTimer !== undefined) clearProgramTimeout(voiceAutoAdvanceTimer);
+    voiceAutoAdvanceTimer = undefined;
+  };
+  const documentationOverlayOpen = () => root.ownerDocument.querySelector(".rn-overlay.is-open") !== null;
+  /**
+   * `REMAKE-188` 自動翻頁的全部前提：有語音頁、片段已播完、逐字已完成、`DL` 等待跑完、
+   * 跳過確認框與復刻資料層都沒開，而且玩家沒有在本頁按過主操作。暫停由程式時鐘負責。
+   */
+  /** 測試模式下標出本頁逐字是否還在跑，讓驗收分辨「補完」與「推進」兩種主操作。 */
+  const markDialogueTyping = (state: "pending" | "true" | "false") => {
+    if (controller.isTestMode) dialogueLayer.dataset.typing = state;
+  };
+  const voiceAutoAdvanceReady = (key: string) => controller.voiceAutoAdvance
+    && !voiceAutoAdvanceCancelled
+    && dialogueVoiced
+    && activeDialogueKey === key
+    && audio.voice.pageClipEnded
+    && dialogueFullText.length > 0
+    && revealedCharacters >= dialogueFullText.length
+    && dialogueTimedPortraitTimer === undefined
+    && !controller.dialogueSkipConfirmOpen;
+  const scheduleVoiceAutoAdvance = (key: string) => {
+    if (voiceAutoAdvanceTimer !== undefined || !voiceAutoAdvanceReady(key)) return;
+    voiceAutoAdvanceTimer = setProgramTimeout(() => {
+      voiceAutoAdvanceTimer = undefined;
+      if (!voiceAutoAdvanceReady(key)) return;
+      // 復刻資料層開著時不翻頁；關上後下一輪檢查才推進。
+      if (documentationOverlayOpen()) {
+        scheduleVoiceAutoAdvance(key);
+        return;
+      }
+      // 與玩家逐字完成後的主操作相同：推進到下一頁，不新增任何控制器入口。
+      controller.advanceDialogue();
+    }, VOICE_AUTO_ADVANCE_DELAY_MS);
   };
   const stopDialogueTimer = () => {
     if (dialogueTimer !== undefined) clearProgramTimeout(dialogueTimer);
@@ -721,9 +782,16 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     portrait?: HTMLElement,
     panel?: HTMLElement,
     cueWindow?: { slot: "upper" | "lower"; state: DialogueWindowState },
+    voicePage?: DialoguePage,
   ) => {
     stopDialogueTimer();
     stopSpeaking(activeDialoguePortrait);
+    // 推進到新的一頁：舊片段立刻淡出，不等新頁的窗體展開或肖像解碼。
+    audio.voice.endPage();
+    dialogueVoiced = false;
+    cancelVoiceAutoAdvance();
+    voiceAutoAdvanceCancelled = false;
+    markDialogueTyping("pending");
     pendingDialogueFastForward = false;
     dialogueRevealStarted = false;
     activeDialogueKey = key;
@@ -739,14 +807,21 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       if (activeDialogueKey !== key || activeDialogueText !== target || revealedCharacters >= dialogueFullText.length) {
         stopSpeaking(activeDialoguePortrait);
         dialogueTimer = undefined;
-        if (activeDialogueKey === key) scheduleAutomaticDialogueAdvance(key);
+        if (activeDialogueKey === key) {
+          markDialogueTyping("false");
+          scheduleAutomaticDialogueAdvance(key);
+          if (dialogueVoiced) audio.voice.typingFinished();
+          scheduleVoiceAutoAdvance(key);
+        }
         return;
       }
       const character = dialogueFullText[revealedCharacters];
       syncDialoguePortraitCue(revealedCharacters);
       revealedCharacters += 1;
       renderNativeDialogueText(target, dialogueFullText.slice(0, revealedCharacters), dialogueFullText);
-      if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
+      // 有語音的頁面整頁不提交逐字聲；原版「說話」開關本身的含義不變。
+      if (dialogueVoiced) audio.voice.glyphTyped(character);
+      else if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
       drawSpeechGlyph(activeDialoguePortrait, character);
       const delay = controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80;
       dialogueTimer = setProgramTimeout(tick, delay);
@@ -755,6 +830,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       if (activeDialogueKey !== key || activeDialogueText !== target) return;
       activeDialoguePortraitReady = true;
       dialogueRevealStarted = true;
+      // 片段與逐字聲、口型同一時點開始；片段未就緒時這一頁就是無語音頁，不在頁中途補播。
+      dialogueVoiced = voicePage !== undefined
+        && audio.voice.beginPage(voicePage, () => scheduleVoiceAutoAdvance(key));
+      markDialogueTyping("true");
       startSpeaking(activeDialoguePortrait, revealedCharacters < dialogueFullText.length);
       tick();
       // 展開途中按下的主操作在這裡兌現。原版是 DOS 鍵盤緩衝：`WU` 不讀輸入，那一下留
@@ -790,6 +869,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       syncDialoguePortraitCue(revealedCharacters);
       renderNativeDialogueText(target, dialogueFullText);
       stopSpeaking(activeDialoguePortrait);
+      markDialogueTyping("false");
       scheduleAutomaticDialogueAdvance(key);
     });
   };
@@ -816,6 +896,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     renderNativeDialogueText(activeDialogueText, dialogueFullText);
     stopSpeaking(activeDialoguePortrait);
     if (controller.groupCommandDialogueActive) scheduleAutomaticDialogueAdvance(activeDialogueKey);
+    // 補完本頁不切斷語音；還沒輪到 `startGlyph` 的片段此時開始。
+    if (dialogueVoiced) audio.voice.typingFinished();
+    markDialogueTyping("false");
     return true;
   };
   const stopFeedbackTimer = () => {
@@ -875,6 +958,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
    * 交給控制器。跳過確認框開著時直接交給控制器選取「是／否」。
    */
   const confirmAtCursor = () => {
+    // 玩家先按下的主操作照常生效，並取消本頁的自動翻頁。
+    voiceAutoAdvanceCancelled = true;
+    cancelVoiceAutoAdvance();
     if (controller.dialogueSkipConfirmOpen
       || (!finishDialogueTyping() && !finishFeedbackTyping())) controller.primaryAtCursor();
   };
@@ -992,6 +1078,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     const button = (event.target as Element).closest<HTMLElement>("[data-action]");
     if (!button) {
       if ((event.target as Element).closest("#dialogue-layer")) {
+        voiceAutoAdvanceCancelled = true;
+        cancelVoiceAutoAdvance();
         if (!controller.dialogueSkipConfirmOpen && !finishDialogueTyping()) {
           controller.advanceDialogue();
         }
@@ -1022,6 +1110,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "toggle-sound-key") controller.toggleKeySound();
     else if (action === "sound-effect-volume") {
       controller.setSoundEffectVolume(Number(button.dataset.soundEffectLevel));
+    }
+    else if (action === "voice-volume") controller.setVoiceVolume(Number(button.dataset.voiceLevel));
+    else if (action === "voice-auto-advance") {
+      controller.setVoiceAutoAdvance(button.dataset.voiceAutoAdvance === "true");
     }
     else if (action === "open-music-settings") controller.openMusicSettings();
     else if (action === "close-music-settings") controller.closeMusicSettings();
@@ -1627,6 +1719,18 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       button.classList.toggle("is-selected", selected);
       button.setAttribute("aria-checked", String(selected));
     }
+    for (const button of root.querySelectorAll<HTMLButtonElement>("[data-voice-level]")) {
+      const selected = Number(button.dataset.voiceLevel) === controller.voiceVolume;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-checked", String(selected));
+    }
+    for (const button of root.querySelectorAll<HTMLButtonElement>("[data-voice-auto-advance]")) {
+      const selected = (button.dataset.voiceAutoAdvance === "true") === controller.voiceAutoAdvance;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-checked", String(selected));
+      // 語音為「關」時自動翻頁沒有作用，整列置灰；偏好本身保留。
+      button.disabled = controller.voiceVolume === 0;
+    }
     for (const button of root.querySelectorAll<HTMLButtonElement>("[data-sound-effect-level]")) {
       const selected = Number(button.dataset.soundEffectLevel) === controller.soundEffectVolume;
       button.classList.toggle("is-selected", selected);
@@ -1823,11 +1927,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             portrait,
             dialogueWindows[page.activeSlot].copy,
             { slot: page.activeSlot, state: activeState },
+            page,
           );
         }
       } else if (pageChanged) {
         stopDialogueTimer();
         stopSpeaking(activeDialoguePortrait);
+        audio.voice.endPage();
+        dialogueVoiced = false;
+        cancelVoiceAutoAdvance();
         activeDialogueKey = pageKey;
         activeDialogueText = undefined;
         activeDialoguePortrait = undefined;
@@ -1840,6 +1948,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         revealedCharacters = 0;
       }
       if (pageChanged) playTimedPortraitCues(page, pageKey);
+      // 跳過確認框取消、`DL` 等待跑完等狀態變化之後，重新檢查本頁能否自動翻頁。
+      else scheduleVoiceAutoAdvance(pageKey);
     } else {
       // These variants change the panel's layout and colours, so they can only
       // be dropped once the collapse they are still styling has finished.
@@ -1853,6 +1963,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       stopDialogueTimer();
       stopTimedPortraitCues();
       stopSpeaking(activeDialoguePortrait);
+      // 對白結束或確認跳過整段：片段淡出。
+      audio.voice.endPage();
+      dialogueVoiced = false;
+      cancelVoiceAutoAdvance();
       activeDialogueKey = "";
       activeDialogueText = undefined;
       activeDialoguePortrait = undefined;
@@ -1952,6 +2066,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     nativeText.dispose();
     stopPortraitAnimations();
     stopDialogueTimer();
+    cancelVoiceAutoAdvance();
+    audio.voice.endPage();
     stopFeedbackTimer();
     hideSidePanelHint();
     for (const menu of animatedMenus) finishMenuClose(menu);

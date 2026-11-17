@@ -11,6 +11,8 @@ import {
 } from "./content/stage49-ending";
 import { STAGE_INDEX } from "./content/stage-index";
 import type { GameController } from "./controller";
+import type { AudioManager } from "./audio";
+import { VOICE_AUTO_ADVANCE_DELAY_MS } from "./content/voice-catalog";
 import { drawEpilogueGlyphs, loadEpilogueFont } from "./epilogue-text";
 import { prepareDomImageElements } from "./dom-image-readiness";
 import { renderNativeDialogueText } from "./dialogue-text";
@@ -160,6 +162,7 @@ function boundaryMarkup(): string {
 export function mountStage49EndingUi(
   root: HTMLElement,
   controller: GameController,
+  audio?: AudioManager,
 ): () => void {
   root.innerHTML = `<main class="stage49-page">
     <div class="game-stage">
@@ -182,6 +185,11 @@ export function mountStage49EndingUi(
   let storyPortrait: HTMLElement | undefined;
   let storyFullText = "";
   let storyRevealedCharacters = 0;
+  /** `REMAKE-188` SAY/0070 本頁開頁時已有語音片段。 */
+  let storyVoiced = false;
+  let voiceAdvanceTimer: ProgramTimeout | undefined;
+  /** 玩家在本頁按過推進就取消自動翻頁。 */
+  let voiceAdvanceCancelled = false;
   let epilogueTimer: ProgramTimeout | undefined;
   let epilogueGeneration = 0;
   let finishEpilogueTyping: (() => boolean) | undefined;
@@ -205,6 +213,25 @@ export function mountStage49EndingUi(
     if (storyTimer !== undefined) clearProgramTimeout(storyTimer);
     storyTimer = undefined;
   };
+  const cancelVoiceAdvance = () => {
+    if (voiceAdvanceTimer !== undefined) clearProgramTimeout(voiceAdvanceTimer);
+    voiceAdvanceTimer = undefined;
+  };
+  /** `REMAKE-188` 自動翻頁：片段播完、逐字完成、玩家沒在本頁按過推進。 */
+  const voiceAdvanceReady = (generation: number) => controller.voiceAutoAdvance
+    && storyVoiced
+    && !voiceAdvanceCancelled
+    && generation === renderGeneration
+    && storyFullText.length > 0
+    && storyRevealedCharacters >= storyFullText.length
+    && (audio?.voice.pageClipEnded ?? false);
+  const scheduleVoiceAdvance = (generation: number) => {
+    if (voiceAdvanceTimer !== undefined || !voiceAdvanceReady(generation)) return;
+    voiceAdvanceTimer = setProgramTimeout(() => {
+      voiceAdvanceTimer = undefined;
+      if (voiceAdvanceReady(generation)) controller.advanceStage49Ending();
+    }, VOICE_AUTO_ADVANCE_DELAY_MS);
+  };
   const finishStoryTyping = (): boolean => {
     if (!storyText || storyRevealedCharacters >= storyFullText.length) return false;
     stopStoryTimer();
@@ -212,6 +239,7 @@ export function mountStage49EndingUi(
     renderNativeDialogueText(storyText, storyFullText);
     stopSpeaking(storyPortrait);
     screen.dataset.storyTyping = "false";
+    if (storyVoiced) audio?.voice.typingFinished();
     return true;
   };
   const primeStoryTyping = (): (() => void) | undefined => {
@@ -235,7 +263,9 @@ export function mountStage49EndingUi(
     storyRevealedCharacters = Math.max(0, Math.min(storyFullText.length, page.revealStart ?? 0));
     renderNativeDialogueText(storyText, storyFullText.slice(0, storyRevealedCharacters));
     screen.dataset.storyTyping = "false";
+    const generation = renderGeneration;
     return () => {
+      storyVoiced = audio?.voice.beginPage(page, () => scheduleVoiceAdvance(generation)) ?? false;
       const speaking = storyRevealedCharacters < storyFullText.length;
       if (storyPortrait) storyPortrait.dataset.speaking = String(speaking);
       screen.dataset.storyTyping = String(speaking);
@@ -244,10 +274,13 @@ export function mountStage49EndingUi(
           stopSpeaking(storyPortrait);
           screen.dataset.storyTyping = "false";
           storyTimer = undefined;
+          if (storyVoiced) audio?.voice.typingFinished();
+          scheduleVoiceAdvance(generation);
           return;
         }
         const character = storyFullText[storyRevealedCharacters];
         storyRevealedCharacters += 1;
+        if (storyVoiced) audio?.voice.glyphTyped(character);
         renderNativeDialogueText(storyText, storyFullText.slice(0, storyRevealedCharacters));
         if (storyPortrait && nativeStoryGlyphMovesMouth(character)) {
           storyPortrait.dataset.mouthFrame = nativeMouthFrameAfterGlyph(
@@ -355,6 +388,11 @@ export function mountStage49EndingUi(
     const generation = ++renderGeneration;
     if (timer !== undefined) clearProgramTimeout(timer);
     stopStoryTimer();
+    // 換頁或離開劇情段：當前片段約 0.1 秒淡出。
+    audio?.voice.endPage();
+    storyVoiced = false;
+    voiceAdvanceCancelled = false;
+    cancelVoiceAdvance();
     stopEpilogueTyping();
     stopSpeaking(storyPortrait);
     storyText = undefined;
@@ -428,6 +466,8 @@ export function mountStage49EndingUi(
     });
   };
   const advance = () => {
+    voiceAdvanceCancelled = true;
+    cancelVoiceAdvance();
     if (segmentFailed) {
       render();
       return;
@@ -466,6 +506,8 @@ export function mountStage49EndingUi(
     renderGeneration += 1;
     if (timer !== undefined) clearProgramTimeout(timer);
     stopStoryTimer();
+    cancelVoiceAdvance();
+    audio?.voice.endPage();
     stopEpilogueTyping();
     stopSpeaking(storyPortrait);
     unsubscribe();

@@ -5,6 +5,7 @@ import {
 } from "./content/resource-manifest.generated";
 import type { StageId } from "./types";
 import { isMusicResourceUrl, primeEncodedMusic } from "./music-resource-cache";
+import { isVoiceResourceUrl, primeEncodedVoice } from "./voice-transport";
 import {
   isSoundEffectResourceUrl,
   prepareSoundEffectBuffers,
@@ -189,8 +190,9 @@ export class ResourcePackLoader {
     route: "ending" | "credits",
     label: string,
     supplementalUrls: readonly string[] = [],
+    afterLoad?: () => Promise<void>,
   ): Promise<void> {
-    await this.ensurePackVisible(route, label, supplementalUrls);
+    await this.ensurePackVisible(route, label, supplementalUrls, [], afterLoad);
   }
 
   /**
@@ -210,6 +212,15 @@ export class ResourcePackLoader {
     } finally {
       this.progressListeners.delete(report);
     }
+  }
+
+  /**
+   * `REMAKE-188` 關卡中途開啟劇情語音時，在背景下載本關片段：不顯示載入頁、不阻塞當前頁，
+   * 仍走同一條 Cache Storage 與編碼資料路徑。失敗由呼叫端把相關頁面當作無語音頁。
+   */
+  async ensureVoice(urls: readonly string[]): Promise<void> {
+    const manifest = await this.loadManifest();
+    await this.loadUrls(manifest, [...new Set(urls)]);
   }
 
   /**
@@ -382,6 +393,7 @@ export class ResourcePackLoader {
       if (!response.ok) throw new Error(`讀取失敗（${response.status}）：${asset.url}`);
       const reader = response.body?.getReader();
       const collectEncoded = isMusicResourceUrl(asset.url)
+        || isVoiceResourceUrl(asset.url)
         || isSoundEffectResourceUrl(asset.url)
         || isStagedRenderAssetUrl(asset.url);
       const encodedChunks: Uint8Array[] | undefined = collectEncoded ? [] : undefined;
@@ -413,6 +425,7 @@ export class ResourcePackLoader {
           offset += chunk.byteLength;
         }
         if (isMusicResourceUrl(asset.url)) primeEncodedMusic(asset.url, encoded);
+        if (isVoiceResourceUrl(asset.url)) primeEncodedVoice(asset.url, encoded);
         if (isSoundEffectResourceUrl(asset.url)) primeEncodedSoundEffect(asset.url, encoded);
         if (isStagedRenderAssetUrl(asset.url)) state.encodedRenderAsset = encodedView;
       }

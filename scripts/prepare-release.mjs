@@ -219,6 +219,18 @@ for (const track of remixManifest.tracks) {
     throw new Error(`release remix differs from its manifest: ${track.output}`);
   }
 }
+// `REMAKE-188`: story voice clips are fetched on demand like the remixes.
+const voiceManifestPath = path.join(releaseDirectory, "assets/original/voice/voice-manifest.json");
+if (!(await pathExists(voiceManifestPath))) {
+  throw new Error("release build is missing the story voice manifest");
+}
+const voiceManifest = JSON.parse(await readFile(voiceManifestPath, "utf8"));
+for (const clip of voiceManifest.clips) {
+  const released = await readFile(path.join(releaseDirectory, "assets/original", clip.output));
+  if (createHash("sha256").update(released).digest("hex") !== clip.sha256) {
+    throw new Error(`release voice clip differs from its manifest: ${clip.output}`);
+  }
+}
 const legacyMusic = files.filter((file) => {
   const relative = path.relative(releaseDirectory, file);
   return /(?:^|\/)(?:story-stage\d+(?:-loop-seamless)?|battle-stage\d+-(?:player|enemy)-(?:entry|loop)(?:-seamless)?)\.wav$/u.test(relative)

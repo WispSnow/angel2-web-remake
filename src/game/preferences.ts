@@ -54,6 +54,17 @@ export interface MusicPreferences {
   musicStyle: MusicStyle;
 }
 
+/**
+ * `REMAKE-188` 劇情語音：設備級本地偏好，不進存檔。`voiceVolume` 為 `0` 即「關」——
+ * 不請求、不下載任何語音檔；`autoAdvance` 只在有語音的頁面於片段播完後代按一次推進。
+ */
+export interface VoicePreferences {
+  voiceVolume: VoiceVolume;
+  autoAdvance: boolean;
+}
+
+export type VoiceVolume = VolumeLevel;
+
 export interface PreferenceStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -63,6 +74,7 @@ export const PRESENTATION_PREFERENCES_KEY = "angel2.preferences.presentation.v1"
 export const SOUND_PREFERENCES_KEY = "angel2.preferences.sound.v1";
 export const MUSIC_PREFERENCES_KEY = "angel2.preferences.music.v1";
 export const DISPLAY_PREFERENCES_KEY = "angel2.preferences.display.v1";
+export const VOICE_PREFERENCES_KEY = "angel2.preferences.voice.v1";
 
 export const DEFAULT_PRESENTATION_PREFERENCES: Readonly<PresentationPreferences> = {
   battlePresentation: "full",
@@ -83,6 +95,11 @@ export const DEFAULT_SOUND_PREFERENCES: Readonly<SoundPreferences> = {
 export const DEFAULT_MUSIC_PREFERENCES: Readonly<MusicPreferences> = {
   musicVolume: 4,
   musicStyle: "original",
+};
+
+export const DEFAULT_VOICE_PREFERENCES: Readonly<VoicePreferences> = {
+  voiceVolume: 0,
+  autoAdvance: false,
 };
 
 export const DEFAULT_DISPLAY_PREFERENCES: Readonly<DisplayPreferences> = {
@@ -106,6 +123,8 @@ export const isMusicStyle = (value: unknown): value is MusicStyle =>
 
 export const isSoundEffectVolume = (value: unknown): value is SoundEffectVolume =>
   isVolumeLevel(value);
+
+export const isVoiceVolume = (value: unknown): value is VoiceVolume => isVolumeLevel(value);
 
 export function loadPresentationPreferences(storage: PreferenceStorage): PresentationPreferences {
   const raw = storage.getItem(PRESENTATION_PREFERENCES_KEY);
@@ -198,6 +217,31 @@ export function saveMusicPreferences(
   preferences: MusicPreferences,
 ): void {
   storage.setItem(MUSIC_PREFERENCES_KEY, JSON.stringify(preferences));
+}
+
+export function loadVoicePreferences(storage: PreferenceStorage): VoicePreferences {
+  const raw = storage.getItem(VOICE_PREFERENCES_KEY);
+  if (!raw) return { ...DEFAULT_VOICE_PREFERENCES };
+  try {
+    const candidate = JSON.parse(raw) as Partial<VoicePreferences>;
+    return {
+      voiceVolume: isVoiceVolume(candidate.voiceVolume)
+        ? candidate.voiceVolume
+        : DEFAULT_VOICE_PREFERENCES.voiceVolume,
+      autoAdvance: typeof candidate.autoAdvance === "boolean"
+        ? candidate.autoAdvance
+        : DEFAULT_VOICE_PREFERENCES.autoAdvance,
+    };
+  } catch {
+    return { ...DEFAULT_VOICE_PREFERENCES };
+  }
+}
+
+export function saveVoicePreferences(
+  storage: PreferenceStorage,
+  preferences: VoicePreferences,
+): void {
+  storage.setItem(VOICE_PREFERENCES_KEY, JSON.stringify(preferences));
 }
 
 export function loadDisplayPreferences(storage: PreferenceStorage): DisplayPreferences {

@@ -53,6 +53,8 @@ import { stagedRenderAssetAvailable } from "./staged-render-asset-cache";
 import { fullCombatImageAvailable } from "./full-combat-image-cache";
 import { MUSIC_BOX_TRACKS, musicBoxProgram } from "./content/music-box";
 import { stageRemixMusicUrls } from "./content/music-remix";
+import { gateVoiceUrls } from "./content/voice-catalog";
+import { STAGE49_STORY_PAGES } from "./content/stage49-ending";
 import type { MusicProgram } from "./music-transport";
 import {
   originalDebugHotkeyRefusal,
@@ -190,15 +192,19 @@ import {
   isMusicStyle,
   isMusicVolume,
   isSoundEffectVolume,
+  isVoiceVolume,
   loadMusicPreferences,
   loadPresentationPreferences,
   loadSoundPreferences,
+  loadVoicePreferences,
   saveMusicPreferences,
   savePresentationPreferences,
   saveSoundPreferences,
+  saveVoicePreferences,
   type MusicStyle,
   type MusicVolume,
   type SoundEffectVolume,
+  type VoiceVolume,
 } from "./preferences";
 import {
   moveSaveSlotIndex,
@@ -247,6 +253,11 @@ export interface StageAssetRequirements {
    * 只在玩家選了 `交響` 時隨資源門下載。
    */
   musicUrls?: readonly string[];
+  /**
+   * `REMAKE-188` 這一關的劇情語音片段；語音為「關」時為空。語音檔不進關卡資源包，
+   * 只在玩家開了語音時隨資源門下載，下載失敗的頁面當作無語音頁。
+   */
+  voiceUrls?: readonly string[];
 }
 
 /**
@@ -688,6 +699,12 @@ export class GameController {
   /** `REMAKE-181` 音樂風格；只改表現，不進存檔。 */
   musicStyle: MusicStyle;
   soundEffectVolume: SoundEffectVolume;
+  /** `REMAKE-188` 劇情語音音量；`0` 即「關」。只改表現，不進存檔。 */
+  voiceVolume: VoiceVolume;
+  /** `REMAKE-188` 有語音的頁面在片段播完後自動推進一頁。 */
+  voiceAutoAdvance: boolean;
+  /** 語音下載或解碼失敗只在狀態列提示一次。 */
+  private voiceFailureNoticed = false;
   speechEnabled: boolean;
   movementSoundEnabled: boolean;
   combatSoundEnabled: boolean;
@@ -807,6 +824,9 @@ export class GameController {
     this.movementSoundEnabled = soundPreferences.movementSoundEnabled;
     this.combatSoundEnabled = soundPreferences.combatSoundEnabled;
     this.keySoundEnabled = soundPreferences.keySoundEnabled;
+    const voicePreferences = loadVoicePreferences(localStorage);
+    this.voiceVolume = voicePreferences.voiceVolume;
+    this.voiceAutoAdvance = voicePreferences.autoAdvance;
     this.initializeStageEventProgress();
   }
 
@@ -1078,6 +1098,7 @@ export class GameController {
           this.musicStyle,
           runtime.preparation ? runtime.definition.nativeStage : undefined,
         ),
+        voiceUrls: gateVoiceUrls(stageId, this.voiceVolume),
       };
     };
     if (this.stageAssetGate) await this.stageAssetGate(stageId, resolveRequirements);
@@ -6361,6 +6382,47 @@ export class GameController {
     this.emit();
   }
 
+  setVoiceVolume(volume: number): void {
+    if (!isVoiceVolume(volume) || volume === this.voiceVolume) return;
+    this.voiceVolume = volume;
+    this.persistVoicePreferences();
+    this.emit();
+  }
+
+  setVoiceAutoAdvance(enabled: boolean): void {
+    if (enabled === this.voiceAutoAdvance) return;
+    this.voiceAutoAdvance = enabled;
+    this.persistVoicePreferences();
+    this.emit();
+  }
+
+  /** 語音片段屬於哪個資源門：結局路由或當前關卡。 */
+  get voiceGate(): StageId | "ending" {
+    return this.phase === "ending" ? "ending" : this.battle.stage.id;
+  }
+
+  /**
+   * 當前劇情頁與其後的幾頁，供語音預先解碼。只看劇情對白；授職、集體命令與 AI 台詞
+   * 沒有語音片段。
+   */
+  upcomingStoryPages(count: number): readonly DialoguePage[] {
+    if (this.phase === "ending") {
+      const ending = this.stage49Ending;
+      if (ending?.section !== "story") return [];
+      return STAGE49_STORY_PAGES.slice(ending.index, ending.index + count);
+    }
+    if (!this.activeStoryId || !isStoryPhase(this.phase)) return [];
+    return storyPagesForId(this.activeStoryId).slice(this.dialogueIndex, this.dialogueIndex + count);
+  }
+
+  /** 首次有片段下載或解碼失敗時，在狀態列給一次現代文字提示；之後的失敗不再打擾。 */
+  reportVoiceUnavailable(): void {
+    if (this.voiceFailureNoticed) return;
+    this.voiceFailureNoticed = true;
+    this.statusMessage = "劇情語音載入失敗，相關頁面改用逐字聲。";
+    this.emit();
+  }
+
   setSoundEffectVolume(volume: number): void {
     if (!isSoundEffectVolume(volume) || volume === this.soundEffectVolume) return;
     this.soundEffectVolume = volume;
@@ -8153,6 +8215,13 @@ export class GameController {
       movementSoundEnabled: this.movementSoundEnabled,
       combatSoundEnabled: this.combatSoundEnabled,
       keySoundEnabled: this.keySoundEnabled,
+    });
+  }
+
+  private persistVoicePreferences(): void {
+    saveVoicePreferences(localStorage, {
+      voiceVolume: this.voiceVolume,
+      autoAdvance: this.voiceAutoAdvance,
     });
   }
 

@@ -217,6 +217,9 @@ for (const { relative } of allFiles) {
     throw new Error(`stage asset was not assigned to a stage pack: ${url}`);
   }
   if (relative.startsWith("music/")) addToPack("stream:music", url);
+  // `REMAKE-188`: story voice clips are never part of a stage pack. The resource
+  // gate requests a stage's clips only when the player has turned voice on.
+  else if (relative.startsWith("voice/")) addToPack("stream:voice", url);
   else if (isSharedBattleSurfaceAsset(relative)
     || relative.startsWith("dialogue/") || relative.startsWith("status-icons/")
     || relative.startsWith("story/")
@@ -272,6 +275,7 @@ addPack("stream:portraits", "肖像串流資料");
 addPack("stream:full-combat", "全景戰鬥串流資料");
 addPack("stream:map-units", "棋子按需資料");
 addPack("stream:music", "其餘音樂串流資料");
+addPack("stream:voice", "劇情語音串流資料");
 addPack("stream:misc", "其餘按需資料");
 
 const packageIdsByUrl = new Map();
