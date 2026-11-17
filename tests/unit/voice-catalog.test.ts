@@ -3,7 +3,14 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, test } from "vitest";
-import { castRoleForPortrait, ELEVENLABS_MODEL, MINIMAX_MODEL, VOICE_CAST } from "../../scripts/lib/voice-cast.mjs";
+import {
+  castRoleForPortrait,
+  ELEVENLABS_MODEL,
+  MINIMAX_MODEL,
+  VOICE_CAST,
+  VOICE_TEMPO_BY_PLATFORM,
+  voiceTempoForRole,
+} from "../../scripts/lib/voice-cast.mjs";
 import { STORY_PAGES_BY_ID } from "../../src/game/content/dialogue";
 import { STAGE49_STORY_PAGES } from "../../src/game/content/stage49-ending";
 import {
@@ -26,6 +33,7 @@ interface VoiceManifestClip {
   portrait: number | null;
   displayTextHash: string;
   startGlyph: number;
+  tempo: number;
   platform?: string;
   model?: string;
   voiceId?: string;
@@ -140,6 +148,19 @@ describe("REMAKE-188 voice catalog", () => {
     // 旁白 is the only MiniMax voice; every portrait speaker is ElevenLabs.
     expect(new Set(manifest.clips.filter(({ platform }) => platform === "minimax").map(({ role }) => role)))
       .toEqual(new Set(["narrator"]));
+  });
+
+  test("speeds every ElevenLabs character up 1.15× and leaves the narrator and ghost montage as made", () => {
+    const tempoByRole = new Map<string, Set<number>>();
+    for (const clip of manifest.clips) {
+      expect(clip.tempo, clip.key).toBe(voiceTempoForRole(clip.role));
+      tempoByRole.set(clip.role, (tempoByRole.get(clip.role) ?? new Set()).add(clip.tempo));
+    }
+    expect(VOICE_TEMPO_BY_PLATFORM).toEqual({ minimax: 1, elevenlabs: 1.15 });
+    expect(tempoByRole.get("narrator")).toEqual(new Set([1]));
+    expect(tempoByRole.get("ghostMontage")).toEqual(new Set([1]));
+    expect(tempoByRole.get("nia")).toEqual(new Set([1.15]));
+    expect(manifest.clips.filter(({ tempo }) => tempo === 1.15)).toHaveLength(704);
   });
 
   test("splices SAY/0164 KY 20–23 word by word and starts KY 20 on the first speaker", () => {

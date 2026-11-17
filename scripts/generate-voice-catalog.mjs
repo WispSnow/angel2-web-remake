@@ -9,7 +9,7 @@
 // - its display-text hash and spoken text match today's page and voice script,
 //   so a later fix to the dialogue forces the affected clips to be redone;
 // - every KY page of every SAY record has a clip or a stated reason not to;
-// - every clip's voice is the accepted cast (scripts/lib/voice-cast.mjs);
+// - every clip's voice and pace are the accepted cast (scripts/lib/voice-cast.mjs);
 // - every OGG matches its hash and is mono.
 //
 // `--import <workbench>` first copies finished clips from the git-ignored voice
@@ -20,7 +20,14 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, rm, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ELEVENLABS_MODEL, GHOST_MONTAGE, MINIMAX_MODEL, VOICE_CAST } from "./lib/voice-cast.mjs";
+import {
+  ELEVENLABS_MODEL,
+  GHOST_MONTAGE,
+  MINIMAX_MODEL,
+  VOICE_CAST,
+  VOICE_TEMPO_BY_PLATFORM,
+  voiceTempoForRole,
+} from "./lib/voice-cast.mjs";
 import { loadStoryPages, sayPages } from "./lib/voice-pages.mjs";
 import { buildVoiceScript, UNVOICED_REASONS, VOICE_LEXICON, VOICE_TYPO_READINGS } from "./lib/voice-script.mjs";
 
@@ -60,6 +67,10 @@ async function importWorkbench(workbench, script) {
     if (clip.role !== GHOST_MONTAGE.role && finished.spoken !== clip.spoken) {
       fail(`SAY ${clip.key} was synthesised from different text; regenerate it`);
     }
+    // Clips finished before the pace field existed were left as synthesised.
+    if ((finished.tempo ?? 1) !== clip.tempo) {
+      fail(`SAY ${clip.key} was finished at ${finished.tempo ?? 1}×, the voice script asks for ${clip.tempo}×; rerun finish.mjs`);
+    }
     const output = `voice/${path.basename(finished.file)}`;
     await copyFile(path.join(workbench, finished.file), path.join(assetRoot, output));
     clips.push({
@@ -73,6 +84,7 @@ async function importWorkbench(workbench, script) {
       displayTextHash: clip.displayTextHash,
       spoken: clip.spoken,
       startGlyph: clip.startGlyph,
+      tempo: clip.tempo,
       ...(clip.platform
         ? {
           platform: clip.platform,
@@ -105,6 +117,11 @@ async function importWorkbench(workbench, script) {
       typoReadings: VOICE_TYPO_READINGS,
       lexicon: VOICE_LEXICON,
       rules: "去掉空白與「」；『』改引號；．串改省略號、單個．改句號；ASCII 點分隔的咒語改頓號；～～留一個；台灣正體轉簡體，妳讀作你",
+    },
+    tempo: {
+      byPlatform: VOICE_TEMPO_BY_PLATFORM,
+      ghostMontage: voiceTempoForRole(GHOST_MONTAGE.role),
+      method: "ffmpeg atempo（保持音高），裁切之後、響度標準化之前；eleven_v4 不理會 voice_settings.speed",
     },
     clips,
     unvoiced: script.unvoiced.map((page) => ({
@@ -142,6 +159,7 @@ function validate(manifest, script, pages) {
     if (clip.role !== expected.role) fail(`SAY ${clip.key} is cast as ${clip.role}, the page shows ${expected.role}`);
     if (clip.gate !== expected.stages[0]) fail(`SAY ${clip.key} gate ${clip.gate} is not ${expected.stages[0]}`);
     if (clip.startGlyph !== expected.startGlyph) fail(`SAY ${clip.key} startGlyph differs from the voice script`);
+    if (clip.tempo !== expected.tempo) fail(`SAY ${clip.key} pace ${clip.tempo}× is not the cast's ${expected.tempo}×; refinish the clip`);
     if (clip.role === GHOST_MONTAGE.role) {
       if (!GHOST_MONTAGE.waits.includes(clip.wait) || clip.record !== GHOST_MONTAGE.record) fail(`${clip.key} is not a montage page`);
       if (!clip.montage?.words?.length) fail(`montage ${clip.key} lists no speakers`);

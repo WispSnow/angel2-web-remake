@@ -4,7 +4,7 @@
 // punctuation; only the spoken copy is normalised.
 
 import OpenCC from "opencc-js";
-import { castRoleForPortrait, GHOST_MONTAGE, VOICE_CAST } from "./voice-cast.mjs";
+import { castRoleForPortrait, GHOST_MONTAGE, VOICE_CAST, voiceTempoForRole } from "./voice-cast.mjs";
 import { clipKey, displayTextHash } from "./voice-pages.mjs";
 
 const toSimplified = OpenCC.Converter({ from: "tw", to: "cn" });
@@ -102,6 +102,7 @@ export function buildVoiceScript(pages) {
       displayTextHash: displayTextHash(displayed),
       spoken: isGhostMontage ? spokenText(displayed).replace(/～/gu, "") : spokenText(displayed),
       startGlyph: 0,
+      tempo: voiceTempoForRole(role),
       ...(voice ? { platform: voice.platform, voiceId: voice.voiceId, voiceName: voice.voiceName } : {}),
     });
   }

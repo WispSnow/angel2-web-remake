@@ -94,6 +94,23 @@ export const GHOST_MONTAGE = Object.freeze({
   role: "ghostMontage",
 });
 
+/**
+ * Playback pace baked into each shipped clip (1 = as synthesised). After the
+ * first in-game listen (2026-11-17) the user found the characters too unhurried
+ * for battle and picked 1.15× for every ElevenLabs voice. eleven_v4 ignores
+ * `voice_settings.speed` (the same seed at 1.2 came back the same length), so
+ * the speed-up is a pitch-preserving time stretch applied when the clip is
+ * finished. The narrator keeps its pace; the ghost montage keeps the round-4 cut.
+ */
+export const VOICE_TEMPO_BY_PLATFORM = Object.freeze({ minimax: 1, elevenlabs: 1.15 });
+
+export function voiceTempoForRole(role) {
+  if (role === GHOST_MONTAGE.role) return 1;
+  const cast = VOICE_CAST[role];
+  if (!cast) throw new Error(`role ${role} has no cast voice`);
+  return VOICE_TEMPO_BY_PLATFORM[cast.platform];
+}
+
 export function castRoleForPortrait(portrait) {
   if (portrait === undefined) return "narrator";
   const role = PORTRAIT_ROLES[portrait];
