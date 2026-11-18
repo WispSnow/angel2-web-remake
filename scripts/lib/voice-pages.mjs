@@ -34,7 +34,7 @@ function isDialoguePage(value) {
     && typeof value.source.wait === "number";
 }
 
-async function importModule(root, relative) {
+export async function importModule(root, relative) {
   const { module } = await runnerImport(path.join(root, relative), {
     configFile: false,
     root,

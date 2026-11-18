@@ -573,6 +573,8 @@ interface SuspendedSelection {
   readonly anchor: Position;
 }
 const pause = programDelay;
+/** `REMAKE-189` 有語音的戰鬥台詞最多再等這麼久；最長的台詞片段約 4 秒。 */
+const VOICE_LINE_HOLD_LIMIT_MS = 8_000;
 const atomicObjectiveConditions = (
   condition: StageObjectiveCondition,
 ): readonly Exclude<StageObjectiveCondition, { type: "any-of" }>[] => condition.type === "any-of"
@@ -705,6 +707,7 @@ export class GameController {
   voiceAutoAdvance: boolean;
   /** 語音下載或解碼失敗只在狀態列提示一次。 */
   private voiceFailureNoticed = false;
+  private voiceLineHold?: () => Promise<void>;
   speechEnabled: boolean;
   movementSoundEnabled: boolean;
   combatSoundEnabled: boolean;
@@ -4160,6 +4163,7 @@ export class GameController {
       : this.presentationFast
         ? Math.max(360, text.length * 20 + 120)
         : Math.max(1_200, text.length * 80 + 220));
+    await this.holdForVoicedLine();
     this.contextualLineDialogue = undefined;
     this.emit();
   }
@@ -6402,8 +6406,26 @@ export class GameController {
   }
 
   /**
-   * 當前劇情頁與其後的幾頁，供語音預先解碼。只看劇情對白；授職、集體命令與 AI 台詞
-   * 沒有語音片段。
+   * `REMAKE-189`：語音層告訴控制器，正在說的戰鬥台詞還要多久。只有表現層會設定它；
+   * 沒有語音層（測試、實驗室）時台詞窗照原版時序收起。
+   */
+  setVoiceLineHold(hold: (() => Promise<void>) | undefined): void {
+    this.voiceLineHold = hold;
+  }
+
+  /**
+   * 原版自行收起的台詞窗（AI 技術、DS:84BB 情境台詞）到點後，若本句有語音，等它說完
+   * 再收起。只延後表現，結算順序與次數不變；上限防止播放層失去 `ended` 時卡住。
+   */
+  private async holdForVoicedLine(): Promise<void> {
+    const hold = this.voiceLineHold;
+    if (!hold || this.voiceVolume === 0) return;
+    await Promise.race([hold(), pause(VOICE_LINE_HOLD_LIMIT_MS)]);
+  }
+
+  /**
+   * 當前劇情頁與其後的幾頁，供語音預先解碼。只看劇情對白；戰鬥台詞按說話者聲線
+   * 在背景下載，開頁時才解碼。
    */
   upcomingStoryPages(count: number): readonly DialoguePage[] {
     if (this.phase === "ending") {
@@ -8400,6 +8422,7 @@ export class GameController {
         ? Math.max(360, text.length * 20 + 120)
         : Math.max(1_200, text.length * 80 + 220);
     await pause(delay);
+    await this.holdForVoicedLine();
     this.aiTechniqueDialogue = undefined;
     this.emit();
   }

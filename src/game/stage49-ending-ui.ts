@@ -12,7 +12,7 @@ import {
 import { STAGE_INDEX } from "./content/stage-index";
 import type { GameController } from "./controller";
 import type { AudioManager } from "./audio";
-import { VOICE_AUTO_ADVANCE_DELAY_MS } from "./content/voice-catalog";
+import { VOICE_AUTO_ADVANCE_DELAY_MS, epilogueNarrationFor } from "./content/voice-catalog";
 import { drawEpilogueGlyphs, loadEpilogueFont } from "./epilogue-text";
 import { prepareDomImageElements } from "./dom-image-readiness";
 import { renderNativeDialogueText } from "./dialogue-text";
@@ -328,10 +328,15 @@ export function mountStage49EndingUi(
       const limit = Math.max(segment.waitNativeTicks, variant.typingNativeTicks) * 10;
       const remaining = Math.max(0, limit - (programNow() - startedAt));
       timer = setProgramTimeout(
-        () => controller.advanceStage49Ending(),
+        // `REMAKE-189`：尾聲旁白比原版停留更長時，等它說完再換段；只延後表現。
+        () => void (audio?.voice.lineHold() ?? Promise.resolve()).then(() => {
+          if (generation === epilogueGeneration) controller.advanceStage49Ending();
+        }),
         controller.presentationFast ? Math.min(30, remaining) : remaining,
       );
     };
+    // `REMAKE-189`：一段尾聲一段旁白，與第一個字同時開始；換段或按鍵推進時淡出。
+    audio?.voice.beginNarration(epilogueNarrationFor(segment.id, variant.selector));
     void loadEpilogueFont().then((font) => {
       if (generation !== epilogueGeneration) return;
       // 0000:0725 waits 24 native ticks *after* each full-width glyph, so the

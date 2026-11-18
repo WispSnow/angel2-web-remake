@@ -91,6 +91,7 @@ export class AudioManager {
   ) {
     this.unlocked = initiallyUnlocked;
     this.voice = new VoiceDirector(controller, root, voiceLoader);
+    controller.setVoiceLineHold(() => this.voice.lineHold());
     this.previousBattleMusicSide = battleMusicSide(controller.phase);
     this.music = new MusicTransport(
       MUSIC_GAIN_BY_VOLUME[controller.musicVolume],
@@ -127,6 +128,7 @@ export class AudioManager {
     this.unsubscribe();
     this.unsubscribeProgramPause();
     this.effects.destroy();
+    this.controller.setVoiceLineHold(undefined);
     this.voice.destroy();
     this.walkEffect = undefined;
     this.releasingWalkEffects.clear();

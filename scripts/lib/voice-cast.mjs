@@ -42,6 +42,43 @@ export const VOICE_CAST = Object.freeze({
   cavalry: { speaker: "騎兵", platform: "elevenlabs", voiceId: "kAIqZ7fZv234ClKXwzDx", voiceName: "Susan - Clear and Calm Storyteller" },
   priest: { speaker: "祭司", platform: "elevenlabs", voiceId: "5qr5FEpvZGzmVOPBS55W", voiceName: "Zi Yue" },
   ghost: { speaker: "亡灵", platform: "elevenlabs", voiceId: "JZLpE3AGwpKYZI2X65hN", voiceName: "Mingyao Ye" },
+  // REMAKE-189 battle-only speakers. None of them types a story page, so none
+  // was auditioned; the user chose "assign, no audition" (2026-11-17). Enemy
+  // generals and enemy generic portraits keep the provisional voices of the
+  // stage-38 ghost passage (data/ghost.json); the ally sister/archer/engineer
+  // families take the last native Mandarin library voices (Shuishui, Kathy,
+  // Helen); the half-dragon family shares the soldier/warrior voice; the twelve
+  // roster allies rotate over the five ally voices in portrait order.
+  kuanmeiyi: { speaker: "庫安梅伊", platform: "elevenlabs", voiceId: "QAe8SYEl8U8qnxlfuLRz", voiceName: "Serena" },
+  aixikeluo: { speaker: "艾西柯羅", platform: "elevenlabs", voiceId: "0H4ruoQ81Ei2FCwjW5j1", voiceName: "Susan (warm)" },
+  meidi: { speaker: "梅蒂", platform: "elevenlabs", voiceId: "QAe8SYEl8U8qnxlfuLRz", voiceName: "Serena" },
+  lilante: { speaker: "麗蘭特", platform: "elevenlabs", voiceId: "NchRhc5KPgHwZagz6MrZ", voiceName: "Macy" },
+  nami: { speaker: "娜米", platform: "elevenlabs", voiceId: "m7QGIiNrWASyI5oJn4I8", voiceName: "Xiaoran" },
+  kenuosi: { speaker: "克諾絲", platform: "elevenlabs", voiceId: "0H4ruoQ81Ei2FCwjW5j1", voiceName: "Susan (warm)" },
+  hading: { speaker: "哈釘", platform: "elevenlabs", voiceId: "SyNyPD84lTuHqi1HONfV", voiceName: "Willow" },
+  feiniya: { speaker: "菲尼雅", platform: "elevenlabs", voiceId: "QAe8SYEl8U8qnxlfuLRz", voiceName: "Serena" },
+  maxier: { speaker: "瑪西爾", platform: "elevenlabs", voiceId: "NchRhc5KPgHwZagz6MrZ", voiceName: "Macy" },
+  enemySister: { speaker: "修女（敵）", platform: "elevenlabs", voiceId: "QAe8SYEl8U8qnxlfuLRz", voiceName: "Serena" },
+  enemyCavalry: { speaker: "騎兵（敵）", platform: "elevenlabs", voiceId: "m7QGIiNrWASyI5oJn4I8", voiceName: "Xiaoran" },
+  enemyWarrior: { speaker: "戰士（敵）", platform: "elevenlabs", voiceId: "0H4ruoQ81Ei2FCwjW5j1", voiceName: "Susan (warm)" },
+  enemyArcher: { speaker: "弓兵（敵）", platform: "elevenlabs", voiceId: "SyNyPD84lTuHqi1HONfV", voiceName: "Willow" },
+  waterWarrior: { speaker: "水戰士", platform: "elevenlabs", voiceId: "m7QGIiNrWASyI5oJn4I8", voiceName: "Xiaoran" },
+  halfDragon: { speaker: "半龍戰士", platform: "elevenlabs", voiceId: "s2LjOZIlsH2Yu4p6MtAK", voiceName: "Bobo" },
+  allySister: { speaker: "修女", platform: "elevenlabs", voiceId: "bss6xwA9ygVKRihgIbhZ", voiceName: "Shuishui" },
+  allyArcher: { speaker: "弓兵", platform: "elevenlabs", voiceId: "GE494ib77Hxb5fJC33Ib", voiceName: "Kathy" },
+  allyEngineer: { speaker: "工兵", platform: "elevenlabs", voiceId: "rBhzOvBlLbfbID0p19ok", voiceName: "Helen" },
+  leiqidite: { speaker: "蕾奇蒂特", platform: "elevenlabs", voiceId: "bss6xwA9ygVKRihgIbhZ", voiceName: "Shuishui" },
+  kelisi: { speaker: "克莉絲", platform: "elevenlabs", voiceId: "GE494ib77Hxb5fJC33Ib", voiceName: "Kathy" },
+  zhuliya: { speaker: "茱莉亞", platform: "elevenlabs", voiceId: "rBhzOvBlLbfbID0p19ok", voiceName: "Helen" },
+  shufeiya: { speaker: "舒菲亞", platform: "elevenlabs", voiceId: "s2LjOZIlsH2Yu4p6MtAK", voiceName: "Bobo" },
+  amanni: { speaker: "阿曼妮", platform: "elevenlabs", voiceId: "kAIqZ7fZv234ClKXwzDx", voiceName: "Susan - Clear and Calm Storyteller" },
+  leiyila: { speaker: "雷伊拉", platform: "elevenlabs", voiceId: "bss6xwA9ygVKRihgIbhZ", voiceName: "Shuishui" },
+  yalisha: { speaker: "亞莉沙", platform: "elevenlabs", voiceId: "GE494ib77Hxb5fJC33Ib", voiceName: "Kathy" },
+  jiexika: { speaker: "潔西卡", platform: "elevenlabs", voiceId: "rBhzOvBlLbfbID0p19ok", voiceName: "Helen" },
+  malin: { speaker: "瑪琳", platform: "elevenlabs", voiceId: "s2LjOZIlsH2Yu4p6MtAK", voiceName: "Bobo" },
+  molina: { speaker: "摩莉娜", platform: "elevenlabs", voiceId: "kAIqZ7fZv234ClKXwzDx", voiceName: "Susan - Clear and Calm Storyteller" },
+  aiouliya: { speaker: "愛歐里雅", platform: "elevenlabs", voiceId: "bss6xwA9ygVKRihgIbhZ", voiceName: "Shuishui" },
+  tasijia: { speaker: "塔絲加", platform: "elevenlabs", voiceId: "GE494ib77Hxb5fJC33Ib", voiceName: "Kathy" },
 });
 
 /** Portrait record -> cast role (spec「选角」, keyed by portrait, not by name). */
@@ -82,6 +119,40 @@ export const PORTRAIT_ROLES = Object.freeze({
   19: "ghost",
   30: "ghost",
   62: "ghost",
+  // REMAKE-189: portraits that only ever speak battle lines. 19/30 (萊莉、阿莉絲)
+  // and 62 (enemy engineer) keep the ghost voice the user picked for them in the
+  // stage-38 passage; it is a plain voice, the ghost effect is the montage's own.
+  12: "kuanmeiyi",
+  6: "aixikeluo",
+  16: "meidi",
+  28: "lilante",
+  20: "nami",
+  4: "kenuosi",
+  15: "hading",
+  29: "feiniya",
+  31: "maxier",
+  49: "enemySister",
+  53: "enemyCavalry",
+  58: "enemyWarrior",
+  60: "enemyArcher",
+  51: "waterWarrior",
+  64: "halfDragon",
+  54: "priest",
+  50: "allySister",
+  59: "allyArcher",
+  61: "allyEngineer",
+  1: "leiqidite",
+  7: "kelisi",
+  9: "zhuliya",
+  17: "shufeiya",
+  18: "amanni",
+  21: "leiyila",
+  22: "yalisha",
+  23: "jiexika",
+  26: "malin",
+  27: "molina",
+  32: "aiouliya",
+  33: "tasijia",
 });
 
 /**
@@ -97,12 +168,13 @@ export const GHOST_MONTAGE = Object.freeze({
 /**
  * Playback pace baked into each shipped clip (1 = as synthesised). After the
  * first in-game listen (2026-11-17) the user found the characters too unhurried
- * for battle and picked 1.15× for every ElevenLabs voice. eleven_v4 ignores
- * `voice_settings.speed` (the same seed at 1.2 came back the same length), so
- * the speed-up is a pitch-preserving time stretch applied when the clip is
- * finished. The narrator keeps its pace; the ghost montage keeps the round-4 cut.
+ * for battle and picked 1.15× for every ElevenLabs voice, then asked for the
+ * narrator at 1.15× as well. eleven_v4 ignores `voice_settings.speed` (the same
+ * seed at 1.2 came back the same length), so the speed-up is a pitch-preserving
+ * time stretch applied when the clip is finished, for MiniMax as well so both
+ * platforms go through one path. The ghost montage keeps the round-4 cut.
  */
-export const VOICE_TEMPO_BY_PLATFORM = Object.freeze({ minimax: 1, elevenlabs: 1.15 });
+export const VOICE_TEMPO_BY_PLATFORM = Object.freeze({ minimax: 1.15, elevenlabs: 1.15 });
 
 export function voiceTempoForRole(role) {
   if (role === GHOST_MONTAGE.role) return 1;

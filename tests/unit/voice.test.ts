@@ -1,8 +1,20 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { STORY_PAGES_BY_ID } from "../../src/game/content/dialogue";
-import { VOICE_CLIPS, VOICE_GAIN_BY_VOLUME, gateVoiceUrls, voiceClipForPage } from "../../src/game/content/voice-catalog";
+import { contextualBattleDialogueFor } from "../../src/game/content/ai-technique-dialogue";
+import { OUTCOME_FEEDBACK_PORTRAIT, OUTCOME_FEEDBACK_TEXT } from "../../src/game/content/outcome-feedback";
+import {
+  VOICE_CLIPS,
+  VOICE_GAIN_BY_VOLUME,
+  battleLineVoiceUrls,
+  epilogueNarrationFor,
+  gateVoiceUrls,
+  voiceClipForPage,
+  voiceCueForPage,
+  voiceLineFor,
+} from "../../src/game/content/voice-catalog";
 import type { GameController } from "../../src/game/controller";
 import type { VoiceVolume } from "../../src/game/preferences";
+import type { PortraitRecord } from "../../src/game/content/portrait-catalog.generated";
 import type { DialoguePage } from "../../src/game/types";
 import { VoiceDirector } from "../../src/game/voice";
 import { primeEncodedVoice, retainEncodedVoice, VoiceTransport } from "../../src/game/voice-transport";
@@ -69,6 +81,7 @@ interface FakeController {
   voiceGate: string;
   isTestMode: boolean;
   pages: readonly DialoguePage[];
+  battle: { units: Array<{ portrait: number }> };
   upcomingStoryPages(count: number): readonly DialoguePage[];
   reportVoiceUnavailable: ReturnType<typeof vi.fn>;
 }
@@ -87,6 +100,7 @@ const setup = (volume: VoiceVolume, loader?: (urls: readonly string[]) => Promis
     voiceGate: "stage-00",
     isTestMode: false,
     pages: STORY_PAGES_BY_ID["stage-00-prebattle-story"],
+    battle: { units: [] },
     upcomingStoryPages(count) { return this.pages.slice(0, count); },
     reportVoiceUnavailable: vi.fn(),
   };
@@ -210,5 +224,98 @@ describe("REMAKE-188 voice director", () => {
     const promotion: DialoguePage = { ...page(0), source: { record: "promotion", wait: 1 } };
     expect(director.beginPage(promotion)).toBe(false);
     expect(voiceClipForPage(page(0))).toBe(VOICE_CLIPS.find(({ key }) => key === "0:1"));
+  });
+});
+
+describe("REMAKE-189 battle lines, feedback and narration", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    FakeAudioContext.instances = [];
+    retainEncodedVoice(new Set());
+  });
+
+  const surrounded = (portrait: PortraitRecord): DialoguePage =>
+    contextualBattleDialogueFor({ name: "測試", portrait, side: 2 }, "surrounded");
+  const primeAll = (urls: readonly string[]) => {
+    for (const url of urls) primeEncodedVoice(url, new TextEncoder().encode(url).buffer);
+  };
+
+  test("downloads the battle lines of every voice on the board after the story clips", async () => {
+    const loader = vi.fn(async (urls: readonly string[]) => primeAll(urls));
+    const { director, controller } = setup(4, loader);
+    controller.battle.units = [{ portrait: 46 }, { portrait: 48 }, { portrait: 48 }];
+    director.sync();
+    await flush();
+    expect(loader.mock.calls[0][0]).toEqual(gateVoiceUrls("stage-00", 4));
+    expect(loader.mock.calls[1][0]).toEqual(battleLineVoiceUrls([46, 48], 4));
+    // The same board does not download again.
+    director.sync();
+    await flush();
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  test("a line plays once its bytes are in memory, and the window holds until it ends", async () => {
+    const { director } = setup(4);
+    director.unlock();
+    const page = surrounded(48);
+    primeAll([voiceCueForPage(page)!.source]);
+    const ended = vi.fn();
+    expect(director.beginPage(page, ended)).toBe(true);
+    await flush();
+    const context = FakeAudioContext.instances[0];
+    expect(context.sources).toHaveLength(1);
+    let held = false;
+    void director.lineHold().then(() => { held = true; });
+    await flush();
+    expect(held).toBe(false);
+    context.sources[0].finish();
+    await flush();
+    expect(held).toBe(true);
+    expect(ended).toHaveBeenCalledTimes(1);
+  });
+
+  test("a line whose bytes are not in memory stays unvoiced and is fetched for next time", async () => {
+    const { director, fetchVoice } = setup(4);
+    director.unlock();
+    expect(director.beginPage(surrounded(46))).toBe(false);
+    await flush();
+    expect(fetchVoice).toHaveBeenCalledWith(voiceCueForPage(surrounded(46))!.source);
+    await expect(director.lineHold()).resolves.toBeUndefined();
+  });
+
+  test("a line that decodes too late is dropped, and the page still hears that it may move on", async () => {
+    const { director, decode } = setup(4);
+    director.unlock();
+    const page = surrounded(47);
+    primeAll([voiceCueForPage(page)!.source]);
+    let now = 1_000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    let release: (buffer: AudioBuffer) => void = () => undefined;
+    decode.mockImplementation(() => new Promise<AudioBuffer>((resolve) => { release = resolve; }));
+    const ended = vi.fn();
+    expect(director.beginPage(page, ended)).toBe(true);
+    await flush();
+    now += 600;
+    release({ duration: 1 } as unknown as AudioBuffer);
+    await flush();
+    expect(director.pageVoiced).toBe(false);
+    expect(ended).toHaveBeenCalledTimes(1);
+    expect(FakeAudioContext.instances[0]?.sources ?? []).toHaveLength(0);
+  });
+
+  test("voices 妮雅's feedback windows and the epilogue narration", async () => {
+    const { director } = setup(3);
+    director.unlock();
+    const narration = epilogueNarrationFor("warriorStatue", 0);
+    expect(narration).toBeDefined();
+    primeAll([narration!.source]);
+    expect(director.beginNarration(narration)).toBe(true);
+    await flush();
+    expect(FakeAudioContext.instances[0].sources).toHaveLength(1);
+    // Not in memory yet: the window types with glyph beeps instead.
+    expect(director.beginLine(OUTCOME_FEEDBACK_PORTRAIT, OUTCOME_FEEDBACK_TEXT.quit)).toBe(false);
+    primeAll([voiceLineFor(OUTCOME_FEEDBACK_PORTRAIT, OUTCOME_FEEDBACK_TEXT.quit)!.source]);
+    expect(director.beginLine(OUTCOME_FEEDBACK_PORTRAIT, OUTCOME_FEEDBACK_TEXT.quit)).toBe(true);
   });
 });

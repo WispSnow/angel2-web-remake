@@ -14,9 +14,28 @@ import {
 import { STORY_PAGES_BY_ID } from "../../src/game/content/dialogue";
 import { STAGE49_STORY_PAGES } from "../../src/game/content/stage49-ending";
 import {
+  NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS,
+  NATIVE_CONTEXTUAL_BATTLE_LINES,
+  contextualBattleDialogueFor,
+} from "../../src/game/content/ai-technique-dialogue";
+import { GROUP_COMMAND_DIALOGUE, groupCommandDialogueFor } from "../../src/game/content/group-command-dialogue";
+import { OUTCOME_FEEDBACK_PORTRAIT, OUTCOME_FEEDBACK_TEXT } from "../../src/game/content/outcome-feedback";
+import { PORTRAIT_CATALOG, type PortraitRecord } from "../../src/game/content/portrait-catalog.generated";
+import { PROMOTION_DIALOGUE_TEXT } from "../../src/game/content/promotion-dialogue";
+import { STAGE3_FOURTH_CORPS_COUNTERATTACK_DIALOGUE } from "../../src/game/content/stage3";
+import { STAGE49_EPILOGUE_SEGMENTS } from "../../src/game/content/stage49-ending.generated";
+import { STARTUP_INTRO } from "../../src/game/content/startup.generated";
+import {
   VOICE_CLIPS,
+  VOICE_LINE_DURATIONS,
+  VOICE_PORTRAIT_VOICES,
+  VOICE_STARTUP_NARRATION,
+  battleLineVoiceUrls,
+  epilogueNarrationFor,
   gateVoiceUrls,
   voiceClipForPage,
+  voiceCueForPage,
+  voiceLineFor,
   voiceTypedText,
 } from "../../src/game/content/voice-catalog";
 import type { DialoguePage } from "../../src/game/types";
@@ -43,9 +62,38 @@ interface VoiceManifestClip {
   durationMs: number;
 }
 
+interface VoiceManifestLine {
+  key: string;
+  textHash: string;
+  roles: string[];
+  surfaces: string[];
+  platform: string;
+  voiceId: string;
+  tempo: number;
+  output: string;
+  sha256: string;
+  durationMs: number;
+}
+
+interface VoiceManifestNarration {
+  key: string;
+  surface: string;
+  role: string;
+  platform: string;
+  tempo: number;
+  startUpdate?: number;
+  segment?: string;
+  selector?: number;
+  output: string;
+  sha256: string;
+}
+
 interface VoiceManifest {
   version: number;
-  decision: string;
+  decisions: string[];
+  lines: VoiceManifestLine[];
+  narration: VoiceManifestNarration[];
+  unvoicedLines: Array<{ surface: string; reason: string }>;
   loudnessLufs: number;
   channels: number;
   clips: VoiceManifestClip[];
@@ -96,7 +144,7 @@ beforeAll(async () => {
 
 describe("REMAKE-188 voice catalog", () => {
   test("matches the asset pack manifest and its mono OGG bytes", async () => {
-    expect(manifest).toMatchObject({ version: 1, decision: "REMAKE-188", loudnessLufs: -19, channels: 1 });
+    expect(manifest).toMatchObject({ version: 2, decisions: ["REMAKE-188", "REMAKE-189"], loudnessLufs: -19, channels: 1 });
     const byKey = new Map(manifest.clips.map((clip) => [clip.key, clip]));
     expect(VOICE_CLIPS.map(({ key }) => key).sort()).toEqual([...byKey.keys()].sort());
     for (const clip of VOICE_CLIPS) {
@@ -150,17 +198,18 @@ describe("REMAKE-188 voice catalog", () => {
       .toEqual(new Set(["narrator"]));
   });
 
-  test("speeds every ElevenLabs character up 1.15× and leaves the narrator and ghost montage as made", () => {
+  test("speeds every voice up 1.15× and leaves only the ghost montage as made", () => {
     const tempoByRole = new Map<string, Set<number>>();
     for (const clip of manifest.clips) {
       expect(clip.tempo, clip.key).toBe(voiceTempoForRole(clip.role));
       tempoByRole.set(clip.role, (tempoByRole.get(clip.role) ?? new Set()).add(clip.tempo));
     }
-    expect(VOICE_TEMPO_BY_PLATFORM).toEqual({ minimax: 1, elevenlabs: 1.15 });
-    expect(tempoByRole.get("narrator")).toEqual(new Set([1]));
+    expect(VOICE_TEMPO_BY_PLATFORM).toEqual({ minimax: 1.15, elevenlabs: 1.15 });
+    expect(tempoByRole.get("narrator")).toEqual(new Set([1.15]));
     expect(tempoByRole.get("ghostMontage")).toEqual(new Set([1]));
     expect(tempoByRole.get("nia")).toEqual(new Set([1.15]));
-    expect(manifest.clips.filter(({ tempo }) => tempo === 1.15)).toHaveLength(704);
+    expect(manifest.clips.filter(({ tempo }) => tempo === 1.15)).toHaveLength(780);
+    expect(new Set([...manifest.lines, ...manifest.narration].map(({ tempo }) => tempo))).toEqual(new Set([1.15]));
   });
 
   test("splices SAY/0164 KY 20–23 word by word and starts KY 20 on the first speaker", () => {
@@ -181,7 +230,10 @@ describe("REMAKE-188 voice catalog", () => {
     expect(stage0.length).toBeGreaterThan(0);
     expect(stage0.every((url) => url.startsWith("/assets/original/voice/0000-")
       || /\/000[1-3]-/u.test(url))).toBe(true);
-    expect(gateVoiceUrls("ending", 2).every((url) => url.includes("/0070-"))).toBe(true);
+    // The ending route also carries the epilogue narration (REMAKE-189).
+    expect(gateVoiceUrls("ending", 2).every((url) => url.includes("/0070-") || url.includes("/narration/epilogue-")))
+      .toBe(true);
+    expect(gateVoiceUrls("ending", 2).filter((url) => url.includes("/narration/"))).toHaveLength(8);
   });
 
   test("treats changed text, string records and appended pages by the typed part only", () => {
@@ -194,5 +246,95 @@ describe("REMAKE-188 voice catalog", () => {
     };
     expect(voiceClipForPage(modded)).toBeUndefined();
     expect(voiceClipForPage({ ...page, source: { record: "promotion", wait: 6 } })).toBeUndefined();
+  });
+});
+
+describe("REMAKE-189 battle lines and narration", () => {
+  const speaker = (portrait: PortraitRecord, side: 1 | 2 = 1) => ({ name: `D/${portrait}`, portrait, side });
+  /** Named allies and enemies, roster allies and generic family portraits of both sides. */
+  const SAMPLE_PORTRAITS: readonly PortraitRecord[] = [46, 45, 10, 0, 12, 4, 26, 1, 47, 48, 49, 50, 51, 53, 57, 58, 59, 60, 61, 62, 64];
+
+  test("ships every line clip at voice/line/<voice>/<text hash>.ogg and the runtime knows its length", async () => {
+    expect(manifest.lines.length).toBeGreaterThan(1_000);
+    for (const line of manifest.lines) {
+      expect(line.output, line.key).toBe(`voice/line/${line.voiceId}/${line.textHash}.ogg`);
+      expect(VOICE_LINE_DURATIONS[line.voiceId]?.[line.textHash], line.key).toBe(line.durationMs);
+      const bytes = await readFile(path.join(root, "public/assets/original", line.output));
+      expect(bytes.toString("ascii", 0, 4), line.key).toBe("OggS");
+      expect(sha256(bytes), line.key).toBe(line.sha256);
+      // Characters only: the narrator never speaks a battle line.
+      expect(line.platform, line.key).toBe("elevenlabs");
+    }
+  });
+
+  test("gives every named portrait a battle voice from the cast", () => {
+    for (const [record, entry] of Object.entries(PORTRAIT_CATALOG)) {
+      if (!entry.battleDisplayName && !entry.displayName) continue;
+      const role = castRoleForPortrait(Number(record));
+      expect(VOICE_PORTRAIT_VOICES[Number(record)], `D/${record}`).toBe(VOICE_CAST[role].voiceId);
+    }
+  });
+
+  test("voices every DS:84BB line and technique notice for any battle speaker, but not the EXP readout", () => {
+    for (const portrait of SAMPLE_PORTRAITS) {
+      for (const line of Object.keys(NATIVE_CONTEXTUAL_BATTLE_LINES) as (keyof typeof NATIVE_CONTEXTUAL_BATTLE_LINES)[]) {
+        const cue = voiceCueForPage(contextualBattleDialogueFor(speaker(portrait, 2), line));
+        if (line === "experienceGain") expect(cue, `${portrait}:${line}`).toBeUndefined();
+        else expect(cue, `${portrait}:${line}`).toMatchObject({ kind: "line" });
+      }
+      for (const group of NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS) {
+        expect(voiceLineFor(portrait, group.text), `${portrait}:${group.text}`).toBeDefined();
+      }
+    }
+    expect(manifest.unvoicedLines.map(({ surface }) => surface)).toEqual(["contextual:experienceGain"]);
+  });
+
+  test("voices the group commands and the promotion dialogue in whoever speaks them", () => {
+    for (const portrait of SAMPLE_PORTRAITS) {
+      for (const id of Object.keys(GROUP_COMMAND_DIALOGUE) as (keyof typeof GROUP_COMMAND_DIALOGUE)[]) {
+        expect(voiceCueForPage(groupCommandDialogueFor(id, speaker(portrait))), `${portrait}:${id}`).toBeDefined();
+      }
+      for (const text of Object.values(PROMOTION_DIALOGUE_TEXT)) {
+        expect(voiceLineFor(portrait, text), `${portrait}:${text}`).toBeDefined();
+      }
+    }
+  });
+
+  test("voices 妮雅's outcome feedback and the REMAKE-172 authored pages, and nothing with changed text", () => {
+    for (const text of Object.values(OUTCOME_FEEDBACK_TEXT)) {
+      expect(voiceLineFor(OUTCOME_FEEDBACK_PORTRAIT, text)).toBeDefined();
+      expect(voiceLineFor(OUTCOME_FEEDBACK_PORTRAIT, `${text}改`)).toBeUndefined();
+    }
+    for (const page of STAGE3_FOURTH_CORPS_COUNTERATTACK_DIALOGUE.pages) {
+      expect(voiceCueForPage(page), page.source.address).toMatchObject({ kind: "line" });
+    }
+    expect(voiceLineFor(undefined, OUTCOME_FEEDBACK_TEXT.defeat)).toBeUndefined();
+  });
+
+  test("narrates the opening crawl sentence by sentence and every epilogue variant", () => {
+    const crawl = manifest.narration.filter(({ surface }) => surface === "startup-crawl");
+    expect(crawl.map(({ startUpdate }) => startUpdate)).toEqual(VOICE_STARTUP_NARRATION.map(({ startUpdate }) => startUpdate));
+    const spokenLines = STARTUP_INTRO.lines.filter(({ text }) => text.trim().length > 0).map(({ update }) => update);
+    const covered = crawl.flatMap((clip) => (clip as VoiceManifestNarration & { lineUpdates: number[] }).lineUpdates);
+    expect(covered).toEqual(spokenLines);
+    let variants = 0;
+    for (const segment of STAGE49_EPILOGUE_SEGMENTS) {
+      for (const variant of segment.variants) {
+        variants += 1;
+        expect(epilogueNarrationFor(segment.id, variant.selector), `${segment.id}:${variant.selector}`).toBeDefined();
+      }
+    }
+    expect(manifest.narration.filter(({ surface }) => surface === "ending-epilogue")).toHaveLength(variants);
+    expect(new Set(manifest.narration.map(({ role, platform }) => `${role}/${platform}`))).toEqual(new Set(["narrator/minimax"]));
+  });
+
+  test("downloads a board's battle lines by voice, and nothing while voice is off", () => {
+    expect(battleLineVoiceUrls([46, 47], 0)).toEqual([]);
+    const urls = battleLineVoiceUrls([46, 47, 57], 4);
+    const voices = new Set([VOICE_PORTRAIT_VOICES[46], VOICE_PORTRAIT_VOICES[47]]);
+    // 士兵 (47) and 戰士 (57) share one voice, so the list holds two voices' lines.
+    expect(VOICE_PORTRAIT_VOICES[57]).toBe(VOICE_PORTRAIT_VOICES[47]);
+    expect(new Set(urls.map((url) => url.split("/")[5]))).toEqual(voices);
+    expect(urls).toHaveLength([...voices].reduce((sum, voice) => sum + Object.keys(VOICE_LINE_DURATIONS[voice]).length, 0));
   });
 });

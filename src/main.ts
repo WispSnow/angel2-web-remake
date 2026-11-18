@@ -374,6 +374,6 @@ else {
         ...stage0PresentationAssets,
         ...stageRemixMusicUrls(STAGE0_DEFINITION.music, loadMusicPreferences(localStorage).musicStyle),
       ]);
-    });
+    }, (urls) => resourceLoader.ensureVoice(urls));
   });
 }

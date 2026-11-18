@@ -69,7 +69,11 @@ test("REMAKE-188: the gate preloads the stage's clips and a voiced page does not
   const requests = voiceRequests(page);
   await openPrebattleStory(page);
   await expect.poll(() => requests.length).toBeGreaterThan(20);
-  expect(requests.every((url) => /\/voice\/000[0-3]-\d\d\.ogg$/u.test(url))).toBe(true);
+  // Story clips of this gate, then (REMAKE-189) the battle lines of the voices on the board.
+  const story = requests.filter((url) => /\/voice\/000[0-3]-\d\d\.ogg$/u.test(url));
+  const lines = requests.filter((url) => /\/voice\/line\/[A-Za-z0-9]+\/[0-9a-f]{8}\.ogg$/u.test(url));
+  expect(story.length).toBeGreaterThan(20);
+  expect(story.length + lines.length).toBe(requests.length);
   expect(new Set(requests).size).toBe(requests.length);
 
   // Page 1 typed (unvoiced: audio was still locked) before the press that
@@ -199,7 +203,9 @@ test("REMAKE-188: the entry panel and the 音效開關 panel write the same pref
   await on.click();
   expect(await stored()).toMatchObject({ voiceVolume: 4 });
   await expect(page.getByTestId("startup-music-style-original")).toHaveAttribute("aria-checked", "true");
-  expect(requests).toEqual([]);
+  // REMAKE-189: turning voice on in the box fetches the opening narration, and only that.
+  await expect.poll(() => requests.length).toBeGreaterThan(0);
+  expect(requests.every((url) => /\/voice\/narration\/startup-\d\d\.ogg$/u.test(url))).toBe(true);
 });
 
 test("REMAKE-188: turning voice on mid-stage downloads in the background; the panel shows both rows", async ({ page }) => {
@@ -222,4 +228,65 @@ test("REMAKE-188: turning voice on mid-stage downloads in the background; the pa
   expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "{}"), VOICE_KEY))
     .toEqual({ voiceVolume: 3, autoAdvance: true });
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/sound-panel-voice-rows.png" });
+});
+
+test("REMAKE-189: the opening crawl is narrated sentence by sentence, and skipping it cuts the narration", async ({ page }) => {
+  await useVoice(page, { voiceVolume: 4 });
+  const requests = voiceRequests(page);
+  await page.goto("/?test=1");
+  const screen = page.getByTestId("startup-screen");
+  await expect(page.getByTestId("startup-enter")).toBeEnabled({ timeout: 15_000 });
+  await expect.poll(() => requests.filter((url) => url.includes("/narration/startup-")).length).toBe(9);
+  await page.getByTestId("startup-enter").click();
+  await expect(screen).toHaveAttribute("data-startup-phase", "intro");
+  await expect(screen).toHaveAttribute("data-narration-playing", "true");
+  await expect.poll(async () => Number(await screen.getAttribute("data-narration-started"))).toBeGreaterThan(0);
+  await page.keyboard.press("Escape");
+  await expect(screen).toHaveAttribute("data-startup-phase", "title-assemble");
+  await expect(screen).toHaveAttribute("data-narration-playing", "false");
+});
+
+test("REMAKE-189: a group command is voiced in the commander's voice and waits for the clip", async ({ page }) => {
+  await useVoice(page, { voiceVolume: 4 });
+  const requests = voiceRequests(page);
+  await page.goto("/?test=1&debugScenario=stage-00-player");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => requests.filter((url) => url.includes("/voice/line/")).length).toBeGreaterThan(30);
+  // A press on the empty page unlocks audio without touching the board; `g` opens the group commands.
+  await page.mouse.click(100, 600);
+  await page.keyboard.press("g");
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  const beeps = await speechRequests(page);
+  await page.getByTestId("group-command-allRest").click();
+  await expect(dialogue(page)).toHaveClass(/group-command-dialogue/);
+  await expect(app(page)).toHaveAttribute("data-voice-page", /^[A-Za-z0-9]+:[0-9a-f]{8}$/u);
+  await expect(app(page)).toHaveAttribute("data-voice-playing", /\/voice\/line\//u);
+  await typingDone(page);
+  expect(await speechRequests(page)).toBe(beeps);
+  // Test mode advances a group command 1.2 s after typing; a voiced one waits for its clip.
+  await page.waitForTimeout(1_500);
+  await expect(dialogue(page)).toHaveClass(/group-command-dialogue/);
+  await expect(app(page)).toHaveAttribute("data-voice-page-ended", "false");
+  await expect(dialogue(page)).not.toHaveClass(/group-command-dialogue/, { timeout: 10_000 });
+});
+
+test("REMAKE-189: 妮雅's quit confirmation is voiced instead of beeping", async ({ page }) => {
+  await useVoice(page, { voiceVolume: 4 });
+  const requests = voiceRequests(page);
+  await page.goto("/?test=1&debugScenario=stage-00-player");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => requests.filter((url) => url.includes("/voice/line/")).length).toBeGreaterThan(30);
+  await page.mouse.click(100, 600);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("system-menu")).toBeVisible();
+  const beeps = await speechRequests(page);
+  await page.getByTestId("system-command-quit").click();
+  await expect(page.getByTestId("quit-confirm")).toBeVisible();
+  await expect(app(page)).toHaveAttribute("data-voice-playing", /\/voice\/line\/8RCmdqih4CKjJ7Bd3ZxT\//u);
+  await page.waitForTimeout(600);
+  expect(await speechRequests(page)).toBe(beeps);
+  // Cancelling closes the window and fades its line out.
+  await page.getByTestId("quit-confirm-menu").getByRole("menuitem", { name: /取/u }).click();
+  await expect(page.getByTestId("quit-confirm")).toBeHidden();
+  await expect(app(page)).toHaveAttribute("data-voice-playing", "none");
 });

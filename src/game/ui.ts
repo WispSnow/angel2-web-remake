@@ -144,6 +144,7 @@ import {
 import { onStagedRenderAssetsChanged, stagedRenderAssetSource } from "./staged-render-asset-cache";
 import { applyStagedNativeUiAssets } from "./native-ui-assets";
 import { DIFFICULTY_OPTIONS } from "./content/startup";
+import { OUTCOME_FEEDBACK_PORTRAIT, OUTCOME_FEEDBACK_TEXT, outcomeFeedbackAttribute } from "./content/outcome-feedback";
 import {
   clearProgramTimeout,
   isProgramPaused,
@@ -275,8 +276,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               })}
               <b class="feedback-portrait-name" data-testid="feedback-portrait-name"
                 data-native-text>${niaPortraitDisplayName}</b>
-              <div class="dialogue-copy native-feedback-copy"><p data-testid="quit-feedback-text" data-full-text="唉啊！．．．要休息了嗎？&#10;請再考慮一下吧！">唉啊！．．．要休息了嗎？
-請再考慮一下吧！</p></div>
+              <div class="dialogue-copy native-feedback-copy"><p data-testid="quit-feedback-text" data-full-text="${outcomeFeedbackAttribute("quit")}">${OUTCOME_FEEDBACK_TEXT.quit}</p></div>
               <div class="button-row action-menu native-command-menu native-confirm-menu"
                 data-testid="quit-confirm-menu" data-kind="confirmation" role="menu" aria-label="離開遊戲選擇">
                 <button type="button" role="menuitem" data-action="quit-confirm" data-quit-index="0"><span class="native-command-label">確 定</span></button>
@@ -293,8 +293,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               })}
               <b class="feedback-portrait-name" data-testid="feedback-portrait-name"
                 data-native-text>${niaPortraitDisplayName}</b>
-              <div class="dialogue-copy native-feedback-copy"><p data-testid="retreat-feedback-text" data-full-text="哦！．．．要撤退嗎？&#10;必竟是沒辦法的事，雙方的實力差太多了．">哦！．．．要撤退嗎？
-必竟是沒辦法的事，雙方的實力差太多了．</p></div>
+              <div class="dialogue-copy native-feedback-copy"><p data-testid="retreat-feedback-text" data-full-text="${outcomeFeedbackAttribute("retreat")}">${OUTCOME_FEEDBACK_TEXT.retreat}</p></div>
               <div class="button-row action-menu native-command-menu native-confirm-menu"
                 data-testid="retreat-confirm-menu" data-kind="confirmation" role="menu" aria-label="全面撤退選擇">
                 <button type="button" role="menuitem" data-action="retreat-confirm" data-retreat-index="0"><span class="native-command-label">確 定</span></button>
@@ -593,6 +592,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let activeFeedbackText: HTMLElement | undefined;
   let activeFeedbackPortrait: HTMLElement | undefined;
   let activeFeedbackPortraitReady = true;
+  let feedbackVoiced = false;
   let sidePanelHintTimer: ProgramTimeout | undefined;
   let sidePanelHintTarget: HTMLElement | undefined;
   const stopPortraitAnimations = startPortraitAnimations(
@@ -755,6 +755,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   };
   const scheduleAutomaticDialogueAdvance = (key: string) => {
     if (!controller.promotionDialogueActive && !controller.groupCommandDialogueActive) return;
+    // `REMAKE-189`：有語音的授職、集體命令頁等片段說完才自行推進；片段的結束回呼再排一次。
+    if (dialogueVoiced && audio.voice.pageVoiced && !audio.voice.pageClipEnded) return;
     // 玩家補完逐字與逐字自然跑完都會走到這裡，重複排程會讓同一頁被推進兩次。
     if (dialogueAdvanceTimer !== undefined) clearProgramTimeout(dialogueAdvanceTimer);
     const delay = controller.groupCommandDialogueActive && controller.isTestMode
@@ -832,7 +834,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       dialogueRevealStarted = true;
       // 片段與逐字聲、口型同一時點開始；片段未就緒時這一頁就是無語音頁，不在頁中途補播。
       dialogueVoiced = voicePage !== undefined
-        && audio.voice.beginPage(voicePage, () => scheduleVoiceAutoAdvance(key));
+        && audio.voice.beginPage(voicePage, () => {
+          scheduleVoiceAutoAdvance(key);
+          if (activeDialogueKey === key && revealedCharacters >= dialogueFullText.length) {
+            scheduleAutomaticDialogueAdvance(key);
+          }
+        });
       markDialogueTyping("true");
       startSpeaking(activeDialoguePortrait, revealedCharacters < dialogueFullText.length);
       tick();
@@ -908,6 +915,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const revealFeedback = (fullText: string, key: string, target: HTMLElement, portrait?: HTMLElement) => {
     stopFeedbackTimer();
     stopSpeaking(activeFeedbackPortrait);
+    if (feedbackVoiced) audio.voice.endPage();
+    feedbackVoiced = false;
     activeFeedbackKey = key;
     feedbackFullText = fullText;
     feedbackRevealedCharacters = 0;
@@ -923,13 +932,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       const character = fullText[feedbackRevealedCharacters];
       feedbackRevealedCharacters += 1;
       renderNativeDialogueText(target, fullText.slice(0, feedbackRevealedCharacters), fullText);
-      if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
+      if (!feedbackVoiced && /[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
       drawSpeechGlyph(activeFeedbackPortrait, character);
       feedbackTimer = setProgramTimeout(tick, controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80);
     };
     const begin = () => {
       if (activeFeedbackKey !== key || activeFeedbackText !== target) return;
       activeFeedbackPortraitReady = true;
+      // `REMAKE-189`：妮雅的結果回饋與系統確認也有語音，與逐字同時開始；有語音就不放逐字聲。
+      feedbackVoiced = audio.voice.beginLine(OUTCOME_FEEDBACK_PORTRAIT, fullText);
       startSpeaking(activeFeedbackPortrait, fullText.length > 0);
       tick();
     };
@@ -1963,8 +1974,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       stopDialogueTimer();
       stopTimedPortraitCues();
       stopSpeaking(activeDialoguePortrait);
-      // 對白結束或確認跳過整段：片段淡出。
-      audio.voice.endPage();
+      // 對白結束或確認跳過整段：片段淡出。只在剛離開一頁對白時切斷，否則每次重繪都會
+      // 打斷結果回饋窗自己的語音。
+      if (activeDialogueKey !== "") audio.voice.endPage();
       dialogueVoiced = false;
       cancelVoiceAutoAdvance();
       activeDialogueKey = "";
@@ -2017,6 +2029,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     } else {
       stopFeedbackTimer();
       stopSpeaking(activeFeedbackPortrait);
+      // 結果回饋窗收起（重試、繼續、取消確認）：它的語音淡出。
+      if (feedbackVoiced) audio.voice.endPage();
+      feedbackVoiced = false;
       activeFeedbackKey = "";
       feedbackFullText = "";
       feedbackRevealedCharacters = 0;
@@ -2918,15 +2933,15 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
   }
   layer.dataset.resultPhase = phase;
   if (phase === "defeat") {
-    const text = "啊！．．．竟然失敗了？\n我太低辜敵人的實力，再給我一次機會吧！";
+    const text = OUTCOME_FEEDBACK_TEXT.defeat;
     layer.innerHTML = nativeFeedbackMarkup(text, "retry", "retry-button");
   } else if (phase === "victoryFeedback") {
     const text = controller.isCampaignPersistenceEnabled
-      ? "哦！．．\n這次的戰役結束了，是否要記錄下來．"
+      ? OUTCOME_FEEDBACK_TEXT.victory
       : "競技場測試已結束。\n可使用上方工具列返回編成，或以相同陣容重開。";
     layer.innerHTML = nativeFeedbackMarkup(text, "victory-continue", "victory-continue");
   } else if (phase === "savePrompt") {
-    const text = "哦！．．\n這次的戰役結束了，是否要記錄下來．";
+    const text = OUTCOME_FEEDBACK_TEXT.victory;
     layer.innerHTML = `${nativeFeedbackMarkup(text)}
       <div class="native-confirm-menu action-menu native-command-menu" data-testid="save-confirm-menu"
         data-kind="confirmation" role="menu" aria-label="是否儲存">

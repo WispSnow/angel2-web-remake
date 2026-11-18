@@ -50,6 +50,8 @@ import {
 } from "./save";
 import type { Difficulty, SaveData } from "./types";
 import type { PreparedStartupMusic } from "./startup-music";
+import { StartupNarration } from "./startup-narration";
+import type { VoiceUrlLoader } from "./voice";
 import {
   loadMusicPreferences,
   loadVoicePreferences,
@@ -157,6 +159,8 @@ export function mountStartup(
   startGame: (selection: StartupSelection) => void,
   startupMusic: PreparedStartupMusic,
   onEntered: () => void,
+  /** `REMAKE-189`：開場旁白走資源門的同一條下載路徑；沒有時直接請求。 */
+  voiceLoader?: VoiceUrlLoader,
 ): () => void {
   applyStagedNativeUiAssets(root);
   const testMode = new URLSearchParams(location.search).has("test");
@@ -317,6 +321,14 @@ export function mountStartup(
   paintNativeDomTextIn(root);
 
   const screen = required(root, "#startup-screen");
+  const narration = new StartupNarration(voiceLoader, (state) => {
+    if (!testMode) return;
+    screen.dataset.narrationNext = String(state.next);
+    screen.dataset.narrationStarted = String(state.started);
+    screen.dataset.narrationSkipped = String(state.skipped);
+    screen.dataset.narrationPlaying = String(state.playing);
+  });
+  narration.setVolume(loadVoicePreferences(localStorage).voiceVolume);
   const viewport = required(root, "#startup-viewport");
   const canvas = required<HTMLCanvasElement>(root, "#startup-canvas");
   const context = canvas.getContext("2d");
@@ -388,10 +400,9 @@ export function mountStartup(
     if ((activationPending && !awaitingRemix) || enabled === voiceEnabled) return;
     voiceEnabled = enabled;
     const current = loadVoicePreferences(localStorage);
-    saveVoicePreferences(localStorage, {
-      ...current,
-      voiceVolume: enabled ? (current.voiceVolume === 0 ? 4 : current.voiceVolume) : 0,
-    });
+    const voiceVolume = enabled ? (current.voiceVolume === 0 ? 4 : current.voiceVolume) : 0;
+    saveVoicePreferences(localStorage, { ...current, voiceVolume });
+    narration.setVolume(voiceVolume);
     updateMusicStyleControls();
     musicStyleStatus.textContent = enabled ? "劇情語音：開" : "劇情語音：關";
   };
@@ -549,11 +560,15 @@ export function mountStartup(
     phaseStartedAt = programNow();
     screen.dataset.startupPhase = "intro";
     startupMusic.playIntro();
+    narration.start();
     updateStartupMusicDebugState();
   };
 
-  const enterTitle = () => {
+  /** `natural`：捲動自然跑完。旁白說完當前一句；玩家跳過時則淡出。 */
+  const enterTitle = (natural = false) => {
     if (phase !== "intro" && phase !== "pretitle") return;
+    if (natural) narration.finish();
+    else narration.stop();
     startupMusic.stopIntro();
     updateStartupMusicDebugState();
     phase = "title";
@@ -587,6 +602,8 @@ export function mountStartup(
     activationButton.disabled = true;
     updateMusicStyleControls();
     activationDetail.textContent = "正在開啟音樂……";
+    // 與音樂同一個手勢解鎖旁白的 AudioContext。
+    narration.unlock();
     activationAttempt += 1;
     const attempt = activationAttempt;
     const abandoned = () => disposed || attempt !== activationAttempt;
@@ -645,6 +662,7 @@ export function mountStartup(
     titleMenu.hidden = true;
     intro.hidden = false;
     startupMusic.playIntro();
+    narration.start();
     updateStartupMusicDebugState();
   };
 
@@ -1108,7 +1126,8 @@ export function mountStartup(
       );
       screen.dataset.introUpdate = String(scrollUpdate);
       paintIntro(scrollUpdate);
-      if (progress >= 1) enterTitle();
+      narration.tick(elapsed, introDuration / STARTUP_INTRO.scrollUpdates);
+      if (progress >= 1) enterTitle(true);
     } else if (!titleAssembled) paintTitleAssembly(elapsed);
     else if (phase === "title" && now - idleSince >= STARTUP_TITLE.idleReplayNativeTicks * NATIVE_TICK_MS) {
       replayIntro();
@@ -1121,6 +1140,7 @@ export function mountStartup(
     disposed = true;
     cancelAnimationFrame(animationFrame);
     startupMusic.dispose();
+    narration.dispose();
     stopScaling();
     window.removeEventListener("keydown", onKeyDown);
     root.removeEventListener("pointerover", onPointerOver);
@@ -1146,8 +1166,12 @@ export function mountStartup(
   else startupMusic.downloadRemix();
   screen.dataset.startupAssetsReady = "false";
   updateStartupMusicDebugState();
-  const unsubscribeProgramPause = onProgramPauseChange((paused) => startupMusic.setPaused(paused));
+  const unsubscribeProgramPause = onProgramPauseChange((paused) => {
+    startupMusic.setPaused(paused);
+    narration.setPaused(paused);
+  });
   startupMusic.setPaused(isProgramPaused());
+  narration.setPaused(isProgramPaused());
   void Promise.all([
     ...STARTUP_IMAGE_URLS.map(async (src) => {
       loadedImages.set(src, await loadStartupImage(src));
