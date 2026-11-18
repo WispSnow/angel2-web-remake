@@ -201,8 +201,10 @@ export function mountStartup(
   let musicStyle: MusicStyle = loadMusicPreferences(localStorage).musicStyle;
   /** `REMAKE-188`：方框裡的「劇情語音」只分開關；開啟時沿用面板上已選的音量檔。 */
   let voiceEnabled = loadVoicePreferences(localStorage).voiceVolume > 0;
-  /** 左右方向鍵切換的那一列；上下方向鍵在兩列之間移動。 */
-  let entryRow: "music" | "voice" = "music";
+  /** `REMAKE-191`：「翻頁方式」即「音效開關」的「自動翻頁」，同一個偏好。 */
+  let voiceAutoAdvance = loadVoicePreferences(localStorage).autoAdvance;
+  /** 左右方向鍵切換的那一列；上下方向鍵在各列之間移動（語音關閉時跳過「翻頁方式」）。 */
+  let entryRow: "music" | "voice" | "voiceMode" = "music";
   const loadedImages = new Map<string, HTMLImageElement>();
 
   root.innerHTML = `
@@ -234,6 +236,14 @@ export function mountStartup(
                   data-testid="startup-voice-off">關</button>
                 <button type="button" role="radio" data-startup-action="voice" data-voice="on"
                   data-testid="startup-voice-on">開</button>
+              </div>
+              <div class="startup-music-style startup-voice-mode" role="radiogroup"
+                aria-labelledby="startup-voice-mode-label" data-testid="startup-voice-mode-row">
+                <span id="startup-voice-mode-label">翻頁方式</span>
+                <button type="button" role="radio" data-startup-action="voice-mode" data-voice-mode="auto"
+                  data-testid="startup-voice-mode-auto">自動</button>
+                <button type="button" role="radio" data-startup-action="voice-mode" data-voice-mode="manual"
+                  data-testid="startup-voice-mode-manual">手動</button>
               </div>
               <p data-testid="startup-voice-hint">${
                 isTauriDesktopRuntime() ? "劇情語音為 AI 合成。" : "劇情語音為 AI 合成，需額外下載。"
@@ -354,8 +364,10 @@ export function mountStartup(
   const musicStyleButtons = root.querySelectorAll<HTMLButtonElement>("[data-startup-action=music-style]");
   const musicStyleStatus = required<HTMLElement>(root, "[data-testid=startup-music-style-status]");
   const voiceButtons = root.querySelectorAll<HTMLButtonElement>("[data-startup-action=voice]");
-  const musicStyleRow = required<HTMLElement>(root, ".startup-music-style:not(.startup-voice)");
+  const musicStyleRow = required<HTMLElement>(root, "[aria-labelledby=startup-music-style-label]");
   const voiceRow = required<HTMLElement>(root, "[data-testid=startup-voice-row]");
+  const voiceModeButtons = root.querySelectorAll<HTMLButtonElement>("[data-startup-action=voice-mode]");
+  const voiceModeRow = required<HTMLElement>(root, "[data-testid=startup-voice-mode-row]");
   const stopScaling = configureGameScaling(viewport, screen);
   /**
    * [OF] `REMAKE-114` withdrew the loop `REMAKE-112` had inferred: MUSIC/1 plays
@@ -389,22 +401,42 @@ export function mountStartup(
       button.setAttribute("aria-checked", String((button.dataset.voice === "on") === voiceEnabled));
       button.disabled = activationPending && !awaitingRemix;
     }
+    // 語音關閉時「翻頁方式」沒有作用，與「音效開關」的「自動翻頁」一樣置灰。
+    for (const button of voiceModeButtons) {
+      button.setAttribute("aria-checked", String((button.dataset.voiceMode === "auto") === voiceAutoAdvance));
+      button.disabled = !voiceEnabled || (activationPending && !awaitingRemix);
+    }
+    voiceModeRow.dataset.disabled = String(!voiceEnabled);
+    if (!voiceEnabled && entryRow === "voiceMode") entryRow = "voice";
     musicStyleRow.dataset.rowSelected = String(entryRow === "music");
     voiceRow.dataset.rowSelected = String(entryRow === "voice");
+    voiceModeRow.dataset.rowSelected = String(entryRow === "voiceMode");
   };
   /**
    * `REMAKE-188`: the same device preference as the 音效開關 panel. Turning it on
    * keeps a volume the player already chose there, otherwise takes 最大.
+   * `REMAKE-191`: turning it on also starts in 自動 page turning (the user's
+   * default for voiced play); 翻頁方式 switches it back to 手動.
    */
   const chooseVoice = (enabled: boolean) => {
     if ((activationPending && !awaitingRemix) || enabled === voiceEnabled) return;
     voiceEnabled = enabled;
     const current = loadVoicePreferences(localStorage);
     const voiceVolume = enabled ? (current.voiceVolume === 0 ? 4 : current.voiceVolume) : 0;
-    saveVoicePreferences(localStorage, { ...current, voiceVolume });
+    const autoAdvance = enabled ? true : current.autoAdvance;
+    voiceAutoAdvance = autoAdvance;
+    saveVoicePreferences(localStorage, { voiceVolume, autoAdvance });
     narration.setVolume(voiceVolume);
     updateMusicStyleControls();
-    musicStyleStatus.textContent = enabled ? "劇情語音：開" : "劇情語音：關";
+    musicStyleStatus.textContent = enabled ? "劇情語音：開，自動翻頁" : "劇情語音：關";
+  };
+  /** `REMAKE-191`: 翻頁方式 writes the panel's 自動翻頁; it only means something with voice on. */
+  const chooseVoiceMode = (auto: boolean) => {
+    if ((activationPending && !awaitingRemix) || !voiceEnabled || auto === voiceAutoAdvance) return;
+    voiceAutoAdvance = auto;
+    saveVoicePreferences(localStorage, { ...loadVoicePreferences(localStorage), autoAdvance: auto });
+    updateMusicStyleControls();
+    musicStyleStatus.textContent = auto ? "翻頁方式：自動" : "翻頁方式：手動";
   };
   /**
    * `REMAKE-186`: the style is a device preference, so choosing here is the same
@@ -848,9 +880,12 @@ export function mountStartup(
       event.preventDefault();
       const direction = keyboardDirection(event.key);
       if (direction?.y) {
-        entryRow = entryRow === "music" ? "voice" : "music";
+        const rows: (typeof entryRow)[] = voiceEnabled ? ["music", "voice", "voiceMode"] : ["music", "voice"];
+        const index = Math.max(0, rows.indexOf(entryRow));
+        entryRow = rows[(index + (direction.y > 0 ? 1 : rows.length - 1)) % rows.length];
         updateMusicStyleControls();
       } else if (direction?.x && entryRow === "voice") chooseVoice(direction.x > 0);
+      else if (direction?.x && entryRow === "voiceMode") chooseVoiceMode(direction.x < 0);
       else if (direction?.x) chooseMusicStyle(direction.x < 0 ? "original" : "orchestral");
       else activateStartup();
       return;
@@ -962,6 +997,13 @@ export function mountStartup(
     if (button.dataset.startupAction === "voice") {
       entryRow = "voice";
       chooseVoice(button.dataset.voice === "on");
+      updateMusicStyleControls();
+      if (!activationButton.disabled) activationButton.focus({ preventScroll: true });
+      return;
+    }
+    if (button.dataset.startupAction === "voice-mode") {
+      entryRow = "voiceMode";
+      chooseVoiceMode(button.dataset.voiceMode === "auto");
       updateMusicStyleControls();
       if (!activationButton.disabled) activationButton.focus({ preventScroll: true });
       return;

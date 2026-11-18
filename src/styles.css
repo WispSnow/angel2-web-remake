@@ -206,6 +206,9 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 /* `REMAKE-188`：上下方向鍵選中的那一列，左右方向鍵切換它。 */
 .startup-music-style[data-row-selected="true"] > span { color: #fff2ca; text-decoration: underline; text-underline-offset: 3px; }
+/* `REMAKE-191`：語音關閉時「翻頁方式」沒有作用，整列置灰而不是顯示等待游標。 */
+.startup-voice-mode[data-disabled="true"] > span { color: #8a7a92; }
+.startup-activation .startup-voice-mode button:disabled { cursor: default; }
 /* Both layers now only carry hidden narration, the menu frames and the menus;
  * the canvas underneath paints every startup pixel. */
 .startup-intro,

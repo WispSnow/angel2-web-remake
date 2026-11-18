@@ -6388,6 +6388,8 @@ export class GameController {
 
   setVoiceVolume(volume: number): void {
     if (!isVoiceVolume(volume) || volume === this.voiceVolume) return;
+    // `REMAKE-191`：從「關」開啟語音時從自動翻頁開始，與開場方框相同；之後可再關掉。
+    if (this.voiceVolume === 0) this.voiceAutoAdvance = true;
     this.voiceVolume = volume;
     this.persistVoicePreferences();
     this.emit();

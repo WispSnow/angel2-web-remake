@@ -163,17 +163,17 @@ describe("music preferences", () => {
 });
 
 describe("REMAKE-188 voice preferences", () => {
-  test("default to 關 without auto-advance and live in their own device key", () => {
+  test("default to 關, auto-advance once turned on (REMAKE-191), in their own device key", () => {
     const storage = new MemoryStorage();
     expect(VOICE_PREFERENCES_KEY).toBe("angel2.preferences.voice.v1");
-    expect(DEFAULT_VOICE_PREFERENCES).toEqual({ voiceVolume: 0, autoAdvance: false });
+    expect(DEFAULT_VOICE_PREFERENCES).toEqual({ voiceVolume: 0, autoAdvance: true });
     expect(loadVoicePreferences(storage)).toEqual(DEFAULT_VOICE_PREFERENCES);
     for (const invalid of [5, -1, 2.5, "4", null]) {
       storage.setItem(VOICE_PREFERENCES_KEY, JSON.stringify({ voiceVolume: invalid, autoAdvance: true }));
       expect(loadVoicePreferences(storage)).toEqual({ voiceVolume: 0, autoAdvance: true });
     }
     storage.setItem(VOICE_PREFERENCES_KEY, JSON.stringify({ voiceVolume: 3, autoAdvance: "yes" }));
-    expect(loadVoicePreferences(storage)).toEqual({ voiceVolume: 3, autoAdvance: false });
+    expect(loadVoicePreferences(storage)).toEqual({ voiceVolume: 3, autoAdvance: true });
     storage.setItem(VOICE_PREFERENCES_KEY, "{");
     expect(loadVoicePreferences(storage)).toEqual(DEFAULT_VOICE_PREFERENCES);
     saveVoicePreferences(storage, { voiceVolume: 4, autoAdvance: true });

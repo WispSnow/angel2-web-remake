@@ -97,9 +97,10 @@ export const DEFAULT_MUSIC_PREFERENCES: Readonly<MusicPreferences> = {
   musicStyle: "original",
 };
 
+/** `REMAKE-191`：語音預設關閉；一旦開啟，預設自動翻頁（用戶 2026-11-17）。 */
 export const DEFAULT_VOICE_PREFERENCES: Readonly<VoicePreferences> = {
   voiceVolume: 0,
-  autoAdvance: false,
+  autoAdvance: true,
 };
 
 export const DEFAULT_DISPLAY_PREFERENCES: Readonly<DisplayPreferences> = {

@@ -290,3 +290,63 @@ test("REMAKE-189: 妮雅's quit confirmation is voiced instead of beeping", asyn
   await expect(page.getByTestId("quit-confirm")).toBeHidden();
   await expect(app(page)).toHaveAttribute("data-voice-playing", "none");
 });
+
+test("REMAKE-191: the entry panel's 翻頁方式 row starts on 自動 with voice and writes the panel's 自動翻頁", async ({ page }) => {
+  await page.goto("/?test=1");
+  await expect(page.getByTestId("startup-enter")).toBeEnabled({ timeout: 15_000 });
+  const stored = () => page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "{}"), VOICE_KEY);
+  const auto = page.getByTestId("startup-voice-mode-auto");
+  const manual = page.getByTestId("startup-voice-mode-manual");
+  const row = page.getByTestId("startup-voice-mode-row");
+  // With voice off the row only shows the default and cannot be changed.
+  await expect(auto).toHaveAttribute("aria-checked", "true");
+  await expect(auto).toBeDisabled();
+  await expect(manual).toBeDisabled();
+  await expect(row).toHaveAttribute("data-disabled", "true");
+
+  // ↓ voice row, → on: voice starts in 自動 page turning.
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("startup-voice-on")).toHaveAttribute("aria-checked", "true");
+  expect(await stored()).toEqual({ voiceVolume: 4, autoAdvance: true });
+  await expect(row).toHaveAttribute("data-disabled", "false");
+  await captureVisualAudit(page.getByTestId("startup-screen"), { path: "artifacts/playwright/startup-voice-mode-row.png" });
+
+  // ↓ reaches 翻頁方式; → picks 手動, ← back to 自動. Nothing enters the game.
+  await page.keyboard.press("ArrowDown");
+  await expect(row).toHaveAttribute("data-row-selected", "true");
+  await page.keyboard.press("ArrowRight");
+  await expect(manual).toHaveAttribute("aria-checked", "true");
+  expect(await stored()).toEqual({ voiceVolume: 4, autoAdvance: false });
+  await page.keyboard.press("ArrowLeft");
+  await expect(auto).toHaveAttribute("aria-checked", "true");
+  await manual.click();
+  expect(await stored()).toEqual({ voiceVolume: 4, autoAdvance: false });
+  await expect(page.getByTestId("startup-screen")).toHaveAttribute("data-startup-phase", "ready");
+
+  // Turning voice off greys the row and moves the selection back to 劇情語音;
+  // turning it on again starts from 自動.
+  await page.getByTestId("startup-voice-off").click();
+  await expect(row).toHaveAttribute("data-disabled", "true");
+  await expect(page.getByTestId("startup-voice-row")).toHaveAttribute("data-row-selected", "true");
+  await page.getByTestId("startup-voice-on").click();
+  await expect(auto).toHaveAttribute("aria-checked", "true");
+  expect(await stored()).toEqual({ voiceVolume: 4, autoAdvance: true });
+});
+
+test("REMAKE-191: turning voice on in the 音效開關 panel starts in 自動翻頁", async ({ page }) => {
+  await useVoice(page, { voiceVolume: 0, autoAdvance: false });
+  await page.goto("/?test=1&debugScenario=stage-00-player");
+  await expect(page.getByTestId("game-screen")).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  await page.getByTestId("sound-hotspot").click();
+  await expect(page.getByTestId("voice-auto-advance-off")).toHaveAttribute("aria-checked", "true");
+  await page.getByTestId("voice-volume-2").click();
+  await expect(page.getByTestId("voice-auto-advance-on")).toHaveAttribute("aria-checked", "true");
+  expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "{}"), VOICE_KEY))
+    .toEqual({ voiceVolume: 2, autoAdvance: true });
+  // A volume change while voice is already on keeps the player's choice.
+  await page.getByTestId("voice-auto-advance-off").click();
+  await page.getByTestId("voice-volume-4").click();
+  await expect(page.getByTestId("voice-auto-advance-off")).toHaveAttribute("aria-checked", "true");
+});
