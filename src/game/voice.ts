@@ -162,6 +162,17 @@ export class VoiceDirector {
   }
 
   /**
+   * `REMAKE-192` 說話動畫跟隨語音：沒有語音頁（或片段已放棄）時為 `undefined`，由逐字驅動；
+   * 有語音頁時，片段此刻有聲才是 `true`——開始之前、語音停頓、說完之後都是 `false`。
+   */
+  get speechActivity(): boolean | undefined {
+    const page = this.page;
+    if (!page) return undefined;
+    if (!page.started || page.ended) return false;
+    return this.transport.speechActive ?? false;
+  }
+
+  /**
    * `REMAKE-189`：戰鬥台詞窗照原版時序到點後，再等本頁片段說完才收起。沒有語音、
    * 片段被切斷或放棄時立刻兌現。只延後表現，不影響結算。
    */

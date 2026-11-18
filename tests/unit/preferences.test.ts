@@ -198,8 +198,8 @@ describe("display preferences", () => {
   test("round-trips every supported mode under its own key", () => {
     const storage = new MemoryStorage();
     for (const imageScaling of ["sharp", "smooth", "integer"] as const) {
-      saveDisplayPreferences(storage, { imageScaling, interfaceZoom: 100 });
-      expect(loadDisplayPreferences(storage)).toEqual({ imageScaling, interfaceZoom: 100 });
+      saveDisplayPreferences(storage, { imageScaling, interfaceZoom: 100, portraitStyle: "original" });
+      expect(loadDisplayPreferences(storage)).toEqual({ imageScaling, interfaceZoom: 100, portraitStyle: "original" });
     }
     // A host-display choice must not disturb the in-game presentation switches.
     expect(storage.getItem(PRESENTATION_PREFERENCES_KEY)).toBeNull();
@@ -209,9 +209,9 @@ describe("display preferences", () => {
     const storage = new MemoryStorage();
     expect(DEFAULT_DISPLAY_PREFERENCES.interfaceZoom).toBe(100);
     for (const interfaceZoom of [100, 125, 150, 200] as const) {
-      saveDisplayPreferences(storage, { imageScaling: "integer", interfaceZoom });
+      saveDisplayPreferences(storage, { imageScaling: "integer", interfaceZoom, portraitStyle: "original" });
       expect(loadDisplayPreferences(storage))
-        .toEqual({ imageScaling: "integer", interfaceZoom });
+        .toEqual({ imageScaling: "integer", interfaceZoom, portraitStyle: "original" });
     }
     // 兩個偏好共用一筆記錄，任何一邊壞掉都只回退自己那一欄。
     for (const rejected of [110, 1.5, "150", null]) {
@@ -222,7 +222,23 @@ describe("display preferences", () => {
       expect(loadDisplayPreferences(storage)).toEqual({
         imageScaling: "smooth",
         interfaceZoom: DEFAULT_DISPLAY_PREFERENCES.interfaceZoom,
+        portraitStyle: DEFAULT_DISPLAY_PREFERENCES.portraitStyle,
       });
+    }
+  });
+
+  test("REMAKE-192 keeps the portrait style beside the other host choices, original by default", () => {
+    const storage = new MemoryStorage();
+    expect(DEFAULT_DISPLAY_PREFERENCES.portraitStyle).toBe("original");
+    saveDisplayPreferences(storage, { imageScaling: "smooth", interfaceZoom: 125, portraitStyle: "hd" });
+    expect(loadDisplayPreferences(storage)).toEqual({ imageScaling: "smooth", interfaceZoom: 125, portraitStyle: "hd" });
+    // 舊記錄沒有這一欄、或值不認得時，只有這一欄回到原版。
+    for (const rejected of [undefined, "HD", "remake", 1, null]) {
+      storage.setItem(
+        DISPLAY_PREFERENCES_KEY,
+        JSON.stringify({ imageScaling: "smooth", interfaceZoom: 125, portraitStyle: rejected }),
+      );
+      expect(loadDisplayPreferences(storage)).toEqual({ imageScaling: "smooth", interfaceZoom: 125, portraitStyle: "original" });
     }
   });
 });

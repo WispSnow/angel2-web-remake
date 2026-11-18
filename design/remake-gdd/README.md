@@ -126,7 +126,7 @@ v72/v71/v70 与 stage 49 主线结局入口；冰雪轮頭最后与碧娜維姬 
 | [`systems/class-showdown-lab.md`](systems/class-showdown-lab.md) | 35 组常规职业同兵种相邻编队、统一等级与平原正式战斗 | 开发工具 / 已实现 |
 | [`systems/promotion-lab.md`](systems/promotion-lab.md) | 12 组可转职来源的临界经验、敌我升级边界与正式候选 UI | 开发工具 / 已实现 |
 | [`systems/debug-harness.md`](systems/debug-harness.md) | 按关选择、快速结算与确定性测试场景 | 开发工具 / 已实现 |
-| [`systems/portrait-animation.md`](systems/portrait-animation.md) | 全战役肖像、眨眼、逐字口型与生成目录 | 表现系统 / 已实现并随第 1 关接受 |
+| [`systems/portrait-animation.md`](systems/portrait-animation.md) | 全战役肖像、眨眼、逐字口型与生成目录；可选高清肖像与跟随语音的说话动画 | 表现系统 / 已实现并随第 1 关接受；高清肖像已实现（`REMAKE-192`） |
 | [`systems/program-pause.md`](systems/program-pause.md) | DOSBox 风格的全局程序冻结、恢复输入、音画时钟与确定性边界 | 功能增强 / 已实现并通过定向验收 |
 | [`systems/voice-over.md`](systems/voice-over.md) | 可选剧情配音：默认关闭、选角、逐字声静音、推进切断与自动翻页、配音稿与按关加载；战斗台词、结果回馈、开场与尾声旁白 | 功能增强 / Draft 0.1 已接受，已实现（`REMAKE-188`；第二期战斗台词与开场、尾声旁白 `REMAKE-189`） |
 | [`systems/original-debug-mode.md`](systems/original-debug-mode.md) | 原版除错模式（宿主开关、Caps Lock 热键、双方生命、经验、即时胜利、直达结局）与常驻音乐盒 | `REMAKE-174` / 第一批已实现，第二、三批纸面合同 |

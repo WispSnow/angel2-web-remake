@@ -44,9 +44,16 @@ export type ImageScalingMode = "sharp" | "smooth" | "integer";
  */
 export type InterfaceZoom = 100 | 125 | 150 | 200;
 
+/**
+ * `REMAKE-192` 肖像風格：`hd` 把有高清版的肖像換成 AI 重繪的動態肖像（待機循環＋配合說話節奏的
+ * 過渡嘴形）。和畫面縮放一樣是宿主顯示偏好，預設原版，不進模擬狀態、PRNG、規則身份或存檔。
+ */
+export type PortraitStyle = "original" | "hd";
+
 export interface DisplayPreferences {
   imageScaling: ImageScalingMode;
   interfaceZoom: InterfaceZoom;
+  portraitStyle: PortraitStyle;
 }
 
 export interface MusicPreferences {
@@ -106,6 +113,7 @@ export const DEFAULT_VOICE_PREFERENCES: Readonly<VoicePreferences> = {
 export const DEFAULT_DISPLAY_PREFERENCES: Readonly<DisplayPreferences> = {
   imageScaling: "sharp",
   interfaceZoom: 100,
+  portraitStyle: "original",
 };
 
 export const isImageScalingMode = (value: unknown): value is ImageScalingMode =>
@@ -113,6 +121,9 @@ export const isImageScalingMode = (value: unknown): value is ImageScalingMode =>
 
 export const isInterfaceZoom = (value: unknown): value is InterfaceZoom =>
   value === 100 || value === 125 || value === 150 || value === 200;
+
+export const isPortraitStyle = (value: unknown): value is PortraitStyle =>
+  value === "original" || value === "hd";
 
 const isVolumeLevel = (value: unknown): value is VolumeLevel =>
   Number.isInteger(value) && typeof value === "number" && value >= 0 && value <= 4;
@@ -257,6 +268,9 @@ export function loadDisplayPreferences(storage: PreferenceStorage): DisplayPrefe
       interfaceZoom: isInterfaceZoom(candidate.interfaceZoom)
         ? candidate.interfaceZoom
         : DEFAULT_DISPLAY_PREFERENCES.interfaceZoom,
+      portraitStyle: isPortraitStyle(candidate.portraitStyle)
+        ? candidate.portraitStyle
+        : DEFAULT_DISPLAY_PREFERENCES.portraitStyle,
     };
   } catch {
     return { ...DEFAULT_DISPLAY_PREFERENCES };

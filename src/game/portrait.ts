@@ -6,8 +6,13 @@ import {
   type PortraitAnimationAssets,
 } from "./content/portrait-catalog.generated";
 import type { PortraitRecord } from "./types";
+import type { PortraitHdEntry } from "./content/portrait-hd";
+import { PORTRAIT_HD_SIZE } from "./content/portrait-hd.generated";
 import { stagedRenderAssetSource } from "./staged-render-asset-cache";
-import { isProgramPaused } from "./program-clock";
+import { isProgramPaused, programNow } from "./program-clock";
+import { PortraitHdPlayer } from "./portrait-hd-player";
+import { SPEECH_PUNCTUATION_QUIET_MS, speechGlyphIsPunctuation, SyllableClock } from "./portrait-speech";
+import { activePortraitHd, markPortraitHdFailed } from "./portrait-style";
 
 type BlinkStage = "idle" | "closing" | "closed" | "opening";
 
@@ -36,10 +41,33 @@ const BLINK_IDLE_MAX_MS = 2_400;
 const TEST_BLINK_IDLE_MIN_MS = 220;
 const TEST_BLINK_IDLE_MAX_MS = 520;
 const PORTRAIT_SIZE = 112;
+/** 原版肖像在有語音的頁面跟隨語音時的切換節拍：沿用原版逐字切換的 80 ms（8 native tick）。 */
+const VOICE_MOUTH_TOGGLE_MS = 80;
+/** 高清視訊最多等這麼久才開始逐字；逾時就先顯示封面，視訊就緒後自行接上。 */
+const HD_VIDEO_READY_TIMEOUT_MS = 1_500;
 const portraitPreparations = new WeakMap<HTMLElement, {
   readonly portrait: string;
   readonly promise: Promise<void>;
 }>();
+
+/**
+ * `REMAKE-192` 每張肖像的說話狀態。原版肖像在無語音頁照原版逐字切換（由對白層呼叫
+ * `portraitSpeechGlyph`）；有語音頁改由動畫迴圈按語音有聲時段切換。高清肖像一律由動畫
+ * 迴圈按說話節奏算張口程度。
+ */
+interface PortraitSpeechState {
+  readonly clock: SyllableClock;
+  nextToggleAt: number;
+}
+const speechStates = new WeakMap<HTMLElement, PortraitSpeechState>();
+const speechStateFor = (element: HTMLElement): PortraitSpeechState => {
+  let state = speechStates.get(element);
+  if (!state) {
+    state = { clock: new SyllableClock(), nextToggleAt: 0 };
+    speechStates.set(element, state);
+  }
+  return state;
+};
 
 const percentage = (value: number) => `${(value / PORTRAIT_SIZE * 100).toFixed(6)}%`;
 const randomInteger = (minimum: number, maximum: number) =>
@@ -89,7 +117,23 @@ export function nativeMouthFrameAfterGlyph(
  */
 const PORTRAIT_UNDERLAY = '<i class="dialogue-portrait-underlay" aria-hidden="true"></i>';
 
-function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: string): string {
+/**
+ * `REMAKE-192` 高清肖像的圖層：封面（循環第 0 幀）墊底，畫布疊在上面由播放器逐幀繪製，
+ * 視訊本身只當解碼來源，縮成 2 px 透明留在版面裡（`display:none` 的視訊不保證會播放）。
+ * 封面沿用 `.portrait-base` 與原本的測試 id，靜止圖記錄（`D/67`）就只有封面。
+ */
+function hdPortraitLayers(entry: PortraitHdEntry, alt: string, baseTestId?: string): string {
+  const base = `${PORTRAIT_UNDERLAY}<img class="portrait-base portrait-hd-poster" ${baseTestId ? `data-testid="${baseTestId}"` : ""} src="${stagedRenderAssetSource(entry.poster)}" data-source-url="${entry.poster}" alt="${alt}" />`;
+  if (!entry.video) return base;
+  return `${base}
+    <canvas class="portrait-hd-canvas" width="${PORTRAIT_HD_SIZE}" height="${PORTRAIT_HD_SIZE}" aria-hidden="true"></canvas>
+    <video class="portrait-hd-video" muted loop playsinline disablepictureinpicture disableremoteplayback preload="auto"
+      src="${stagedRenderAssetSource(entry.video.source)}" data-source-url="${entry.video.source}" aria-hidden="true"></video>`;
+}
+
+function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: string, redEyes = false): string {
+  const hd = activePortraitHd(portrait, { redEyes });
+  if (hd) return hdPortraitLayers(hd, alt, baseTestId);
   const portraitSource = portraitSourceFor(portrait);
   const animation: PortraitAnimationAssets | null = PORTRAIT_CATALOG[portrait].animation;
   const base = `${PORTRAIT_UNDERLAY}<img class="portrait-base" ${baseTestId ? `data-testid="${baseTestId}"` : ""} src="${stagedRenderAssetSource(portraitSource)}" data-source-url="${portraitSource}" alt="${alt}" />`;
@@ -119,9 +163,17 @@ function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: stri
     ).join("")}`;
 }
 
+/** 這張臉此刻畫哪一套；`configureAnimatedPortrait` 據此判斷要不要重建圖層。 */
+const portraitStyleFor = (portrait: PortraitRecord, redEyes: boolean): { style: "hd" | "original"; mode?: string } => {
+  const hd = activePortraitHd(portrait, { redEyes });
+  return hd ? { style: "hd", mode: hd.mode } : { style: "original" };
+};
+
 export function animatedPortraitMarkup(portrait: PortraitRecord, options: PortraitMarkupOptions): string {
+  const { style, mode } = portraitStyleFor(portrait, options.redEyes ?? false);
   return `
     <span class="animated-portrait ${options.className}"
+      data-portrait-style="${style}"${mode ? ` data-portrait-hd-mode="${mode}"` : ""}
       ${options.wrapperTestId ? `data-testid="${options.wrapperTestId}"` : ""}
       data-portrait-channel="${options.channel}"
       data-portrait-record="${portrait}"
@@ -130,9 +182,10 @@ export function animatedPortraitMarkup(portrait: PortraitRecord, options: Portra
       data-mouth-frame="1"
       data-talk-count="0"
       data-speaking="false"
+      data-speech-driver="glyph"
       data-red-eyes="${options.redEyes ? "true" : "false"}"
       data-portrait-ready="false">
-      ${portraitLayers(portrait, options.alt, options.baseTestId)}
+      ${portraitLayers(portrait, options.alt, options.baseTestId, options.redEyes ?? false)}
     </span>`;
 }
 
@@ -145,18 +198,30 @@ export function configureAnimatedPortrait(
   redEyes = false,
 ): void {
   element.dataset.redEyes = String(redEyes);
-  if (element.dataset.portraitRecord !== String(portrait)) {
+  const { style, mode } = portraitStyleFor(portrait, redEyes);
+  const recordChanged = element.dataset.portraitRecord !== String(portrait);
+  if (recordChanged || element.dataset.portraitStyle !== style) {
     element.dataset.portraitRecord = String(portrait);
     element.dataset.portraitChannel = channel;
+    element.dataset.portraitStyle = style;
+    if (mode) element.dataset.portraitHdMode = mode;
+    else delete element.dataset.portraitHdMode;
+    delete element.dataset.portraitHdVideo;
+    delete element.dataset.mouthOpenness;
     element.dataset.blinkFrame = "1";
-    element.dataset.blinkCount = "0";
-    element.dataset.mouthFrame = "1";
-    element.dataset.talkCount = "0";
-    element.dataset.speaking = "false";
     element.dataset.portraitReady = "false";
     delete element.dataset.portraitError;
     portraitPreparations.delete(element);
-    element.innerHTML = portraitLayers(portrait, alt, baseTestId);
+    // 只換風格（同一張臉）時不打斷正在說的話：發言、驅動與口型狀態都留著。
+    if (recordChanged) {
+      element.dataset.blinkCount = "0";
+      element.dataset.mouthFrame = "1";
+      element.dataset.talkCount = "0";
+      element.dataset.speaking = "false";
+      element.dataset.speechDriver = "glyph";
+      speechStates.delete(element);
+    }
+    element.innerHTML = portraitLayers(portrait, alt, baseTestId, redEyes);
     return;
   }
   const base = element.querySelector<HTMLImageElement>(".portrait-base");
@@ -171,12 +236,16 @@ export function prepareAnimatedPortrait(element: HTMLElement): Promise<void> {
   element.dataset.portraitReady = "false";
   delete element.dataset.portraitError;
   const images = [...element.querySelectorAll<HTMLImageElement>("img")];
-  const pending = Promise.all(images.map(async (image) => {
-    await image.decode();
-    if (image.naturalWidth === 0 || image.naturalHeight === 0) {
-      throw new Error(`portrait layer decoded empty: ${image.src}`);
-    }
-  })).then(() => {
+  const video = element.querySelector<HTMLVideoElement>("video.portrait-hd-video");
+  const pending = Promise.all([
+    ...images.map(async (image) => {
+      await image.decode();
+      if (image.naturalWidth === 0 || image.naturalHeight === 0) {
+        throw new Error(`portrait layer decoded empty: ${image.src}`);
+      }
+    }),
+    ...(video ? [hdVideoReady(element, video)] : []),
+  ]).then(() => {
     if (element.dataset.portraitRecord === portrait) element.dataset.portraitReady = "true";
   }).catch((error: unknown) => {
     if (element.dataset.portraitRecord === portrait) {
@@ -195,10 +264,139 @@ export function prepareAnimatedPortrait(element: HTMLElement): Promise<void> {
   return pending;
 }
 
+/**
+ * 高清視訊的就緒條件：有第一幀可畫（`loadeddata`）。逾時不算失敗——封面就是第 0 幀，先照常
+ * 開始逐字，播放器在視訊就緒後自行接上；真正的載入錯誤才把這條記錄退回原版。
+ */
+function hdVideoReady(element: HTMLElement, video: HTMLVideoElement): Promise<void> {
+  if (video.readyState >= 2) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      video.removeEventListener("loadeddata", done);
+      video.removeEventListener("error", failed);
+      resolve();
+    };
+    const failed = () => {
+      const record = Number(element.dataset.portraitRecord);
+      if (isPortraitRecord(record)) {
+        markPortraitHdFailed(record, video.error?.message || `media error ${video.error?.code ?? "unknown"}`);
+      }
+      done();
+    };
+    const timer = setTimeout(done, HD_VIDEO_READY_TIMEOUT_MS);
+    video.addEventListener("loadeddata", done);
+    video.addEventListener("error", failed);
+  });
+}
+
+/**
+ * `REMAKE-192` 說話的開始、逐字、打完與結束。對白層、結果回饋窗與結局劇情共用這四個入口，
+ * 原版與高清兩套肖像的口型規則都只寫在這裡：
+ *
+ * - 無語音頁：逐字期間說話。原版每畫一個全形字切換一次（`nativeMouthFrameAfterGlyph`）；高清
+ *   按說話節奏開合，標點閉嘴 160 ms。
+ * - 有語音頁：語音有聲時說話，語音裡的停頓閉嘴，片段說完才停，與逐字是否打完無關（逐字通常
+ *   比語音快一倍半）。原版每 80 ms 切換一次，高清按說話節奏開合。片段中途放棄時退回逐字。
+ */
+export function beginPortraitSpeech(
+  portrait: HTMLElement | undefined,
+  options: { readonly typing: boolean; readonly voiced: boolean },
+): void {
+  if (!portrait) return;
+  portrait.dataset.speaking = String(options.typing);
+  portrait.dataset.speechDriver = options.voiced ? "voice" : "glyph";
+  portrait.dataset.mouthFrame = "1";
+  const state = speechStateFor(portrait);
+  state.clock.reset();
+  state.nextToggleAt = 0;
+}
+
+/**
+ * 每畫一個字呼叫。`voiceDriving` 為真（本頁的語音片段還在）時口型交給語音，逐字不切換；
+ * 否則照原版逐字切換。高清肖像只在這裡記下標點停頓。
+ */
+export function portraitSpeechGlyph(portrait: HTMLElement | undefined, character: string, voiceDriving: boolean): void {
+  if (!portrait) return;
+  if (voiceDriving && portrait.dataset.speechDriver === "voice") return;
+  if (portrait.dataset.portraitStyle === "hd") {
+    if (speechGlyphIsPunctuation(character)) {
+      speechStateFor(portrait).clock.quietUntil = programNow() + SPEECH_PUNCTUATION_QUIET_MS;
+    }
+    return;
+  }
+  if (!nativeStoryGlyphMovesMouth(character)) return;
+  portrait.dataset.mouthFrame = nativeMouthFrameAfterGlyph(portrait.dataset.mouthFrame, character);
+  portrait.dataset.talkCount = String(Number(portrait.dataset.talkCount ?? "0") + 1);
+}
+
+/** 逐字打完或被補完。有語音的頁面嘴巴繼續跟著語音，直到換頁或片段說完。 */
+export function endPortraitTyping(portrait: HTMLElement | undefined): void {
+  if (!portrait) return;
+  portrait.dataset.speaking = "false";
+  if (portrait.dataset.speechDriver !== "voice") portrait.dataset.mouthFrame = "1";
+}
+
+/** 換頁、換窗、收起或隱藏：這張臉不再說話。 */
+export function stopPortraitSpeech(portrait: HTMLElement | undefined): void {
+  if (!portrait) return;
+  portrait.dataset.speaking = "false";
+  portrait.dataset.speechDriver = "glyph";
+  portrait.dataset.mouthFrame = "1";
+  const state = speechStates.get(portrait);
+  if (state) {
+    state.clock.reset();
+    state.nextToggleAt = 0;
+  }
+}
+
+const hdPlayers = new WeakMap<HTMLVideoElement, PortraitHdPlayer>();
+
+/**
+ * `REMAKE-192` 肖像風格改變、高清檔案補進租約或某條記錄退回原版之後，把畫面上每一張動態
+ * 肖像重新對一次該畫的那一套；臉沒換、風格沒變的不動。
+ */
+export function refreshAnimatedPortraits(root: ParentNode): void {
+  for (const element of root.querySelectorAll<HTMLElement>("[data-portrait-channel]")) {
+    const record = Number(element.dataset.portraitRecord);
+    const channel = element.dataset.portraitChannel;
+    if (!isPortraitRecord(record) || !channel) continue;
+    const base = element.querySelector<HTMLImageElement>(".portrait-base");
+    configureAnimatedPortrait(element, record, base?.alt ?? "", channel, base?.dataset.testid, element.dataset.redEyes === "true");
+  }
+}
+
+/**
+ * 換關重建 HUD 之類整段 `innerHTML` 重寫的表面，若同一個通道仍是同一張臉、同一套風格，
+ * 就把舊的肖像節點搬回去：高清視訊不必從頭解碼重播，眨眼與口型狀態也接得上。舊節點在
+ * 同一個 task 內重新插入，媒體元素不會因為短暫離開文件而被暫停。
+ */
+export function adoptAnimatedPortraits(container: ParentNode, previous: readonly HTMLElement[]): void {
+  for (const old of previous) {
+    const channel = old.dataset.portraitChannel;
+    if (!channel) continue;
+    const fresh = container.querySelector<HTMLElement>(`[data-portrait-channel="${CSS.escape(channel)}"]`);
+    if (!fresh || fresh === old
+      || fresh.dataset.portraitRecord !== old.dataset.portraitRecord
+      || fresh.dataset.portraitStyle !== old.dataset.portraitStyle
+      || fresh.dataset.redEyes !== old.dataset.redEyes
+      || fresh.className !== old.className) {
+      continue;
+    }
+    const freshBase = fresh.querySelector<HTMLImageElement>(".portrait-base");
+    const oldBase = old.querySelector<HTMLImageElement>(".portrait-base");
+    if (freshBase && oldBase) oldBase.alt = freshBase.alt;
+    if (fresh.dataset.testid) old.dataset.testid = fresh.dataset.testid;
+    fresh.replaceWith(old);
+  }
+}
+
 export function startPortraitAnimations(
   root: HTMLElement,
   testMode: boolean,
   shouldPause: () => boolean = isProgramPaused,
+  /** `REMAKE-192`：本頁語音此刻是否有聲；沒有語音頁時回傳 `undefined`。 */
+  voiceActivity: () => boolean | undefined = () => undefined,
 ): () => void {
   const blinkStates = new Map<string, BlinkState>();
   let animationFrame = 0;
@@ -246,12 +444,83 @@ export function startPortraitAnimations(
     return "1";
   };
 
+  /** 這張臉此刻是否在說話：有語音就看語音，否則看逐字。 */
+  const talkingNow = (element: HTMLElement): { talking: boolean; voiced: boolean } => {
+    if (element.dataset.speechDriver === "voice") {
+      const activity = voiceActivity();
+      if (activity !== undefined) return { talking: activity, voiced: true };
+    }
+    return { talking: element.dataset.speaking === "true", voiced: false };
+  };
+
+  const forcedOpenness = (element: HTMLElement): number | undefined => {
+    const forced = element.dataset.forceMouthFrame;
+    return forced === undefined ? undefined : forced === "1" ? 0 : 1;
+  };
+
+  const tickHd = (element: HTMLElement, portrait: PortraitRecord, paused: boolean, clockNow: number) => {
+    const video = element.querySelector<HTMLVideoElement>("video.portrait-hd-video");
+    const canvas = element.querySelector<HTMLCanvasElement>("canvas.portrait-hd-canvas");
+    if (element.dataset.portraitReady !== "true") {
+      void prepareAnimatedPortrait(element).catch(() => undefined);
+    }
+    if (!video || !canvas) return;
+    const entry = activePortraitHd(portrait, { redEyes: element.dataset.redEyes === "true" });
+    if (!entry) return;
+    let player = hdPlayers.get(video);
+    if (!player || player.canvas !== canvas) {
+      player = new PortraitHdPlayer(element, portrait, entry, video, canvas, testMode);
+      hdPlayers.set(video, player);
+    }
+    const state = speechStateFor(element);
+    const { talking } = talkingNow(element);
+    const forced = forcedOpenness(element);
+    // 程式時鐘在全局暫停時凍結，音節也就停在當下的開度。
+    state.clock.talking = talking;
+    const before = state.clock.count;
+    const openness = forced ?? state.clock.at(clockNow);
+    if (state.clock.count !== before) {
+      element.dataset.talkCount = String(Number(element.dataset.talkCount ?? "0") + (state.clock.count - before));
+    }
+    player.sync({
+      paused,
+      visible: element.isConnected && !element.hidden && element.getClientRects().length > 0,
+      openness,
+      talking: forced === undefined ? talking : forced > 0,
+      now: clockNow,
+    });
+  };
+
+  /** 原版肖像在有語音的頁面：語音有聲時每 80 ms 切換一次，停頓與說完閉嘴。 */
+  const tickOriginalVoice = (element: HTMLElement, paused: boolean, clockNow: number) => {
+    const { talking, voiced } = talkingNow(element);
+    if (!voiced || paused) return;
+    const state = speechStateFor(element);
+    if (!talking) {
+      if (element.dataset.mouthFrame !== "1") element.dataset.mouthFrame = "1";
+      state.nextToggleAt = 0;
+      return;
+    }
+    if (clockNow < state.nextToggleAt) return;
+    element.dataset.mouthFrame = element.dataset.mouthFrame === "2" ? "1" : "2";
+    element.dataset.talkCount = String(Number(element.dataset.talkCount ?? "0") + 1);
+    state.nextToggleAt = clockNow + VOICE_MOUTH_TOGGLE_MS;
+  };
+
   const tick = (now: number) => {
     const paused = shouldPause();
+    const clockNow = programNow();
     for (const element of root.querySelectorAll<HTMLElement>("[data-portrait-channel]")) {
       const channel = element.dataset.portraitChannel;
       const portrait = Number(element.dataset.portraitRecord);
-      if (!channel || !isPortraitRecord(portrait) || !PORTRAIT_CATALOG[portrait].animation) continue;
+      if (!channel || !isPortraitRecord(portrait)) continue;
+      if (element.dataset.portraitStyle === "hd") {
+        // 眨眼已經在視訊裡；原版的眨眼計時與口型覆蓋片在高清模式下停用。
+        tickHd(element, portrait, paused, clockNow);
+        continue;
+      }
+      if (!PORTRAIT_CATALOG[portrait].animation) continue;
+      tickOriginalVoice(element, paused, clockNow);
       let blinkState = blinkStates.get(channel);
       if (!blinkState || blinkState.portrait !== portrait) {
         blinkState = resetBlinkState(portrait, now);

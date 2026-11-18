@@ -12,6 +12,7 @@ import {
   DIALOGUE_PORTRAIT_FRAME_ASSETS,
   DIALOGUE_TEXT_WINDOW_ASSET,
   portraitSourceFor,
+  type PortraitRecord,
 } from "./portrait-catalog.generated";
 import { dialoguePortraitRecords, portraitAssetUrlsForRecords } from "./portrait-assets";
 
@@ -47,6 +48,12 @@ export const STAGE49_ENDING_ASSETS = {
     decline: musicAsset("UN", 49),
   },
 } as const;
+
+/** Every portrait the ending route shows: story windows and the 22 roster cards (`REMAKE-192` HD gate). */
+export const STAGE49_ENDING_PORTRAIT_RECORDS: readonly PortraitRecord[] = [...new Set([
+  ...dialoguePortraitRecords(STAGE49_STORY_PAGES),
+  ...STAGE49_ROSTER_ACTORS.map(({ portraitRecord }) => portraitRecord),
+])].sort((left, right) => left - right);
 
 /** Assets outside `ending/` that the route gate must retain for its DOM surface. */
 export const STAGE49_ENDING_SUPPLEMENTAL_ASSETS = [...new Set([

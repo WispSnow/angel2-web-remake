@@ -241,7 +241,9 @@ pnpm exec playwright install ffmpeg
 - `src/game/content/portrait-catalog.generated.ts` 与 `public/assets/original/portraits/` 由
   `scripts/generate-portrait-catalog.mjs` 生成；修改肖像来源或布局证据后运行
   `pnpm content:portraits`，不要手工登记角色动画。`D/63` 无原版覆盖帧/布局，`D/67`
-  依证据沿用 `D/56` 布局。
+  依证据沿用 `D/56` 布局。可选高清肖像（`REMAKE-192`）的 `portrait-hd.generated.ts` 由
+  `scripts/generate-portrait-hd.mjs` 从素材包 `portraits/hd/hd-manifest.json` 生成（`pnpm content:portraits-hd`，
+  从 git 忽略的工作台导入用 `-- --import tmp/portrait-hd/export`）；原版主图一变它就拒绝生成，要先复审对应的高清记录。
 - `src/game/content/character-catalog.generated.ts` 由 `scripts/generate-character-catalog.mjs`
   生成，来源是原版角色描述子表、关卡模板、胜负条件表、逐关事件处理器与对白语料；修改证据后
   运行 `pnpm content:characters`。角色出场关卡必须同时合并静态模板、名单候选、事件生成与对白

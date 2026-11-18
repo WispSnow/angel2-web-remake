@@ -2,7 +2,6 @@ import {
   DIALOGUE_PORTRAIT_FRAME_ASSETS,
   DIALOGUE_TEXT_WINDOW_ASSET,
   PORTRAIT_CATALOG,
-  portraitSourceFor,
 } from "./content/portrait-catalog.generated";
 import {
   STAGE49_ENDING_ASSETS,
@@ -18,11 +17,15 @@ import { prepareDomImageElements } from "./dom-image-readiness";
 import { renderNativeDialogueText } from "./dialogue-text";
 import {
   animatedPortraitMarkup,
-  nativeMouthFrameAfterGlyph,
-  nativeStoryGlyphMovesMouth,
+  beginPortraitSpeech,
+  endPortraitTyping,
+  portraitSpeechGlyph,
   prepareAnimatedPortrait,
+  refreshAnimatedPortraits,
   startPortraitAnimations,
+  stopPortraitSpeech,
 } from "./portrait";
+import { onPortraitPresentationChange, portraitStillSourceFor } from "./portrait-style";
 import { configureGameScaling } from "./scaling";
 import { decodeStagedRenderImages, stagedRenderAssetSource } from "./staged-render-asset-cache";
 import type { DialoguePage } from "./types";
@@ -99,14 +102,16 @@ function rosterMarkup(controller: GameController): string {
   const card = session?.rosterCard;
   if (!card || !session) return "";
   const decorationSource = STAGE49_ENDING_ASSETS.decoration(card.actor.decorationRecord);
-  const portraitSource = portraitSourceFor(card.actor.portraitRecord);
+  // `REMAKE-192`：戰後記錄卡不放視訊，高清模式下用循環第 0 幀的封面。
+  const portrait = portraitStillSourceFor(card.actor.portraitRecord);
+  const portraitSource = portrait.source;
   const classIllustrationSource = STAGE49_ENDING_ASSETS.classIllustration(card.nativeClassRecord);
   return `<div class="stage49-roster" data-testid="stage49-roster"
       aria-label="戰後記錄 ${session.index + 1}／22">
     <div class="stage49-roster-stripe" aria-hidden="true"></div>
     <img class="stage49-decoration" data-testid="stage49-roster-decoration"
       src="${stagedRenderAssetSource(decorationSource)}" data-source-url="${decorationSource}" alt="">
-    <img class="stage49-roster-portrait" data-testid="stage49-roster-portrait"
+    <img class="stage49-roster-portrait${portrait.hd ? " portrait-hd-still" : ""}" data-testid="stage49-roster-portrait"
       src="${stagedRenderAssetSource(portraitSource)}" data-source-url="${portraitSource}" alt="${escapeHtml(card.actor.name)}肖像">
     <img class="stage49-roster-class-illustration" data-testid="stage49-roster-class-illustration"
       src="${stagedRenderAssetSource(classIllustrationSource)}" data-source-url="${classIllustrationSource}"
@@ -178,7 +183,13 @@ export function mountStage49EndingUi(
   const screen = root.querySelector<HTMLButtonElement>("#stage49-screen");
   if (!viewport || !screen) throw new Error("stage 49 ending surface not found");
   const destroyScaling = configureGameScaling(viewport, screen);
-  const destroyPortraitAnimations = startPortraitAnimations(root, controller.isTestMode, isProgramPaused);
+  const destroyPortraitAnimations = startPortraitAnimations(
+    root,
+    controller.isTestMode,
+    isProgramPaused,
+    // `REMAKE-192`：有語音的頁面口型跟著語音有聲時段走。
+    () => audio?.voice.speechActivity,
+  );
   let timer: ProgramTimeout | undefined;
   let storyTimer: ProgramTimeout | undefined;
   let storyText: HTMLElement | undefined;
@@ -204,11 +215,7 @@ export function mountStage49EndingUi(
     epilogueGeneration += 1;
   };
 
-  const stopSpeaking = (portrait: HTMLElement | undefined) => {
-    if (!portrait) return;
-    portrait.dataset.speaking = "false";
-    portrait.dataset.mouthFrame = "1";
-  };
+  const stopSpeaking = stopPortraitSpeech;
   const stopStoryTimer = () => {
     if (storyTimer !== undefined) clearProgramTimeout(storyTimer);
     storyTimer = undefined;
@@ -237,7 +244,8 @@ export function mountStage49EndingUi(
     stopStoryTimer();
     storyRevealedCharacters = storyFullText.length;
     renderNativeDialogueText(storyText, storyFullText);
-    stopSpeaking(storyPortrait);
+    // 補完本頁不切斷語音，嘴巴也繼續跟著語音說完。
+    endPortraitTyping(storyPortrait);
     screen.dataset.storyTyping = "false";
     if (storyVoiced) audio?.voice.typingFinished();
     return true;
@@ -267,11 +275,11 @@ export function mountStage49EndingUi(
     return () => {
       storyVoiced = audio?.voice.beginPage(page, () => scheduleVoiceAdvance(generation)) ?? false;
       const speaking = storyRevealedCharacters < storyFullText.length;
-      if (storyPortrait) storyPortrait.dataset.speaking = String(speaking);
+      beginPortraitSpeech(storyPortrait, { typing: speaking, voiced: storyVoiced });
       screen.dataset.storyTyping = String(speaking);
       const tick = () => {
         if (!storyText || storyRevealedCharacters >= storyFullText.length) {
-          stopSpeaking(storyPortrait);
+          endPortraitTyping(storyPortrait);
           screen.dataset.storyTyping = "false";
           storyTimer = undefined;
           if (storyVoiced) audio?.voice.typingFinished();
@@ -282,13 +290,7 @@ export function mountStage49EndingUi(
         storyRevealedCharacters += 1;
         if (storyVoiced) audio?.voice.glyphTyped(character);
         renderNativeDialogueText(storyText, storyFullText.slice(0, storyRevealedCharacters));
-        if (storyPortrait && nativeStoryGlyphMovesMouth(character)) {
-          storyPortrait.dataset.mouthFrame = nativeMouthFrameAfterGlyph(
-            storyPortrait.dataset.mouthFrame,
-            character,
-          );
-          storyPortrait.dataset.talkCount = String(Number(storyPortrait.dataset.talkCount ?? "0") + 1);
-        }
+        portraitSpeechGlyph(storyPortrait, character, storyVoiced && (audio?.voice.pageVoiced ?? false));
         storyTimer = setProgramTimeout(
           tick,
           controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80,
@@ -504,6 +506,8 @@ export function mountStage49EndingUi(
   screen.addEventListener("click", advance);
   window.addEventListener("keydown", keydown);
   const unsubscribe = controller.onChange(render);
+  // `REMAKE-192`：換肖像風格只在原地換掉臉，不重放這一段（`render` 會從頭開始本段）。
+  const stopPortraitPresentationRefresh = onPortraitPresentationChange(() => refreshAnimatedPortraits(root));
   render();
   screen.focus({ preventScroll: true });
   return () => {
@@ -516,6 +520,7 @@ export function mountStage49EndingUi(
     stopEpilogueTyping();
     stopSpeaking(storyPortrait);
     unsubscribe();
+    stopPortraitPresentationRefresh();
     destroyPortraitAnimations();
     destroyScaling();
     window.removeEventListener("keydown", keydown);

@@ -189,6 +189,17 @@ describe("versioned resource manifest", () => {
     expect(resolvedPackUrls(manifest, "stream:full-combat").size).toBe(172);
     // Includes the four module-29 red-eye overlays (frame 7 of D/0, D/2, D/3 and D/41).
     expect(resolvedPackUrls(manifest, "stream:portraits").size).toBe(504);
+
+    // `REMAKE-192`: 66 loop videos, 67 posters and the pack manifest, in no stage or route pack.
+    const hd = resolvedPackUrls(manifest, "stream:portraits-hd");
+    expect(hd.size).toBe(134);
+    expect(hd).toContain("/assets/original/portraits/hd/0046/portrait.mp4");
+    expect(hd).toContain("/assets/original/portraits/hd/0067/poster.webp");
+    for (const pack of manifest.packs.filter(({ id }) => id !== "stream:portraits-hd")) {
+      for (const url of resolvedPackUrls(manifest, pack.id)) {
+        expect(url.includes("/portraits/hd/"), `${pack.id} must not carry ${url}`).toBe(false);
+      }
+    }
   });
 
   test("gives every debug campaign scenario its formal campaign stage pack", async () => {

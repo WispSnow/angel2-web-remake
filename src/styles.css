@@ -95,6 +95,11 @@ html[data-desktop-runtime="true"] .display-settings {
   padding: 8px 12px;
   background: #0b080be8;
 }
+/* `REMAKE-192`：第二行從說明文字換成「肖像」按鈕組，高了 9 px；桌面版窄窗（960 寬）因此
+   少了一點高度、畫面不再剛好填滿。窄窗時收緊上下留白與行距，宿主列總高不變。 */
+@media (max-width: 1100px) {
+  html[data-desktop-runtime="true"] .display-settings { gap: 6px; padding-top: 6px; padding-bottom: 6px; }
+}
 html[data-desktop-runtime="true"] .stage49-help { display: none; }
 
 /* Phaser writes `image-rendering: pixelated` straight onto its canvas element
@@ -675,6 +680,21 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .animated-portrait[data-force-mouth-frame="1"] .portrait-mouth-1,
 .animated-portrait[data-force-mouth-frame="2"] .portrait-mouth-2,
 .animated-portrait[data-force-mouth-frame="3"] .portrait-mouth-3 { opacity: 1; }
+/* `REMAKE-192` 高清肖像：448² 縮到 112 邏輯像素，最近鄰會出鋸齒，一律平滑重採樣。畫布由
+   播放器逐幀繪製（待機畫面加嘴形），視訊只是解碼來源，縮成 2 px 透明留在版面裡——
+   `display:none` 的視訊不保證會播放。封面墊在畫布下面，視訊就緒前與不能播放時顯示它。 */
+.animated-portrait[data-portrait-style="hd"],
+.animated-portrait[data-portrait-style="hd"] > img,
+.animated-portrait > canvas.portrait-hd-canvas,
+.full-status > img.portrait-hd-still,
+.deployment-detail-portrait.portrait-hd-still,
+.stage49-screen img.portrait-hd-still { image-rendering: auto; }
+.animated-portrait > canvas.portrait-hd-canvas {
+  position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none;
+}
+.animated-portrait > video.portrait-hd-video {
+  position: absolute; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none;
+}
 
 .unit-hud { position: absolute; z-index: 7; left: 484px; top: 4px; width: 152px; height: 317px; pointer-events: none; }
 .hud-tactical { z-index: 0; }
@@ -2507,6 +2527,11 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   box-shadow: 0 0 0 2px #7fd18b, 0 0 6px 1px rgba(127, 209, 139, .55);
 }
 .display-settings-hint { flex: 1 1 100%; margin: 0; color: #8d7c65; font-size: 11px; }
+/* `REMAKE-192`：第一行（畫面縮放、介面縮放與右端入口）照舊；「肖像」排在第二行、正對「畫面縮放」下方，
+   與說明文字同一行。第一行已經排滿 640 寬的 Web 畫面，放進去會把右端入口擠到下一行。 */
+.display-settings-secondary { display: flex; flex: 1 1 100%; align-items: center; gap: 8px; min-width: 0; }
+.display-settings-secondary > .display-settings-group + .display-settings-hint { margin-left: 8px; }
+.display-settings-secondary > .display-settings-hint { flex: 1 1 auto; min-width: 0; }
 
 @media (max-width: 560px) {
   .page-shell { width: 100%; padding: 12px 0 28px; }

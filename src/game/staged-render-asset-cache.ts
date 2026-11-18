@@ -59,6 +59,8 @@ const contentTypeFor = (url: string): string => {
   if (url.endsWith(".png")) return "image/png";
   if (url.endsWith(".json")) return "application/json";
   if (url.endsWith(".svg")) return "image/svg+xml";
+  if (url.endsWith(".webp")) return "image/webp";
+  if (url.endsWith(".mp4")) return "video/mp4";
   throw new Error(`unsupported staged render asset ${url}`);
 };
 
@@ -69,7 +71,17 @@ const contentTypeFor = (url: string): string => {
  */
 export function isStagedRenderAssetUrl(url: string): boolean {
   return url.startsWith("/assets/original/")
-    && (url.endsWith(".png") || url.endsWith(".json") || url.endsWith(".svg"));
+    && (url.endsWith(".png") || url.endsWith(".json") || url.endsWith(".svg")
+      || isPortraitHdAssetUrl(url));
+}
+
+/**
+ * `REMAKE-192` 高清肖像的封面（WebP）與循環視訊（MP4）。`<img>`／`<video>` 一樣不經過
+ * Cache Storage，所以要和 PNG 一樣交出資源門已下載那份位元組的物件網址。
+ */
+export function isPortraitHdAssetUrl(url: string): boolean {
+  return url.startsWith("/assets/original/portraits/hd/")
+    && (url.endsWith(".webp") || url.endsWith(".mp4"));
 }
 
 function releaseAssets(assets: ActiveStagedRenderAssets): void {

@@ -5,7 +5,7 @@ import {
   nextExperienceThresholdFor,
   type ClassId,
 } from "./content/classes";
-import { portraitSourceFor } from "./content/portrait-catalog.generated";
+import { portraitStillSourceFor } from "./portrait-style";
 import { allyMapUnitAsset } from "./content/map-unit-assets";
 import { mapUnitVisualOffset } from "./content/map-unit-presentation";
 import { stagedRenderAssetSource } from "./staged-render-asset-cache";
@@ -136,9 +136,11 @@ function detailHtml(view: RosterEntryView): string {
   const experienceSpan = Math.max(1, nextExperience - previousExperience);
   const experienceGained = Math.max(0, unit.experience - previousExperience);
 
+  // `REMAKE-192`：部署詳情不放視訊，高清模式下用循環第 0 幀的封面。
+  const portrait = portraitStillSourceFor(unit.portrait);
   return `<div class="deployment-detail-head">
       <span class="deployment-detail-portrait-frame">
-        <img class="deployment-detail-portrait" src="${stagedRenderAssetSource(portraitSourceFor(unit.portrait))}" alt="" aria-hidden="true" />
+        <img class="deployment-detail-portrait${portrait.hd ? " portrait-hd-still" : ""}" src="${stagedRenderAssetSource(portrait.source)}" alt="" aria-hidden="true" />
         <em class="deployment-detail-state">${statusLabelFor(view)}</em>
       </span>
       <div class="deployment-detail-copy">

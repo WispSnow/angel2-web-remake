@@ -28,7 +28,10 @@ test("the scaling picker lives outside the logical screen and defaults to sharp"
   // The picker is host chrome, not an original menu entry: it must never be
   // inside the 640x350 logical screen the original UI evidence describes.
   await expect(panel.locator("xpath=ancestor::*[@data-testid='startup-screen']")).toHaveCount(0);
-  await expect(panel.getByRole("radio")).toHaveText(["銳利", "平滑", "整數倍"]);
+  await expect(panel.locator("[data-image-scaling-slot]").getByRole("radio")).toHaveText(["銳利", "平滑", "整數倍"]);
+  // `REMAKE-192`: the portrait style shares the row, 原版 by default.
+  await expect(panel.locator("[data-portrait-style-slot]").getByRole("radio")).toHaveText(["原版", "高清"]);
+  await expect(page.getByTestId("portrait-style-original")).toHaveAttribute("aria-checked", "true");
   await expect(page.getByTestId("image-scaling-sharp")).toHaveAttribute("aria-checked", "true");
   await expect(await screenMetrics(page)).toMatchObject({
     imageRendering: "pixelated",
@@ -479,7 +482,7 @@ test.describe("Tauri host interface zoom", () => {
     await page.getByTestId("image-scaling-smooth").click();
     expect(await page.evaluate(() =>
       JSON.parse(localStorage.getItem("angel2.preferences.display.v1") ?? "null")))
-      .toEqual({ imageScaling: "smooth", interfaceZoom: 150 });
+      .toEqual({ imageScaling: "smooth", interfaceZoom: 150, portraitStyle: "original" });
 
     await page.reload();
     await expect(page.getByTestId("battle-canvas")).toBeVisible();

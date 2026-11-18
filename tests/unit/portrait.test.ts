@@ -145,6 +145,8 @@ describe("animated portrait preparation", () => {
     const portrait = {
       dataset: { portraitChannel: "stage49-story-lower", portraitRecord: "46", portraitReady: "false" },
       querySelectorAll: () => layers,
+      // An original-style portrait has no HD video layer (`REMAKE-192`).
+      querySelector: () => null,
     } as unknown as HTMLElement;
     const root = { querySelectorAll: () => [portrait] } as unknown as HTMLElement;
     const settle = () => new Promise((resolve) => globalThis.setTimeout(resolve, 0));

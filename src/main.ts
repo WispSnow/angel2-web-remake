@@ -27,9 +27,15 @@ import { loadMusicPreferences } from "./game/preferences";
 import type { PortraitRecord } from "./game/types";
 import {
   STAGE49_ENDING_MUSIC,
+  STAGE49_ENDING_PORTRAIT_RECORDS,
   STAGE49_ENDING_SUPPLEMENTAL_ASSETS,
   STAGE49_EPILOGUE_MUSIC_BY_SELECTOR,
 } from "./game/content/stage49-ending";
+import {
+  notifyPortraitPresentationChanged,
+  onPortraitStyleChange,
+  portraitHdUrlsForStyle,
+} from "./game/portrait-style";
 import {
   prepareStartupMusic,
   type PreparedStartupMusic,
@@ -91,6 +97,8 @@ const stageAssetGate: StageAssetGate = (stageId, resolveRequirements) => {
         ...classPresentationAssetUrls(requirements),
         ...originalDebugEditorAssetUrls(),
         ...requirements.musicUrls ?? [],
+        // `REMAKE-192`：選了高清才把本關各張臉的高清檔案放進資源門；原版模式不發任何高清請求。
+        ...portraitHdUrlsForStyle(requirements.portraitRecords),
       ];
     },
     async () => {
@@ -128,16 +136,20 @@ const controllerAssetRequirements = (controller: GameController): StageAssetRequ
   voiceUrls: gateVoiceUrls(controller.battle.stage.id, controller.voiceVolume),
 });
 const stage0Units = createStage0Units();
+const stage0PortraitRecords: readonly PortraitRecord[] = [...new Set<PortraitRecord>([
+  46,
+  ...stage0Units.map(({ portrait }) => portrait),
+  ...stageDialoguePortraitRecords(STAGE0_DEFINITION),
+])];
 const stage0PresentationAssets = classPresentationAssetUrls({
   allyClassIds: stage0Units.filter(({ side }) => side === 1).map(({ classId }) => classId),
   encounterClassIds: stage0Units.map(({ classId }) => classId),
   nativeStage: 0,
-  portraitRecords: [...new Set<PortraitRecord>([
-    46,
-    ...stage0Units.map(({ portrait }) => portrait),
-    ...stageDialoguePortraitRecords(STAGE0_DEFINITION),
-  ])],
+  portraitRecords: stage0PortraitRecords,
 });
+
+/** 換一局（重新掛載控制器）時換掉上一局的訂閱，不讓舊控制器繼續下載。 */
+let stopHdPortraitDownloads: (() => void) | undefined;
 
 const mountController = (
   controller: GameController,
@@ -237,6 +249,7 @@ const mountController = (
           "讀取主線結局資料",
           [
             ...STAGE49_ENDING_SUPPLEMENTAL_ASSETS,
+            ...portraitHdUrlsForStyle(STAGE49_ENDING_PORTRAIT_RECORDS),
             ...remixMusicUrls([
               STAGE49_ENDING_MUSIC.story,
               STAGE49_ENDING_MUSIC.roster,
@@ -281,6 +294,21 @@ const mountController = (
 
   controller.onChange(syncSurface);
   syncSurface();
+  // `REMAKE-192` 關卡中途改選高清：在背景下載目前這一關（或結局路由）各張臉的高清檔案，
+  // 補進目前的租約後再換臉；下載完成前照常顯示原版。改回原版不必下載任何東西。
+  stopHdPortraitDownloads?.();
+  stopHdPortraitDownloads = onPortraitStyleChange((style) => {
+    if (style !== "hd" || !stagedResources) return;
+    const records = controller.phase === "ending"
+      ? STAGE49_ENDING_PORTRAIT_RECORDS
+      : controllerAssetRequirements(controller).portraitRecords;
+    void stagedResources.extendActiveStage(portraitHdUrlsForStyle(records, style))
+      .then(() => notifyPortraitPresentationChanged())
+      .catch((error: unknown) => {
+        console.warn("HD portrait download failed", error);
+        controller.reportPortraitHdUnavailable();
+      });
+  });
   if (!releaseBuild) exposeDebugApi(controller);
 };
 
@@ -372,6 +400,7 @@ else {
     mountStartup(root, startGame, startupMusic, () => {
       resourceLoader.prefetchStage("stage-00", [
         ...stage0PresentationAssets,
+        ...portraitHdUrlsForStyle(stage0PortraitRecords),
         ...stageRemixMusicUrls(STAGE0_DEFINITION.music, loadMusicPreferences(localStorage).musicStyle),
       ]);
     }, (urls) => resourceLoader.ensureVoice(urls));

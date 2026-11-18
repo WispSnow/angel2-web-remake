@@ -707,6 +707,7 @@ export class GameController {
   voiceAutoAdvance: boolean;
   /** 語音下載或解碼失敗只在狀態列提示一次。 */
   private voiceFailureNoticed = false;
+  private portraitHdFailureNoticed = false;
   private voiceLineHold?: () => Promise<void>;
   speechEnabled: boolean;
   movementSoundEnabled: boolean;
@@ -6444,6 +6445,14 @@ export class GameController {
     if (this.voiceFailureNoticed) return;
     this.voiceFailureNoticed = true;
     this.statusMessage = "劇情語音載入失敗，相關頁面改用逐字聲。";
+    this.emit();
+  }
+
+  /** `REMAKE-192`：高清肖像載入或播放失敗、該角色退回原版時，狀態列提示一次。 */
+  reportPortraitHdUnavailable(): void {
+    if (this.portraitHdFailureNoticed) return;
+    this.portraitHdFailureNoticed = true;
+    this.statusMessage = "高清肖像載入失敗，相關角色改用原版肖像。";
     this.emit();
   }
 

@@ -4,7 +4,6 @@ import {
   DIALOGUE_TEXT_WINDOW_ASSET,
   STORY_BACKDROP_ASSET,
   PORTRAIT_CATALOG,
-  portraitSourceFor,
 } from "./content/portrait-catalog.generated";
 import { BATTLE_ACTION_DEFINITIONS, isVirtActionId } from "./content/actions";
 import {
@@ -111,14 +110,19 @@ import {
   type PointerPosition,
 } from "./menu-pointer-glide";
 import {
+  adoptAnimatedPortraits,
   animatedPortraitMarkup,
+  beginPortraitSpeech,
   configureAnimatedPortrait,
+  endPortraitTyping,
   module29ShowsRedEyes,
-  nativeMouthFrameAfterGlyph,
-  nativeStoryGlyphMovesMouth,
+  portraitSpeechGlyph,
   prepareAnimatedPortrait,
+  refreshAnimatedPortraits,
   startPortraitAnimations,
+  stopPortraitSpeech,
 } from "./portrait";
+import { onPortraitPresentationChange, portraitStillSourceFor, takePortraitHdFailureNotice } from "./portrait-style";
 import {
   configureGameScaling,
   LOGICAL_SCREEN_HEIGHT,
@@ -599,23 +603,22 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     root,
     controller.isTestMode,
     () => isProgramPaused() || controller.phase === "nextStage" || controller.phase === "quit",
+    // `REMAKE-192`：有語音的頁面口型跟著語音有聲時段走，不跟逐字。
+    () => audio.voice.speechActivity,
   );
 
-  const stopSpeaking = (portrait: HTMLElement | undefined) => {
-    if (!portrait) return;
-    portrait.dataset.speaking = "false";
-    portrait.dataset.mouthFrame = "1";
-  };
-  const startSpeaking = (portrait: HTMLElement | undefined, speaking: boolean) => {
-    if (!portrait) return;
-    portrait.dataset.speaking = String(speaking);
-    portrait.dataset.mouthFrame = "1";
-  };
-  const drawSpeechGlyph = (portrait: HTMLElement | undefined, character: string) => {
-    if (!portrait || !nativeStoryGlyphMovesMouth(character)) return;
-    portrait.dataset.mouthFrame = nativeMouthFrameAfterGlyph(portrait.dataset.mouthFrame, character);
-    portrait.dataset.talkCount = String(Number(portrait.dataset.talkCount ?? "0") + 1);
-  };
+  // `REMAKE-192` 說話的口型規則都在 `portrait.ts`；這裡只告訴它本頁是否由語音驅動。
+  const stopSpeaking = stopPortraitSpeech;
+  const startSpeaking = (portrait: HTMLElement | undefined, typing: boolean, voiced: boolean) =>
+    beginPortraitSpeech(portrait, { typing, voiced });
+  const drawSpeechGlyph = (portrait: HTMLElement | undefined, character: string, voiced: boolean) =>
+    portraitSpeechGlyph(portrait, character, voiced && audio.voice.pageVoiced);
+  // 換成高清（或退回原版）時重畫所有肖像；靜態表面由 `render` 重建。
+  const stopPortraitPresentationRefresh = onPortraitPresentationChange(() => {
+    refreshAnimatedPortraits(root);
+    if (takePortraitHdFailureNotice()) controller.reportPortraitHdUnavailable();
+    render();
+  });
   /** 貼上一扇對話窗的肖像與姓名牌；回傳這次是否換了一張臉。 */
   const showDialoguePortrait = (
     slot: "upper" | "lower",
@@ -671,7 +674,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       dialoguePortraitAfterTyping(cueWindow.state, typed),
       true,
     );
-    if (swapped && typed < dialogueFullText.length) startSpeaking(activeDialoguePortrait, true);
+    // 有語音的頁面，換上來的臉即使逐字已經打完也要跟著語音說話（SAY/0164 逐詞換臉）。
+    if (swapped && (typed < dialogueFullText.length || dialogueVoiced)) {
+      startSpeaking(activeDialoguePortrait, typed < dialogueFullText.length, dialogueVoiced && audio.voice.pageVoiced);
+    }
   };
   const stopTimedPortraitCues = () => {
     if (dialogueTimedPortraitTimer !== undefined) clearProgramTimeout(dialogueTimedPortraitTimer);
@@ -807,7 +813,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     renderNativeDialogueText(target, fullText.slice(0, revealedCharacters), fullText);
     const tick = () => {
       if (activeDialogueKey !== key || activeDialogueText !== target || revealedCharacters >= dialogueFullText.length) {
-        stopSpeaking(activeDialoguePortrait);
+        // 換頁時 `revealDialogue` 已經把舊臉收聲；只有本頁打完時嘴巴才可能繼續跟著語音。
+        if (activeDialogueKey === key) endPortraitTyping(activeDialoguePortrait);
+        else stopSpeaking(activeDialoguePortrait);
         dialogueTimer = undefined;
         if (activeDialogueKey === key) {
           markDialogueTyping("false");
@@ -824,7 +832,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       // 有語音的頁面整頁不提交逐字聲；原版「說話」開關本身的含義不變。
       if (dialogueVoiced) audio.voice.glyphTyped(character);
       else if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
-      drawSpeechGlyph(activeDialoguePortrait, character);
+      drawSpeechGlyph(activeDialoguePortrait, character, dialogueVoiced);
       const delay = controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80;
       dialogueTimer = setProgramTimeout(tick, delay);
     };
@@ -841,7 +849,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           }
         });
       markDialogueTyping("true");
-      startSpeaking(activeDialoguePortrait, revealedCharacters < dialogueFullText.length);
+      startSpeaking(activeDialoguePortrait, revealedCharacters < dialogueFullText.length, dialogueVoiced);
       tick();
       // 展開途中按下的主操作在這裡兌現。原版是 DOS 鍵盤緩衝：`WU` 不讀輸入，那一下留
       // 在緩衝區，等第一個字形的 8 tick 等待才被讀走並快進其餘。`tick()` 已經畫完第一
@@ -901,7 +909,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     revealedCharacters = dialogueFullText.length;
     syncDialoguePortraitCue(revealedCharacters);
     renderNativeDialogueText(activeDialogueText, dialogueFullText);
-    stopSpeaking(activeDialoguePortrait);
+    // 補完本頁不切斷語音，嘴巴也繼續跟著語音說完。
+    endPortraitTyping(activeDialoguePortrait);
     if (controller.groupCommandDialogueActive) scheduleAutomaticDialogueAdvance(activeDialogueKey);
     // 補完本頁不切斷語音；還沒輪到 `startGlyph` 的片段此時開始。
     if (dialogueVoiced) audio.voice.typingFinished();
@@ -925,7 +934,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     renderNativeDialogueText(target, "", fullText);
     const tick = () => {
       if (activeFeedbackKey !== key || activeFeedbackText !== target || feedbackRevealedCharacters >= fullText.length) {
-        stopSpeaking(activeFeedbackPortrait);
+        if (activeFeedbackKey === key) endPortraitTyping(activeFeedbackPortrait);
+        else stopSpeaking(activeFeedbackPortrait);
         feedbackTimer = undefined;
         return;
       }
@@ -933,7 +943,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       feedbackRevealedCharacters += 1;
       renderNativeDialogueText(target, fullText.slice(0, feedbackRevealedCharacters), fullText);
       if (!feedbackVoiced && /[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
-      drawSpeechGlyph(activeFeedbackPortrait, character);
+      drawSpeechGlyph(activeFeedbackPortrait, character, feedbackVoiced);
       feedbackTimer = setProgramTimeout(tick, controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80);
     };
     const begin = () => {
@@ -941,7 +951,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       activeFeedbackPortraitReady = true;
       // `REMAKE-189`：妮雅的結果回饋與系統確認也有語音，與逐字同時開始；有語音就不放逐字聲。
       feedbackVoiced = audio.voice.beginLine(OUTCOME_FEEDBACK_PORTRAIT, fullText);
-      startSpeaking(activeFeedbackPortrait, fullText.length > 0);
+      startSpeaking(activeFeedbackPortrait, fullText.length > 0, feedbackVoiced);
       tick();
     };
     activeFeedbackPortraitReady = portrait === undefined;
@@ -960,7 +970,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     stopFeedbackTimer();
     feedbackRevealedCharacters = feedbackFullText.length;
     renderNativeDialogueText(activeFeedbackText, feedbackFullText);
-    stopSpeaking(activeFeedbackPortrait);
+    endPortraitTyping(activeFeedbackPortrait);
     return true;
   };
   /**
@@ -1791,6 +1801,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       else button.setAttribute("aria-pressed", String(pressed));
     }
     if (!sidePanelHotspotsActive) hideSidePanelHint();
+    const previousHudPortraits = [...hud.querySelectorAll<HTMLElement>("[data-portrait-channel]")];
     hud.innerHTML = `${renderTactical(controller, Boolean(focus))}${
       focus
         ? renderHud(controller, focus.unit, focus.stats)
@@ -1798,6 +1809,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           ? renderTerrainInspection(terrain)
           : ""
     }`;
+    // `REMAKE-192`：同一個單位的肖像節點搬回去，高清視訊不會每移一次游標就從頭重播。
+    adoptAnimatedPortraits(hud, previousHudPortraits);
     // `innerHTML` 丟掉了上一輪的容器，但畫布本身還被持有著，內容也還在——重新
     // 掛回去即可，不必再合成一次。
     hud.querySelector(".hud-tactical")?.append(tacticalPanelChrome.element);
@@ -2071,6 +2084,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     eventController.abort();
     unsubscribe();
     stopNativePresentationAssetRefresh();
+    stopPortraitPresentationRefresh();
     stopScaling();
     stopOriginalDebugSubscription();
     stopGamepad();
@@ -2179,9 +2193,11 @@ function buildFullCombatSkeleton(
   const statusPanel = (side: "left" | "right", unit: typeof attacker) => {
     const stats = source.unitStats(unit);
     const life = unit.id === attacker.id ? presentation.displayedAttackerLife : presentation.displayedDefenderLife;
+    // `REMAKE-192`：全景狀態框不放視訊，高清模式下用循環第 0 幀的封面。
+    const portrait = portraitStillSourceFor(unit.portrait);
     return `
       <div class="full-status ${side}" data-testid="full-${side}-status" hidden>
-        <img src="${stagedRenderAssetSource(portraitSourceFor(unit.portrait))}" alt="${unit.name}肖像" />
+        <img ${portrait.hd ? 'class="portrait-hd-still" ' : ""}src="${stagedRenderAssetSource(portrait.source)}" alt="${unit.name}肖像" />
         <dl>
           <div><dt data-native-text>經驗</dt><dd data-native-text>${unit.experience}</dd></div>
           <div><dt data-native-text>生命</dt><dd data-native-text>${life}</dd></div>

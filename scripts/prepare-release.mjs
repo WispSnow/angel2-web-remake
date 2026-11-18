@@ -232,6 +232,19 @@ for (const clip of [...voiceManifest.clips, ...(voiceManifest.lines ?? []), ...(
     throw new Error(`release voice clip differs from its manifest: ${clip.output}`);
   }
 }
+// `REMAKE-192`: HD portraits (loop videos and posters) are fetched on demand when the
+// player picks 高清, like the voice clips.
+const portraitHdManifestPath = path.join(releaseDirectory, "assets/original/portraits/hd/hd-manifest.json");
+if (!(await pathExists(portraitHdManifestPath))) {
+  throw new Error("release build is missing the HD portrait manifest");
+}
+const portraitHdManifest = JSON.parse(await readFile(portraitHdManifestPath, "utf8"));
+for (const file of portraitHdManifest.records.flatMap((entry) => [entry.poster, entry.video].filter(Boolean))) {
+  const released = await readFile(path.join(releaseDirectory, "assets/original", file.output));
+  if (createHash("sha256").update(released).digest("hex") !== file.sha256) {
+    throw new Error(`release HD portrait differs from its manifest: ${file.output}`);
+  }
+}
 const legacyMusic = files.filter((file) => {
   const relative = path.relative(releaseDirectory, file);
   return /(?:^|\/)(?:story-stage\d+(?:-loop-seamless)?|battle-stage\d+-(?:player|enemy)-(?:entry|loop)(?:-seamless)?)\.wav$/u.test(relative)

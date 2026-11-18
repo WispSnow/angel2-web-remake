@@ -1,0 +1,113 @@
+import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import path from "node:path";
+import { describe, expect, it, vi } from "vitest";
+import { PORTRAIT_RECORDS, portraitSourceFor } from "../../src/game/content/portrait-catalog.generated";
+import { PORTRAIT_HD_AVAILABLE, portraitHdAssetUrls, portraitHdEntry } from "../../src/game/content/portrait-hd";
+import { PORTRAIT_HD_ENTRIES, PORTRAIT_HD_SIZE } from "../../src/game/content/portrait-hd.generated";
+import {
+  activePortraitHd,
+  markPortraitHdFailed,
+  onPortraitPresentationChange,
+  portraitHdUrlsForStyle,
+  portraitStillSourceFor,
+  portraitStyle,
+  setPortraitStyle,
+  takePortraitHdFailureNotice,
+} from "../../src/game/portrait-style";
+
+const assetRoot = path.resolve("public");
+
+describe("REMAKE-192 generated HD portrait catalog", () => {
+  it("covers every record except D/63, which stays original", () => {
+    expect(PORTRAIT_HD_AVAILABLE).toBe(true);
+    const records = Object.keys(PORTRAIT_HD_ENTRIES).map(Number);
+    expect(records).toEqual(PORTRAIT_RECORDS.filter((record) => record !== 63));
+    expect(portraitHdEntry(63)).toBeUndefined();
+  });
+
+  it("gives each mouth mode the layout the player draws", () => {
+    const modes = new Map<string, number[]>();
+    for (const [record, entry] of Object.entries(PORTRAIT_HD_ENTRIES)) {
+      modes.set(entry.mode, [...(modes.get(entry.mode) ?? []), Number(record)]);
+      if (entry.mode === "still") {
+        expect(entry.video).toBeUndefined();
+        continue;
+      }
+      expect(entry.video?.height).toBe(PORTRAIT_HD_SIZE);
+      if (entry.mode === "tween") {
+        const { patch, levels, knots } = entry.mouth ?? { patch: undefined, levels: [], knots: [] };
+        expect(patch).toBeDefined();
+        expect(levels).toHaveLength(4);
+        expect(knots[0]).toBe(0);
+        expect(knots.at(-1)).toBe(1);
+        // Mouth tiles stay inside the strip right of the 448 square.
+        for (const tile of levels) {
+          expect(tile.sx).toBeGreaterThanOrEqual(PORTRAIT_HD_SIZE);
+          expect(tile.sy + (patch?.h ?? 0)).toBeLessThanOrEqual(PORTRAIT_HD_SIZE);
+        }
+      }
+    }
+    // Plan doc 18.1: soldiers and cavalry hide the mouth, the dragon king and wyvern
+    // fade their whole speaking frame in, and the D/67 statue is a still.
+    expect(modes.get("none")).toEqual([47, 48, 52, 53]);
+    expect(modes.get("continuous")).toEqual([56, 66]);
+    expect(modes.get("still")).toEqual([67]);
+    expect(modes.get("tween")).toHaveLength(60);
+  });
+
+  it("ships every referenced file in the asset pack, matching the pack manifest", () => {
+    const manifest = JSON.parse(readFileSync(path.join(assetRoot, "assets/original/portraits/hd/hd-manifest.json"), "utf8")) as {
+      records: { record: number; poster: { output: string; sha256: string }; video?: { output: string; sha256: string } }[];
+    };
+    for (const entry of manifest.records) {
+      for (const file of [entry.poster, entry.video].filter((value) => value !== undefined)) {
+        const bytes = readFileSync(path.join(assetRoot, "assets/original", file.output));
+        expect(createHash("sha256").update(bytes).digest("hex"), file.output).toBe(file.sha256);
+      }
+      for (const url of portraitHdAssetUrls(entry.record as (typeof PORTRAIT_RECORDS)[number])) {
+        expect(existsSync(path.join(assetRoot, url))).toBe(true);
+      }
+    }
+  });
+});
+
+describe("REMAKE-192 portrait style resolution", () => {
+  it("defaults to the original style and requests no HD file for it", () => {
+    expect(portraitStyle()).toBe("original");
+    expect(activePortraitHd(46)).toBeUndefined();
+    expect(portraitStillSourceFor(46)).toEqual({ source: portraitSourceFor(46), hd: false });
+    expect(portraitHdUrlsForStyle([46, 63])).toEqual([]);
+  });
+
+  it("switches whole records to HD, except D/63 and a face that must show red eyes", () => {
+    const changed = vi.fn();
+    const stop = onPortraitPresentationChange(changed);
+    setPortraitStyle("hd");
+    expect(changed).toHaveBeenCalledTimes(1);
+    stop();
+    expect(portraitHdUrlsForStyle([46, 63])).toEqual([
+      "/assets/original/portraits/hd/0046/portrait.mp4",
+      "/assets/original/portraits/hd/0046/poster.webp",
+    ]);
+    expect(activePortraitHd(46)?.mode).toBe("tween");
+    expect(activePortraitHd(63)).toBeUndefined();
+    // The HD set has no frame-7 red eyes, so a possessed face stays original as a whole.
+    expect(activePortraitHd(2, { redEyes: true })).toBeUndefined();
+    expect(activePortraitHd(2, { redEyes: false })?.mode).toBe("tween");
+    expect(portraitStillSourceFor(46)).toEqual({ source: "/assets/original/portraits/hd/0046/poster.webp", hd: true });
+  });
+
+  it("falls a failed record back to the original once and reports it once", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    markPortraitHdFailed(5, "decode error");
+    markPortraitHdFailed(5, "decode error");
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(activePortraitHd(5)).toBeUndefined();
+    expect(portraitStillSourceFor(5).hd).toBe(false);
+    expect(takePortraitHdFailureNotice()).toBe(true);
+    expect(takePortraitHdFailureNotice()).toBe(false);
+    warn.mockRestore();
+    setPortraitStyle("original");
+  });
+});

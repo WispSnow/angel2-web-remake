@@ -201,6 +201,11 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
     .toContainText("MiniMax");
   await expect(page.getByTestId("remake-disclaimer-ai-voice"))
     .toContainText("ElevenLabs");
+  // REMAKE-192: the HD portraits name the models that drew and animated them.
+  await expect(page.getByTestId("remake-disclaimer-ai-portraits"))
+    .toContainText("Qwen-Image-Edit");
+  await expect(page.getByTestId("remake-disclaimer-ai-portraits"))
+    .toContainText("RIFE");
   await expect(page.getByTestId("remake-note-REMAKE-100")).toHaveCount(0);
   await captureVisualAudit(page.locator(".rn-dialog"), {
     path: "artifacts/playwright/remake-disclaimer-desktop.png",

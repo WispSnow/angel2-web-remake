@@ -6,6 +6,8 @@
  * 依賴它的自動翻頁計時一併凍結。
  */
 
+import { voiceActiveAt, voiceActivityTrack, type VoiceActivityTrack } from "./voice-activity";
+
 type FetchVoice = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 type DecodeVoice = (encoded: ArrayBuffer) => Promise<AudioBuffer>;
 
@@ -70,9 +72,27 @@ export interface VoiceTransportState {
 
 interface ActiveVoice {
   readonly url: string;
+  readonly buffer: AudioBuffer;
   readonly source: AudioBufferSourceNode;
   readonly output: GainNode;
+  /** `context.currentTime` at `start()`; the context clock stops while suspended, so the position pauses too. */
+  readonly startedAt: number;
   ended: boolean;
+}
+
+/** `REMAKE-192` 有聲時段只算一次；PCM 被逐出解碼快取時一併丟掉。 */
+const activityTracks = new WeakMap<AudioBuffer, VoiceActivityTrack | null>();
+
+function activityTrackFor(buffer: AudioBuffer): VoiceActivityTrack | null {
+  let track = activityTracks.get(buffer);
+  if (track === undefined) {
+    // 拿不到 PCM（測試替身）時當作整段有聲：口型從頭說到片段結束。
+    track = typeof buffer.getChannelData === "function" && buffer.numberOfChannels > 0
+      ? voiceActivityTrack(buffer.getChannelData(0), buffer.sampleRate)
+      : null;
+    activityTracks.set(buffer, track);
+  }
+  return track;
 }
 
 export class VoiceTransport {
@@ -182,7 +202,7 @@ export class VoiceTransport {
     source.buffer = buffer;
     source.connect(output);
     output.connect(masterGain);
-    const active: ActiveVoice = { url, source, output, ended: false };
+    const active: ActiveVoice = { url, buffer, source, output, startedAt: context.currentTime, ended: false };
     source.addEventListener("ended", () => {
       if (active.ended) return;
       active.ended = true;
@@ -222,6 +242,21 @@ export class VoiceTransport {
 
   get playingUrl(): string | undefined {
     return this.current?.url;
+  }
+
+  /**
+   * `REMAKE-192`：正在播放的片段此刻聽得到聲音嗎？沒有片段時為 `undefined`。位置扣掉輸出
+   * 延遲，口型對的是玩家聽到的那一刻；context 掛起（全局暫停）時位置不動。
+   */
+  get speechActive(): boolean | undefined {
+    const active = this.current;
+    const context = this.context;
+    if (!active || active.ended || !context) return undefined;
+    const latency = (context.outputLatency || 0) + (context.baseLatency || 0);
+    const position = context.currentTime - active.startedAt - latency;
+    const track = activityTrackFor(active.buffer);
+    if (!track) return position >= 0 && position < (active.buffer.duration || 0);
+    return voiceActiveAt(track, position);
   }
 
   destroy(): void {

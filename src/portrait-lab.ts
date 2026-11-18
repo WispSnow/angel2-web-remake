@@ -9,8 +9,11 @@ import {
 import {
   animatedPortraitMarkup,
   nativeMouthFrameAfterGlyph,
+  refreshAnimatedPortraits,
   startPortraitAnimations,
 } from "./game/portrait";
+import { PORTRAIT_HD_AVAILABLE } from "./game/content/portrait-hd";
+import { onPortraitPresentationChange, portraitStyle, setPortraitStyle } from "./game/portrait-style";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
@@ -54,6 +57,13 @@ root.innerHTML = `
         <button type="button" data-mouth="2" aria-pressed="false">小幅張嘴</button>
         <button type="button" data-mouth="3" aria-pressed="false">完整素材</button>
       </fieldset>
+      ${PORTRAIT_HD_AVAILABLE ? `<fieldset data-control-group="style">
+        <legend>風格（REMAKE-192）</legend>
+        <button type="button" data-portrait-style="original" data-testid="portrait-lab-style-original"
+          aria-pressed="${portraitStyle() === "original"}">原版</button>
+        <button type="button" data-portrait-style="hd" data-testid="portrait-lab-style-hd"
+          aria-pressed="${portraitStyle() === "hd"}">高清</button>
+      </fieldset>` : ""}
     </section>
     <p class="portrait-lab-summary" data-testid="portrait-lab-summary">68 筆主肖像 · 67 筆具完整眨眼與口型 · D/63 原版無覆蓋幀及布局</p>
     <section class="portrait-grid" data-testid="portrait-lab" data-filter="current" aria-label="角色肖像目錄">
@@ -107,6 +117,15 @@ root.querySelectorAll<HTMLButtonElement>("[data-blink]").forEach((button) => {
   });
 });
 
+// 與遊戲共用同一個宿主偏好：在這裡切換，回到遊戲也是同一套。
+root.querySelectorAll<HTMLButtonElement>("[data-portrait-style]").forEach((button) => {
+  button.addEventListener("click", () => {
+    setPressed("style", button);
+    setPortraitStyle(button.dataset.portraitStyle === "hd" ? "hd" : "original");
+  });
+});
+const stopPresentationRefresh = onPortraitPresentationChange(() => refreshAnimatedPortraits(root));
+
 let automaticSpeech = true;
 root.querySelectorAll<HTMLButtonElement>("[data-mouth]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -135,5 +154,6 @@ const speechTimer = window.setInterval(() => {
 
 window.addEventListener("pagehide", () => {
   stopBlinking();
+  stopPresentationRefresh();
   window.clearInterval(speechTimer);
 }, { once: true });

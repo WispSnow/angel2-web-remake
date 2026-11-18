@@ -151,6 +151,10 @@ for (const { relative } of allFiles) {
   if (relative.startsWith("startup/")) addToPack("boot", url);
   else if (relative.startsWith("full-combat-atlases/") || relative.startsWith("full-combat/backgrounds/")) {
     addToPack("stream:full-combat", url);
+  } else if (relative.startsWith("portraits/hd/")) {
+    // `REMAKE-192`: HD portraits are never part of a stage pack. The resource gate
+    // requests a stage's records only when the player has chosen 高清.
+    addToPack("stream:portraits-hd", url);
   } else if (relative.startsWith("portraits/") || relative.startsWith("portrait-animation/")) {
     addToPack("stream:portraits", url);
   } else if (relative.startsWith("ending/")) addToPack("ending", url);
@@ -272,6 +276,7 @@ for (let index = 0; index < stageIds.length; index += 1) {
 addPack("ending", "主線結局資料");
 addPack("credits", "製作人員表資料");
 addPack("stream:portraits", "肖像串流資料");
+addPack("stream:portraits-hd", "高清肖像串流資料");
 addPack("stream:full-combat", "全景戰鬥串流資料");
 addPack("stream:map-units", "棋子按需資料");
 addPack("stream:music", "其餘音樂串流資料");
