@@ -190,10 +190,12 @@ describe("versioned resource manifest", () => {
     // Includes the four module-29 red-eye overlays (frame 7 of D/0, D/2, D/3 and D/41).
     expect(resolvedPackUrls(manifest, "stream:portraits").size).toBe(504);
 
-    // `REMAKE-192`: 66 loop videos, 67 posters and the pack manifest, in no stage or route pack.
+    // `REMAKE-192`: 66 loop videos, 67 posters and the pack manifest, plus the `REMAKE-195`
+    // red-eye video and poster of D/0, 2, 3 and 41, in no stage or route pack.
     const hd = resolvedPackUrls(manifest, "stream:portraits-hd");
-    expect(hd.size).toBe(134);
+    expect(hd.size).toBe(142);
     expect(hd).toContain("/assets/original/portraits/hd/0046/portrait.mp4");
+    expect(hd).toContain("/assets/original/portraits/hd/0041/red-eyes.mp4");
     expect(hd).toContain("/assets/original/portraits/hd/0067/poster.webp");
     for (const pack of manifest.packs.filter(({ id }) => id !== "stream:portraits-hd")) {
       for (const url of resolvedPackUrls(manifest, pack.id)) {

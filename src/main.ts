@@ -98,7 +98,8 @@ const stageAssetGate: StageAssetGate = (stageId, resolveRequirements) => {
         ...originalDebugEditorAssetUrls(),
         ...requirements.musicUrls ?? [],
         // `REMAKE-192`：選了高清才把本關各張臉的高清檔案放進資源門；原版模式不發任何高清請求。
-        ...portraitHdUrlsForStyle(requirements.portraitRecords),
+        // `REMAKE-195`：這一關被操控的角色另外帶上紅眼版。
+        ...portraitHdUrlsForStyle(requirements.portraitRecords, undefined, requirements.nativeStage),
       ];
     },
     async () => {
@@ -299,10 +300,14 @@ const mountController = (
   stopHdPortraitDownloads?.();
   stopHdPortraitDownloads = onPortraitStyleChange((style) => {
     if (style !== "hd" || !stagedResources) return;
-    const records = controller.phase === "ending"
-      ? STAGE49_ENDING_PORTRAIT_RECORDS
-      : controllerAssetRequirements(controller).portraitRecords;
-    void stagedResources.extendActiveStage(portraitHdUrlsForStyle(records, style))
+    let urls: readonly string[];
+    if (controller.phase === "ending") {
+      urls = portraitHdUrlsForStyle(STAGE49_ENDING_PORTRAIT_RECORDS, style);
+    } else {
+      const { portraitRecords, nativeStage } = controllerAssetRequirements(controller);
+      urls = portraitHdUrlsForStyle(portraitRecords, style, nativeStage);
+    }
+    void stagedResources.extendActiveStage(urls)
       .then(() => notifyPortraitPresentationChanged())
       .catch((error: unknown) => {
         console.warn("HD portrait download failed", error);

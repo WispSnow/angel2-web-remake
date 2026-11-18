@@ -174,17 +174,24 @@ function portraitLayers(
     ).join("")}`;
 }
 
-/** 這張臉此刻畫哪一套；`configureAnimatedPortrait` 據此判斷要不要重建圖層。 */
-const portraitStyleFor = (portrait: PortraitRecord, redEyes: boolean): { style: "hd" | "original"; mode?: string } => {
+/**
+ * 這張臉此刻畫哪一套；`configureAnimatedPortrait` 據此判斷要不要重建圖層。高清而要紅眼時畫的是
+ * `REMAKE-195` 的紅眼版（`variant`）。
+ */
+const portraitStyleFor = (
+  portrait: PortraitRecord,
+  redEyes: boolean,
+): { style: "hd" | "original"; mode?: string; variant?: "red-eyes" } => {
   const hd = activePortraitHd(portrait, { redEyes });
-  return hd ? { style: "hd", mode: hd.mode } : { style: "original" };
+  if (!hd) return { style: "original" };
+  return redEyes ? { style: "hd", mode: hd.mode, variant: "red-eyes" } : { style: "hd", mode: hd.mode };
 };
 
 export function animatedPortraitMarkup(portrait: PortraitRecord, options: PortraitMarkupOptions): string {
-  const { style, mode } = portraitStyleFor(portrait, options.redEyes ?? false);
+  const { style, mode, variant } = portraitStyleFor(portrait, options.redEyes ?? false);
   return `
     <span class="animated-portrait ${options.className}"
-      data-portrait-style="${style}"${mode ? ` data-portrait-hd-mode="${mode}"` : ""}
+      data-portrait-style="${style}"${mode ? ` data-portrait-hd-mode="${mode}"` : ""}${variant ? ` data-portrait-hd-variant="${variant}"` : ""}
       ${options.wrapperTestId ? `data-testid="${options.wrapperTestId}"` : ""}
       data-portrait-channel="${options.channel}"
       data-portrait-record="${portrait}"
@@ -209,15 +216,19 @@ export function configureAnimatedPortrait(
   baseTestId?: string,
   redEyes = false,
 ): void {
+  // 原版的紅眼只是覆蓋片的開關（樣式表看 `data-red-eyes`）；高清紅眼是另一支視訊，要重建圖層。
+  const redEyesChanged = element.dataset.redEyes !== String(redEyes);
   element.dataset.redEyes = String(redEyes);
-  const { style, mode } = portraitStyleFor(portrait, redEyes);
+  const { style, mode, variant } = portraitStyleFor(portrait, redEyes);
   const recordChanged = element.dataset.portraitRecord !== String(portrait);
-  if (recordChanged || element.dataset.portraitStyle !== style) {
+  if (recordChanged || element.dataset.portraitStyle !== style || (style === "hd" && redEyesChanged)) {
     element.dataset.portraitRecord = String(portrait);
     element.dataset.portraitChannel = channel;
     element.dataset.portraitStyle = style;
     if (mode) element.dataset.portraitHdMode = mode;
     else delete element.dataset.portraitHdMode;
+    if (variant) element.dataset.portraitHdVariant = variant;
+    else delete element.dataset.portraitHdVariant;
     delete element.dataset.portraitHdVideo;
     delete element.dataset.mouthOpenness;
     element.dataset.blinkFrame = "1";

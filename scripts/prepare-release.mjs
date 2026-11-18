@@ -239,7 +239,8 @@ if (!(await pathExists(portraitHdManifestPath))) {
   throw new Error("release build is missing the HD portrait manifest");
 }
 const portraitHdManifest = JSON.parse(await readFile(portraitHdManifestPath, "utf8"));
-for (const file of portraitHdManifest.records.flatMap((entry) => [entry.poster, entry.video].filter(Boolean))) {
+for (const file of portraitHdManifest.records.flatMap((entry) =>
+  [entry.poster, entry.video, entry.redEyes?.poster, entry.redEyes?.video].filter(Boolean))) {
   const released = await readFile(path.join(releaseDirectory, "assets/original", file.output));
   if (createHash("sha256").update(released).digest("hex") !== file.sha256) {
     throw new Error(`release HD portrait differs from its manifest: ${file.output}`);

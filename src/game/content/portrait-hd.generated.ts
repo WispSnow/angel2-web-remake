@@ -10,6 +10,7 @@ export const PORTRAIT_HD_ENTRIES: Readonly<Partial<Record<PortraitRecord, Portra
     poster: "/assets/original/portraits/hd/0000/poster.webp",
     video: { source: "/assets/original/portraits/hd/0000/portrait.mp4", width: 544, height: 448, frames: 123, fps: 24 },
     mouth: { patch: {"x":136,"y":170,"w":92,"h":90}, levels: [{"sx":448,"sy":0},{"sx":448,"sy":90},{"sx":448,"sy":180},{"sx":448,"sy":270}], knots: [0,0.19,0.48,0.79,1] },
+    redEyes: { poster: "/assets/original/portraits/hd/0000/red-eyes-poster.webp", video: { source: "/assets/original/portraits/hd/0000/red-eyes.mp4", width: 544, height: 448, frames: 123, fps: 24 } },
   },
   1: {
     mode: "tween",
@@ -22,12 +23,14 @@ export const PORTRAIT_HD_ENTRIES: Readonly<Partial<Record<PortraitRecord, Portra
     poster: "/assets/original/portraits/hd/0002/poster.webp",
     video: { source: "/assets/original/portraits/hd/0002/portrait.mp4", width: 560, height: 448, frames: 123, fps: 24 },
     mouth: { patch: {"x":146,"y":152,"w":104,"h":104}, levels: [{"sx":448,"sy":0},{"sx":448,"sy":104},{"sx":448,"sy":208},{"sx":448,"sy":312}], knots: [0,0.2,0.49,0.81,1] },
+    redEyes: { poster: "/assets/original/portraits/hd/0002/red-eyes-poster.webp", video: { source: "/assets/original/portraits/hd/0002/red-eyes.mp4", width: 560, height: 448, frames: 123, fps: 24 } },
   },
   3: {
     mode: "tween",
     poster: "/assets/original/portraits/hd/0003/poster.webp",
     video: { source: "/assets/original/portraits/hd/0003/portrait.mp4", width: 560, height: 448, frames: 123, fps: 24 },
     mouth: { patch: {"x":192,"y":164,"w":104,"h":92}, levels: [{"sx":448,"sy":0},{"sx":448,"sy":92},{"sx":448,"sy":184},{"sx":448,"sy":276}], knots: [0,0.24,0.47,0.77,1] },
+    redEyes: { poster: "/assets/original/portraits/hd/0003/red-eyes-poster.webp", video: { source: "/assets/original/portraits/hd/0003/red-eyes.mp4", width: 560, height: 448, frames: 123, fps: 24 } },
   },
   4: {
     mode: "tween",
@@ -256,6 +259,7 @@ export const PORTRAIT_HD_ENTRIES: Readonly<Partial<Record<PortraitRecord, Portra
     poster: "/assets/original/portraits/hd/0041/poster.webp",
     video: { source: "/assets/original/portraits/hd/0041/portrait.mp4", width: 544, height: 448, frames: 123, fps: 24 },
     mouth: { patch: {"x":254,"y":132,"w":96,"h":102}, levels: [{"sx":448,"sy":0},{"sx":448,"sy":102},{"sx":448,"sy":204},{"sx":448,"sy":306}], knots: [0,0.21,0.56,0.72,1] },
+    redEyes: { poster: "/assets/original/portraits/hd/0041/red-eyes-poster.webp", video: { source: "/assets/original/portraits/hd/0041/red-eyes.mp4", width: 544, height: 448, frames: 123, fps: 24 } },
   },
   42: {
     mode: "tween",

@@ -15,13 +15,17 @@
 //   the 448 square (RIFE 1/4, 1/2, 3/4 and the open copy, plan doc 23.4) at a
 //   patch inside the square, with increasing measured openness knots; the dragon
 //   records fade the whole right half in; mouthless records are 448 wide; the
-//   statue D/67 is a still.
+//   statue D/67 is a still;
+// - REMAKE-195: a record carries a red-eye (possessed) variant exactly when its
+//   original has the frame-7 eye-red.png. The variant swaps only the video and
+//   poster: same size, frame count and mouth strip as the loop it was made from.
 //
 // `--import <workbench export>` first copies the files from the git-ignored HD
 // workbench (tmp/portrait-hd/export, made by its tools/export_hd.py) into the
 // asset pack and rewrites the manifest. The workbench never ships.
 
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -110,6 +114,26 @@ async function originalBaseSha256(record) {
   return sha256(await readFile(path.join(assetRoot, "portraits", pad(record), "base.png")));
 }
 
+/** The original's frame 7, module 29's possessed red eyes; only these records get an HD red-eye variant. */
+const hasOriginalRedEyes = (record) => existsSync(path.join(assetRoot, "portraits", pad(record), "eye-red.png"));
+
+async function checkVideo(file) {
+  const video = await readFile(path.join(assetRoot, file.output));
+  if (sha256(video) !== file.sha256 || video.length !== file.bytes) fail(`${file.output} does not match the manifest`);
+  const tracks = mp4Tracks(video);
+  if (tracks.length !== 1 || tracks[0].handler !== "vide") fail(`${file.output} must hold exactly one video track and no audio`);
+  if (tracks[0].width !== file.width || tracks[0].height !== file.height || file.height !== SIZE) {
+    fail(`${file.output} is ${tracks[0].width}x${tracks[0].height}, manifest says ${file.width}x${file.height}`);
+  }
+}
+
+async function checkPoster(file) {
+  const poster = await readFile(path.join(assetRoot, file.output));
+  if (sha256(poster) !== file.sha256 || poster.length !== file.bytes) fail(`${file.output} does not match the manifest`);
+  const size = webpSize(poster);
+  if (size.width !== SIZE || size.height !== SIZE) fail(`${file.output} is ${size.width}x${size.height}`);
+}
+
 async function importWorkbench(workbench) {
   const exported = JSON.parse(await readFile(path.join(workbench, "manifest.json"), "utf8"));
   if (exported.format !== "angel2-portrait-hd-export" || exported.version !== 1) fail("unexpected workbench export format");
@@ -119,17 +143,22 @@ async function importWorkbench(workbench) {
     const directory = path.join(hdRoot, pad(entry.record));
     await mkdir(directory, { recursive: true });
     const shipped = { record: entry.record, mode: entry.mode, originalBaseSha256: await originalBaseSha256(entry.record) };
-    for (const kind of ["video", "poster"]) {
-      const file = entry[kind];
-      if (!file) continue;
-      const name = kind === "video" ? "portrait.mp4" : "poster.webp";
+    const ship = async (file, name) => {
       await copyFile(path.join(workbench, file.file), path.join(directory, name));
-      shipped[kind] = {
+      return {
         output: `portraits/hd/${pad(entry.record)}/${name}`,
         width: file.width,
         height: file.height,
         bytes: file.bytes,
         sha256: file.sha256,
+      };
+    };
+    if (entry.video) shipped.video = await ship(entry.video, "portrait.mp4");
+    shipped.poster = await ship(entry.poster, "poster.webp");
+    if (entry.redEyes) {
+      shipped.redEyes = {
+        video: await ship(entry.redEyes.video, "red-eyes.mp4"),
+        poster: await ship(entry.redEyes.poster, "red-eyes-poster.webp"),
       };
     }
     if (entry.video) Object.assign(shipped, { frames: entry.frames, fps: entry.fps });
@@ -141,10 +170,11 @@ async function importWorkbench(workbench) {
   const manifest = {
     format: FORMAT,
     version: VERSION,
-    decision: "REMAKE-192",
+    decision: "REMAKE-192, REMAKE-195",
     size: SIZE,
     video: "H.264 yuv420p CRF 20, 24 fps, faststart, muted loop",
     poster: "WebP q90, frame 0 of the loop",
+    redEyes: "possessed variant (module 29 frame 7): irises recoloured red, blinks bridged; same layout and mouth strip",
     records,
   };
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
@@ -166,11 +196,12 @@ async function validate(manifest) {
       fail(`${label} was made from a different original base.png; review the HD record before shipping it`);
     }
 
-    const poster = await readFile(path.join(assetRoot, entry.poster.output));
-    if (sha256(poster) !== entry.poster.sha256 || poster.length !== entry.poster.bytes) fail(`${entry.poster.output} does not match the manifest`);
-    const size = webpSize(poster);
-    if (size.width !== SIZE || size.height !== SIZE) fail(`${entry.poster.output} is ${size.width}x${size.height}`);
+    await checkPoster(entry.poster);
     expectedFiles.add(path.relative("portraits/hd", entry.poster.output));
+    if (Boolean(entry.redEyes) !== hasOriginalRedEyes(entry.record)) {
+      fail(entry.redEyes ? `${label} has a red-eye variant but the original has no frame 7`
+        : `${label} needs a red-eye variant: the original has frame 7 (eye-red.png)`);
+    }
 
     if (entry.mode === "still") {
       if (entry.video || entry.patch) fail(`${label} is a still but carries a video or mouth layout`);
@@ -178,15 +209,16 @@ async function validate(manifest) {
       continue;
     }
     if (!entry.video) fail(`${label} has no video`);
-    const video = await readFile(path.join(assetRoot, entry.video.output));
-    if (sha256(video) !== entry.video.sha256 || video.length !== entry.video.bytes) fail(`${entry.video.output} does not match the manifest`);
-    const tracks = mp4Tracks(video);
-    if (tracks.length !== 1 || tracks[0].handler !== "vide") fail(`${entry.video.output} must hold exactly one video track and no audio`);
-    if (tracks[0].width !== entry.video.width || tracks[0].height !== entry.video.height || entry.video.height !== SIZE) {
-      fail(`${entry.video.output} is ${tracks[0].width}x${tracks[0].height}, manifest says ${entry.video.width}x${entry.video.height}`);
-    }
+    await checkVideo(entry.video);
     if (!(entry.frames > 24 && entry.fps === 24)) fail(`${label} frame count or rate out of range`);
     expectedFiles.add(path.relative("portraits/hd", entry.video.output));
+    if (entry.redEyes) {
+      // The variant reuses the loop's mouth strip and layout, so it must be the same frame for frame.
+      await checkVideo(entry.redEyes.video);
+      await checkPoster(entry.redEyes.poster);
+      if (entry.redEyes.video.width !== entry.video.width) fail(`${label} red-eye video does not match the loop's layout`);
+      for (const file of [entry.redEyes.video, entry.redEyes.poster]) expectedFiles.add(path.relative("portraits/hd", file.output));
+    }
 
     if (entry.mode === "none") {
       if (entry.video.width !== SIZE || entry.patch) fail(`${label} is mouthless but its video is not a bare square`);
@@ -237,6 +269,9 @@ const entries = records.map((entry) => {
     lines.push(`    mouth: { patch: ${JSON.stringify(entry.patch)}, levels: ${JSON.stringify(entry.levels)}, knots: ${JSON.stringify(entry.knots)} },`);
   }
   if (entry.mode === "continuous") lines.push(`    speakingFrame: ${JSON.stringify(entry.source)},`);
+  if (entry.redEyes) {
+    lines.push(`    redEyes: { poster: ${url(entry.redEyes.poster.output)}, video: { source: ${url(entry.redEyes.video.output)}, width: ${entry.redEyes.video.width}, height: ${entry.redEyes.video.height}, frames: ${entry.frames}, fps: ${entry.fps} } },`);
+  }
   lines.push("  },");
   return lines.join("\n");
 });
@@ -252,5 +287,6 @@ await writeFile(generatedModule, [
   "};",
   "",
 ].join("\n"));
-const bytes = records.reduce((sum, entry) => sum + entry.poster.bytes + (entry.video?.bytes ?? 0), 0);
+const bytes = records.reduce((sum, entry) => sum + entry.poster.bytes + (entry.video?.bytes ?? 0)
+  + (entry.redEyes ? entry.redEyes.video.bytes + entry.redEyes.poster.bytes : 0), 0);
 console.log(`portrait HD catalog: ${records.length} records, ${(bytes / 1024 / 1024).toFixed(1)} MiB -> ${path.relative(root, generatedModule)}`);

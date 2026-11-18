@@ -1,6 +1,7 @@
 import "./styles.css";
 import "./portrait-lab.css";
 import {
+  isPortraitRecord,
   PORTRAIT_CATALOG,
   PORTRAIT_RECORDS,
   type PortraitAnimationAssets,
@@ -8,6 +9,7 @@ import {
 } from "./game/content/portrait-catalog.generated";
 import {
   animatedPortraitMarkup,
+  configureAnimatedPortrait,
   nativeMouthFrameAfterGlyph,
   refreshAnimatedPortraits,
   startPortraitAnimations,
@@ -64,6 +66,11 @@ root.innerHTML = `
         <button type="button" data-portrait-style="hd" data-testid="portrait-lab-style-hd"
           aria-pressed="${portraitStyle() === "hd"}">高清</button>
       </fieldset>` : ""}
+      <fieldset data-control-group="red-eyes">
+        <legend>紅眼（frame 7）</legend>
+        <button type="button" data-red-eyes="false" data-testid="portrait-lab-red-eyes-off" aria-pressed="true">一般</button>
+        <button type="button" data-red-eyes="true" data-testid="portrait-lab-red-eyes-on" aria-pressed="false">被操控</button>
+      </fieldset>
     </section>
     <p class="portrait-lab-summary" data-testid="portrait-lab-summary">68 筆主肖像 · 67 筆具完整眨眼與口型 · D/63 原版無覆蓋幀及布局</p>
     <section class="portrait-grid" data-testid="portrait-lab" data-filter="current" aria-label="角色肖像目錄">
@@ -125,6 +132,22 @@ root.querySelectorAll<HTMLButtonElement>("[data-portrait-style]").forEach((butto
   });
 });
 const stopPresentationRefresh = onPortraitPresentationChange(() => refreshAnimatedPortraits(root));
+
+// 模組 29 對 `D/0、2、3、41` 在被操控期間以 frame 7 取代每一個眨眼幀；高清風格換成 `REMAKE-195` 的紅眼版。
+root.querySelectorAll<HTMLButtonElement>("button[data-red-eyes]").forEach((button) => {
+  button.addEventListener("click", () => {
+    setPressed("red-eyes", button);
+    for (const portrait of animatedPortraits()) {
+      const record = Number(portrait.dataset.portraitRecord);
+      if (!isPortraitRecord(record)) continue;
+      const animation: PortraitAnimationAssets | null = PORTRAIT_CATALOG[record].animation;
+      if (!animation?.redEyes) continue;
+      const base = portrait.querySelector<HTMLImageElement>(".portrait-base");
+      configureAnimatedPortrait(portrait, record, base?.alt ?? "", portrait.dataset.portraitChannel ?? "", undefined,
+        button.dataset.redEyes === "true");
+    }
+  });
+});
 
 let automaticSpeech = true;
 root.querySelectorAll<HTMLButtonElement>("[data-mouth]").forEach((button) => {

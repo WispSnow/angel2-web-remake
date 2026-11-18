@@ -2216,7 +2216,7 @@ function buildFullCombatSkeleton(
     const stats = source.unitStats(unit);
     const life = unit.id === attacker.id ? presentation.displayedAttackerLife : presentation.displayedDefenderLife;
     // `REMAKE-194`：原版的狀態框只在入場時畫一次，原版風格維持靜止主圖；高清風格播待機循環
-    // （閉嘴，不說話）。要畫紅眼的角色照 `REMAKE-192` 整條退回原版。
+    // （閉嘴，不說話）。被操控的角色在高清風格下播紅眼版（`REMAKE-195`），與單位詳情一致。
     const portrait = animatedPortraitMarkup(unit.portrait, {
       alt: `${unit.name}肖像`,
       channel: `full-combat-${side}`,

@@ -18,17 +18,19 @@ export interface PortraitHdRect {
   readonly h: number;
 }
 
+export interface PortraitHdVideo {
+  readonly source: string;
+  readonly width: number;
+  readonly height: number;
+  readonly frames: number;
+  readonly fps: number;
+}
+
 export interface PortraitHdEntry {
   readonly mode: PortraitHdMode;
   /** 循環的第 0 幀（閉嘴），WebP；靜態表面、影片就緒前與無法播放時都顯示它。 */
   readonly poster: string;
-  readonly video?: {
-    readonly source: string;
-    readonly width: number;
-    readonly height: number;
-    readonly frames: number;
-    readonly fps: number;
-  };
+  readonly video?: PortraitHdVideo;
   readonly mouth?: {
     readonly patch: PortraitHdRect;
     /** 條帶裡四格嘴形的左上角，依序為 1/4、1/2、3/4 與全開。 */
@@ -38,23 +40,46 @@ export interface PortraitHdEntry {
   };
   /** `continuous` 的整幅說話畫面在視訊裡的左上角。 */
   readonly speakingFrame?: { readonly sx: number; readonly sy: number };
+  /**
+   * `REMAKE-195` 被操控的紅眼版（原版有 frame 7 的 `D/0、2、3、41`）：虹膜改紅、眨眼補成睜眼，
+   * 只換視訊與封面，尺寸、幀數與嘴形條帶都和一般循環相同。
+   */
+  readonly redEyes?: { readonly poster: string; readonly video: PortraitHdVideo };
 }
 
 export function portraitHdEntry(record: PortraitRecord): PortraitHdEntry | undefined {
   return PORTRAIT_HD_ENTRIES[record];
 }
 
-/** 這條記錄的全部高清檔案；沒有高清版時為空。 */
-export function portraitHdAssetUrls(record: PortraitRecord): readonly string[] {
-  const entry = PORTRAIT_HD_ENTRIES[record];
-  if (!entry) return [];
-  return entry.video ? [entry.poster, entry.video.source] : [entry.poster];
+/**
+ * 這張臉此刻要畫的那一套：一般循環，或 `redEyes` 時的紅眼版（換掉封面與視訊，其餘相同）。
+ * 要紅眼而這條記錄沒有紅眼版時回傳 `undefined`。
+ */
+export function portraitHdVariant(entry: PortraitHdEntry, redEyes: boolean): PortraitHdEntry | undefined {
+  if (!redEyes) return entry;
+  if (!entry.redEyes) return undefined;
+  return { ...entry, poster: entry.redEyes.poster, video: entry.redEyes.video, redEyes: undefined };
 }
 
-export function portraitHdAssetUrlsForRecords(records: Iterable<PortraitRecord>): readonly string[] {
+/** 這條記錄一般循環（或紅眼版）的高清檔案；沒有高清版時為空。 */
+export function portraitHdAssetUrls(record: PortraitRecord, redEyes = false): readonly string[] {
+  const entry = PORTRAIT_HD_ENTRIES[record];
+  const shown = entry && portraitHdVariant(entry, redEyes);
+  if (!shown) return [];
+  return shown.video ? [shown.poster, shown.video.source] : [shown.poster];
+}
+
+/** 一組記錄的高清檔案；`redEyeRecords` 另外帶上這些記錄的紅眼版。 */
+export function portraitHdAssetUrlsForRecords(
+  records: Iterable<PortraitRecord>,
+  redEyeRecords: Iterable<PortraitRecord> = [],
+): readonly string[] {
   const urls = new Set<string>();
   for (const record of records) {
     for (const url of portraitHdAssetUrls(record)) urls.add(url);
+  }
+  for (const record of redEyeRecords) {
+    for (const url of portraitHdAssetUrls(record, true)) urls.add(url);
   }
   return [...urls].sort();
 }

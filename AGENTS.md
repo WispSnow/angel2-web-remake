@@ -244,6 +244,7 @@ pnpm exec playwright install ffmpeg
   依证据沿用 `D/56` 布局。可选高清肖像（`REMAKE-192`）的 `portrait-hd.generated.ts` 由
   `scripts/generate-portrait-hd.mjs` 从素材包 `portraits/hd/hd-manifest.json` 生成（`pnpm content:portraits-hd`，
   从 git 忽略的工作台导入用 `-- --import tmp/portrait-hd/export`）；原版主图一变它就拒绝生成，要先复审对应的高清记录。
+  被操控红眼版（`REMAKE-195`）只给原版有 `eye-red.png` 的记录，由工作台 `tools/red_eyes.py` 从一般循环派生。
 - `src/game/content/character-catalog.generated.ts` 由 `scripts/generate-character-catalog.mjs`
   生成，来源是原版角色描述子表、关卡模板、胜负条件表、逐关事件处理器与对白语料；修改证据后
   运行 `pnpm content:characters`。角色出场关卡必须同时合并静态模板、名单候选、事件生成与对白

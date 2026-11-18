@@ -321,3 +321,55 @@ test("REMAKE-194: in 原版 the full-screen combat panels keep the still face th
     await expect(page.getByTestId(`full-${side}-portrait`)).toHaveAttribute("data-blink-count", "0");
   }
 });
+
+/**
+ * `REMAKE-195` red-eye variants. Module 29 draws D/41 frame 7 in place of every
+ * blink while stage 30 is undecided (S30-L); in HD the possessed face plays a
+ * red-eye loop with the same layout and mouth strip and no blink.
+ */
+test("REMAKE-195: in HD the possessed 維絲塔 plays her red-eye loop, and only stage 30's red-eye files are fetched", async ({ page }) => {
+  const requests = hdRequests(page);
+  await usePreferences(page, { hd: true });
+  await page.goto("/?debugScenario=stage-30-player&difficulty=0&test=1");
+  const composite = page.getByTestId("unit-portrait-composite");
+  await expect(composite).toHaveAttribute("data-portrait-record", "46");
+  await expect(composite).toHaveAttribute("data-portrait-style", "hd");
+  // The cursor opens on Nia at (28,25); 維絲塔's soldier form stands at (28,17).
+  for (let step = 0; step < 8; step += 1) await page.keyboard.press("ArrowUp");
+  await expect(composite).toHaveAttribute("data-portrait-record", "41");
+  await expect(composite).toHaveAttribute("data-red-eyes", "true");
+  await expect(composite).toHaveAttribute("data-portrait-style", "hd");
+  await expect(composite).toHaveAttribute("data-portrait-hd-variant", "red-eyes");
+  await expect(composite.locator("video")).toHaveAttribute("data-source-url", "/assets/original/portraits/hd/0041/red-eyes.mp4");
+  await expect(composite.locator(".portrait-base")).toHaveAttribute("data-source-url", "/assets/original/portraits/hd/0041/red-eyes-poster.webp");
+  await expect(composite).toHaveAttribute("data-portrait-hd-video", "playing");
+  const time = Number(await composite.getAttribute("data-portrait-hd-video-time"));
+  await expect.poll(async () => Number(await composite.getAttribute("data-portrait-hd-video-time"))).not.toBe(time);
+  expect(requests).toContain("/assets/original/portraits/hd/0041/red-eyes.mp4");
+  expect(requests.filter((url) => url.includes("red-eyes") && !url.includes("/0041/"))).toEqual([]);
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage30-hd-red-eyes-unit-detail.png" });
+});
+
+test("REMAKE-195: the portrait lab's 紅眼 switch shows frame 7 in 原版 and the red-eye loop in 高清", async ({ page }) => {
+  await usePreferences(page, { hd: true });
+  await page.goto("/portrait-lab.html");
+  const gotis = page.getByTestId("portrait-record-0").locator(".animated-portrait");
+  const nia = page.getByTestId("portrait-record-46").locator(".animated-portrait");
+  await expect(gotis).toHaveAttribute("data-portrait-style", "hd");
+  await page.getByTestId("portrait-lab-red-eyes-on").click();
+  await expect(gotis).toHaveAttribute("data-portrait-hd-variant", "red-eyes");
+  await expect(gotis.locator("video")).toHaveAttribute("data-source-url", "/assets/original/portraits/hd/0000/red-eyes.mp4");
+  // Records without frame 7 are left as they are.
+  await expect(nia).toHaveAttribute("data-red-eyes", "false");
+  await expect(nia).not.toHaveAttribute("data-portrait-hd-variant", /./u);
+  await captureVisualAudit(page.getByTestId("portrait-record-0"), { path: "artifacts/playwright/portrait-lab-hd-red-eyes-d0.png" });
+  await page.getByTestId("portrait-lab-style-original").click();
+  await expect(gotis).toHaveAttribute("data-portrait-style", "original");
+  await expect(gotis).toHaveAttribute("data-red-eyes", "true");
+  await expect(gotis.locator(".portrait-red-eyes")).toHaveCSS("opacity", "1");
+  await page.getByTestId("portrait-lab-style-hd").click();
+  await page.getByTestId("portrait-lab-red-eyes-off").click();
+  await expect(gotis).toHaveAttribute("data-portrait-style", "hd");
+  await expect(gotis).not.toHaveAttribute("data-portrait-hd-variant", /./u);
+  await expect(gotis.locator("video")).toHaveAttribute("data-source-url", "/assets/original/portraits/hd/0000/portrait.mp4");
+});
