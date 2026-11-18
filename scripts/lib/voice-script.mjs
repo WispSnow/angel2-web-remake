@@ -4,7 +4,7 @@
 // punctuation; only the spoken copy is normalised.
 
 import OpenCC from "opencc-js";
-import { castRoleForPortrait, GHOST_MONTAGE, VOICE_CAST, voiceTempoForRole } from "./voice-cast.mjs";
+import { castRoleForPortrait, GHOST_MONTAGE, VOICE_CAST, voiceTempoForClip, voiceTempoForRole } from "./voice-cast.mjs";
 import { clipKey, displayTextHash } from "./voice-pages.mjs";
 
 const toSimplified = OpenCC.Converter({ from: "tw", to: "cn" });
@@ -26,11 +26,17 @@ export const VOICE_TYPO_READINGS = Object.freeze([
 ]);
 
 /**
- * Pronunciation substitutions on the simplified spoken text. Empty while the
- * whisper spot-check finds no name misread; add `[written, spoken]` pairs here
- * rather than editing individual clips.
+ * Pronunciation substitutions on the simplified spoken text; add `[written,
+ * spoken]` pairs here rather than editing individual clips. Applies to story,
+ * battle lines and narration alike.
+ *
+ * - 主将 (REMAKE-190, user 2026-11-17): in「请主将授我新的职业」the synthesiser
+ *   took 将 as the auxiliary jiāng ("will") and split it off 主. The homophone
+ *   匠 has only the jiàng reading, so 主 + 匠 comes out as the noun zhǔjiàng.
  */
-export const VOICE_LEXICON = Object.freeze([]);
+export const VOICE_LEXICON = Object.freeze([
+  ["主将", "主匠"],
+]);
 
 /** Why a SAY page with no clip has none; every page lacking a clip must name one. */
 export const UNVOICED_REASONS = Object.freeze({
@@ -102,7 +108,7 @@ export function buildVoiceScript(pages) {
       displayTextHash: displayTextHash(displayed),
       spoken: isGhostMontage ? spokenText(displayed).replace(/～/gu, "") : spokenText(displayed),
       startGlyph: 0,
-      tempo: voiceTempoForRole(role),
+      tempo: isGhostMontage ? voiceTempoForRole(role) : voiceTempoForClip(role, page.record),
       ...(voice ? { platform: voice.platform, voiceId: voice.voiceId, voiceName: voice.voiceName } : {}),
     });
   }

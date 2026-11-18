@@ -31,6 +31,7 @@ import {
   PORTRAIT_ROLES,
   VOICE_CAST,
   VOICE_TEMPO_BY_PLATFORM,
+  VOICE_TEMPO_OVERRIDES,
   voiceTempoForRole,
 } from "./lib/voice-cast.mjs";
 import {
@@ -178,6 +179,7 @@ async function importWorkbench(workbench, script) {
     },
     tempo: {
       byPlatform: VOICE_TEMPO_BY_PLATFORM,
+      sceneOverrides: VOICE_TEMPO_OVERRIDES,
       ghostMontage: voiceTempoForRole(GHOST_MONTAGE.role),
       method: "ffmpeg atempo（保持音高），裁切之後、響度標準化之前；eleven_v4 不理會 voice_settings.speed",
     },

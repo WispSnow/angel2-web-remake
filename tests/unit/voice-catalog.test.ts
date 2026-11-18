@@ -9,6 +9,7 @@ import {
   MINIMAX_MODEL,
   VOICE_CAST,
   VOICE_TEMPO_BY_PLATFORM,
+  voiceTempoForClip,
   voiceTempoForRole,
 } from "../../scripts/lib/voice-cast.mjs";
 import { STORY_PAGES_BY_ID } from "../../src/game/content/dialogue";
@@ -198,18 +199,27 @@ describe("REMAKE-188 voice catalog", () => {
       .toEqual(new Set(["narrator"]));
   });
 
-  test("speeds every voice up 1.15× and leaves only the ghost montage as made", () => {
+  test("speeds every voice up 1.15×, the stage-0 report to 1.25×, and leaves only the ghost montage as made", () => {
     const tempoByRole = new Map<string, Set<number>>();
     for (const clip of manifest.clips) {
-      expect(clip.tempo, clip.key).toBe(voiceTempoForRole(clip.role));
+      const expected = clip.role === "ghostMontage" ? voiceTempoForRole(clip.role) : voiceTempoForClip(clip.role, clip.record);
+      expect(clip.tempo, clip.key).toBe(expected);
       tempoByRole.set(clip.role, (tempoByRole.get(clip.role) ?? new Set()).add(clip.tempo));
     }
     expect(VOICE_TEMPO_BY_PLATFORM).toEqual({ minimax: 1.15, elevenlabs: 1.15 });
     expect(tempoByRole.get("narrator")).toEqual(new Set([1.15]));
     expect(tempoByRole.get("ghostMontage")).toEqual(new Set([1]));
-    expect(tempoByRole.get("nia")).toEqual(new Set([1.15]));
-    expect(manifest.clips.filter(({ tempo }) => tempo === 1.15)).toHaveLength(780);
+    // REMAKE-190: 妮雅 and the wounded soldier in SAY/0 only.
+    expect(manifest.clips.filter(({ tempo }) => tempo === 1.25).map(({ key }) => key))
+      .toEqual(["0:3", "0:4", "0:5", "0:6", "0:7", "0:8", "0:9", "0:10"]);
+    expect(manifest.clips.filter(({ tempo }) => tempo === 1.15)).toHaveLength(772);
     expect(new Set([...manifest.lines, ...manifest.narration].map(({ tempo }) => tempo))).toEqual(new Set([1.15]));
+  });
+
+  test("reads 主將 as the noun zhǔjiàng (REMAKE-190)", () => {
+    const request = manifest.lines.filter(({ surfaces }) => surfaces.includes("promotion:teammateRequest"));
+    expect(request).toHaveLength(39);
+    for (const line of request) expect((line as VoiceManifestLine & { spoken: string }).spoken).toContain("请主匠授我");
   });
 
   test("splices SAY/0164 KY 20–23 word by word and starts KY 20 on the first speaker", () => {

@@ -183,6 +183,22 @@ export function voiceTempoForRole(role) {
   return VOICE_TEMPO_BY_PLATFORM[cast.platform];
 }
 
+/**
+ * Scene pace overrides for story clips (user 2026-11-17, REMAKE-190). The stage-0
+ * prebattle story (SAY/0) is the wounded soldier's report that the palace has
+ * been stormed; at 1.15× 妮雅 and the soldier still dragged, so their pages there
+ * play at 1.25×. The narrator in the same record keeps the common pace.
+ */
+export const VOICE_TEMPO_OVERRIDES = Object.freeze([
+  Object.freeze({ record: 0, roles: Object.freeze(["nia", "allySoldier"]), tempo: 1.25 }),
+]);
+
+/** Pace of one story clip: a scene override for its SAY record, else its role's pace. */
+export function voiceTempoForClip(role, record) {
+  const override = VOICE_TEMPO_OVERRIDES.find((entry) => entry.record === record && entry.roles.includes(role));
+  return override?.tempo ?? voiceTempoForRole(role);
+}
+
 export function castRoleForPortrait(portrait) {
   if (portrait === undefined) return "narrator";
   const role = PORTRAIT_ROLES[portrait];
