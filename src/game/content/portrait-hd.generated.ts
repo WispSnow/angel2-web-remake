@@ -22,7 +22,7 @@ export const PORTRAIT_HD_ENTRIES: Readonly<Partial<Record<PortraitRecord, Portra
     mode: "tween",
     poster: "/assets/original/portraits/hd/0002/poster.webp",
     video: { source: "/assets/original/portraits/hd/0002/portrait.mp4", width: 560, height: 448, frames: 123, fps: 24 },
-    mouth: { patch: {"x":146,"y":152,"w":104,"h":104}, levels: [{"sx":448,"sy":0},{"sx":448,"sy":104},{"sx":448,"sy":208},{"sx":448,"sy":312}], knots: [0,0.2,0.49,0.81,1] },
+    mouth: { patch: {"x":146,"y":154,"w":100,"h":96}, levels: [{"sx":448,"sy":0},{"sx":448,"sy":96},{"sx":448,"sy":192},{"sx":448,"sy":288}], knots: [0,0.2,0.5,0.69,1] },
     redEyes: { poster: "/assets/original/portraits/hd/0002/red-eyes-poster.webp", video: { source: "/assets/original/portraits/hd/0002/red-eyes.mp4", width: 560, height: 448, frames: 123, fps: 24 } },
   },
   3: {
@@ -393,7 +393,7 @@ export const PORTRAIT_HD_ENTRIES: Readonly<Partial<Record<PortraitRecord, Portra
     mode: "tween",
     poster: "/assets/original/portraits/hd/0065/poster.webp",
     video: { source: "/assets/original/portraits/hd/0065/portrait.mp4", width: 544, height: 448, frames: 123, fps: 24 },
-    mouth: { patch: {"x":138,"y":154,"w":94,"h":88}, levels: [{"sx":448,"sy":0},{"sx":448,"sy":88},{"sx":448,"sy":176},{"sx":448,"sy":264}], knots: [0,0.19,0.53,0.74,1] },
+    mouth: { patch: {"x":138,"y":158,"w":94,"h":90}, levels: [{"sx":448,"sy":0},{"sx":448,"sy":90},{"sx":448,"sy":180},{"sx":448,"sy":270}], knots: [0,0.17,0.45,0.71,1] },
   },
   66: {
     mode: "continuous",
