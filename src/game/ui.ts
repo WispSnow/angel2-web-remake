@@ -122,7 +122,7 @@ import {
   startPortraitAnimations,
   stopPortraitSpeech,
 } from "./portrait";
-import { onPortraitPresentationChange, portraitStillSourceFor, takePortraitHdFailureNotice } from "./portrait-style";
+import { onPortraitPresentationChange, takePortraitHdFailureNotice } from "./portrait-style";
 import { PORTRAIT_HD_AVAILABLE } from "./content/portrait-hd";
 import {
   configureGameScaling,
@@ -2073,7 +2073,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       activeFeedbackPortrait = undefined;
       activeFeedbackPortraitReady = true;
     }
-    renderCombat(combatPresentation, controller);
+    renderCombat(combatPresentation, controller, (portrait) => battlePortraitShowsRedEyes(controller, portrait));
   };
   recordBackupUi = mountRecordSaveBackupUi(root, {
     storage: localStorage,
@@ -2205,6 +2205,7 @@ function buildFullCombatSkeleton(
   presentation: CombatPresentation,
   source: CombatPresentationRenderSource,
   backgroundRecord: number,
+  portraitRedEyes: (portrait: PortraitRecord) => boolean,
 ): void {
   const { attacker, defender } = presentation;
   const backgroundAsset = fullCombatBackgroundAsset(backgroundRecord);
@@ -2214,11 +2215,19 @@ function buildFullCombatSkeleton(
   const statusPanel = (side: "left" | "right", unit: typeof attacker) => {
     const stats = source.unitStats(unit);
     const life = unit.id === attacker.id ? presentation.displayedAttackerLife : presentation.displayedDefenderLife;
-    // `REMAKE-192`：全景狀態框不放視訊，高清模式下用循環第 0 幀的封面。
-    const portrait = portraitStillSourceFor(unit.portrait);
+    // `REMAKE-194`：原版的狀態框只在入場時畫一次，原版風格維持靜止主圖；高清風格播待機循環
+    // （閉嘴，不說話）。要畫紅眼的角色照 `REMAKE-192` 整條退回原版。
+    const portrait = animatedPortraitMarkup(unit.portrait, {
+      alt: `${unit.name}肖像`,
+      channel: `full-combat-${side}`,
+      className: "full-status-portrait",
+      wrapperTestId: `full-${side}-portrait`,
+      redEyes: portraitRedEyes(unit.portrait),
+      originalStill: true,
+    });
     return `
       <div class="full-status ${side}" data-testid="full-${side}-status" hidden>
-        <img ${portrait.hd ? 'class="portrait-hd-still" ' : ""}src="${stagedRenderAssetSource(portrait.source)}" alt="${unit.name}肖像" />
+        ${portrait}
         <dl>
           <div><dt data-native-text>經驗</dt><dd data-native-text>${unit.experience}</dd></div>
           <div><dt data-native-text>生命</dt><dd data-native-text>${life}</dd></div>
@@ -2289,6 +2298,8 @@ const FULL_COMBAT_PALETTE: Readonly<Record<number, string>> = {
 export function renderCombat(
   layer: HTMLElement,
   source: CombatPresentationRenderSource,
+  /** 模組 29 此刻是否要把這張臉畫成紅眼；實驗室沒有關卡，一律否。 */
+  portraitRedEyes: (portrait: PortraitRecord) => boolean = () => false,
 ): void {
   const presentation = source.combatPresentation;
   layer.hidden = !presentation;
@@ -2314,7 +2325,7 @@ export function renderCombat(
   if (layer.dataset.fullBattleKey !== battleKey) {
     layer.className = "combat-presentation full-combat";
     layer.removeAttribute("style");
-    buildFullCombatSkeleton(layer, presentation, source, scene.backgroundRecord);
+    buildFullCombatSkeleton(layer, presentation, source, scene.backgroundRecord, portraitRedEyes);
     layer.dataset.fullBattleKey = battleKey;
   }
   layer.dataset.fullCombatPhase = presentation.phase;

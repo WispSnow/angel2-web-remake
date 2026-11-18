@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { enterAttackTargeting } from "./command-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 /**
@@ -220,4 +221,103 @@ test("REMAKE-192: on a voiced page the original mouth keeps its 80 ms flap until
   const settled = Number(await activePortrait(page).getAttribute("data-talk-count"));
   await page.waitForTimeout(400);
   expect(Number(await activePortrait(page).getAttribute("data-talk-count"))).toBe(settled);
+});
+
+/**
+ * `REMAKE-194` full-screen combat panels. Stage 0's test hook puts 妮雅 between
+ * two soldiers; `slowFull` plays the presentation at native speed so the
+ * panels stay up long enough to watch.
+ */
+const openFullCombat = async (page: Page) => {
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1&slowFull=1");
+  await expect(page.getByTestId("unit-portrait-composite")).toBeVisible();
+  const state = () => page.evaluate(() => window.__ANGEL2__?.getState() as unknown as {
+    battlePresentation: "map" | "full";
+    cameraOrigin: { x: number; y: number };
+    targets: Array<{ x: number; y: number }>;
+  });
+  if ((await state()).battlePresentation !== "full") {
+    await page.keyboard.press("Escape");
+    await page.getByTestId("system-command-settings").click();
+    await page.getByTestId("presentation-button").click();
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("system-menu")).toBeHidden();
+  }
+  expect((await state()).battlePresentation).toBe("full");
+  await page.evaluate(() => window.__ANGEL2__?.forceMultipleTargets());
+  await page.keyboard.press(" ");
+  await enterAttackTargeting(page);
+  const { cameraOrigin, targets: [target] } = await state();
+  await page.getByTestId("battle-canvas").click({
+    position: { x: 40 + (target.x - cameraOrigin.x) * 40 + 20, y: 23 + (target.y - cameraOrigin.y) * 44 + 22 },
+  });
+  await expect(page.getByTestId("full-left-status")).toBeVisible();
+  await expect(page.getByTestId("full-right-status")).toBeVisible();
+};
+
+/**
+ * The 92x104 framed box crops a square face exactly like the old `<img>`: every
+ * face layer (base or poster, and the HD canvas) fills the 88x100 inner box with
+ * `object-fit: cover`, so the face is 100x100 with 6 px cut off each side.
+ */
+const expectCoverCrop = async (portrait: Locator) => {
+  const geometry = await portrait.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const scale = box.width / (element as HTMLElement).offsetWidth;
+    const layers = [...element.querySelectorAll<HTMLElement>(".portrait-base, canvas.portrait-hd-canvas")].map((layer) => {
+      const rect = layer.getBoundingClientRect();
+      return [
+        Math.round((rect.left - box.left) / scale),
+        Math.round((rect.top - box.top) / scale),
+        Math.round(rect.width / scale),
+        Math.round(rect.height / scale),
+        getComputedStyle(layer).objectFit,
+      ].join(" ");
+    });
+    return { width: Math.round(box.width / scale), height: Math.round(box.height / scale), layers: [...new Set(layers)] };
+  });
+  expect(geometry).toEqual({ width: 92, height: 104, layers: ["2 2 88 100 cover"] });
+};
+
+test("REMAKE-194: in HD the full-screen combat panels play the idle loop with the mouth shut", async ({ page }) => {
+  await usePreferences(page, { hd: true });
+  await openFullCombat(page);
+  for (const side of ["left", "right"] as const) {
+    const portrait = page.getByTestId(`full-${side}-portrait`);
+    await expect(portrait).toHaveAttribute("data-portrait-style", "hd");
+    await expect(portrait).toHaveAttribute("data-portrait-hd-video", "playing");
+    await expect(portrait.locator("canvas.portrait-hd-canvas")).toHaveAttribute("data-drawn", "true");
+    const time = Number(await portrait.getAttribute("data-portrait-hd-video-time"));
+    await expect.poll(async () => Number(await portrait.getAttribute("data-portrait-hd-video-time"))).not.toBe(time);
+    await expect(portrait).toHaveAttribute("data-mouth-openness", "0.000");
+    await expectCoverCrop(portrait);
+    // The global `canvas { … !important }` used to win and shrink the 448² frame nearest-neighbour.
+    expect(await portrait.locator("canvas").evaluate((canvas) => getComputedStyle(canvas).imageRendering)).toBe("auto");
+    // The player halves the 448² composite down to the square's on-screen device pixels itself.
+    const backing = await portrait.locator("canvas").evaluate((canvas: HTMLCanvasElement) => {
+      const rect = canvas.getBoundingClientRect();
+      return { width: canvas.width, height: canvas.height, displayed: Math.round(Math.max(rect.width, rect.height) * devicePixelRatio) };
+    });
+    expect(backing.width).toBe(Math.min(448, backing.displayed));
+    expect(backing.height).toBe(backing.width);
+  }
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/full-combat-hd-idle-loop.png" });
+});
+
+test("REMAKE-194: in 原版 the full-screen combat panels keep the still face the original draws once", async ({ page }) => {
+  await usePreferences(page, {});
+  await openFullCombat(page);
+  for (const side of ["left", "right"] as const) {
+    const portrait = page.getByTestId(`full-${side}-portrait`);
+    await expect(portrait).toHaveAttribute("data-portrait-style", "original");
+    await expect(portrait).toHaveAttribute("data-original-still", "true");
+    await expect(portrait.locator("img")).toHaveCount(1);
+    await expect(portrait.locator("canvas, video")).toHaveCount(0);
+    await expectCoverCrop(portrait);
+  }
+  await page.waitForTimeout(800);
+  for (const side of ["left", "right"] as const) {
+    await expect(page.getByTestId(`full-${side}-portrait`)).toHaveAttribute("data-blink-count", "0");
+  }
 });

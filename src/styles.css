@@ -684,12 +684,13 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
    `display:none` 的視訊不保證會播放。封面墊在畫布下面，視訊就緒前與不能播放時顯示它。 */
 .animated-portrait[data-portrait-style="hd"],
 .animated-portrait[data-portrait-style="hd"] > img,
-.animated-portrait > canvas.portrait-hd-canvas,
-.full-status > img.portrait-hd-still,
 .deployment-detail-portrait.portrait-hd-still,
 .stage49-screen img.portrait-hd-still { image-rendering: auto; }
+/* 全域的 `canvas { … !important }`（為了蓋過 Phaser 的行內宣告）也蓋得到這塊畫布，這裡同樣要
+   `!important`，否則畫布照最近鄰縮小，線稿斷成點線（`REMAKE-194` 補正）。 */
 .animated-portrait > canvas.portrait-hd-canvas {
   position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none;
+  image-rendering: auto !important;
 }
 .animated-portrait > video.portrait-hd-video {
   position: absolute; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none;
@@ -1858,17 +1859,19 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 .full-status.left { left: 2px; }
 .full-status.right { right: 2px; }
-.full-status > img {
+.full-status > .full-status-portrait {
   position: absolute;
   top: 7px;
   width: 92px;
   height: 104px;
   border: 2px ridge #e7b827;
-  object-fit: cover;
-  image-rendering: var(--image-rendering, pixelated);
 }
-.full-status.left > img { left: 6px; }
-.full-status.right > img { right: 6px; }
+.full-status.left > .full-status-portrait { left: 6px; }
+.full-status.right > .full-status-portrait { right: 6px; }
+/* 方形肖像在 88×100 的內框裡裁成 100×100、左右各裁 6 px，與改版前的 `<img>` 同一個裁切；
+   `REMAKE-194` 高清待機循環的畫布與封面也照這樣裁。 */
+.full-status-portrait > .portrait-base,
+.full-status-portrait > canvas.portrait-hd-canvas { object-fit: cover; }
 .full-status dl { position: absolute; top: 6px; width: 68px; margin: 0; }
 .full-status.left dl { right: 4px; }
 .full-status.right dl { left: 4px; }

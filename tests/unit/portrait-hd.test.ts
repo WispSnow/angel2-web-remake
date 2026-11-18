@@ -2,9 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { PORTRAIT_RECORDS, portraitSourceFor } from "../../src/game/content/portrait-catalog.generated";
+import { PORTRAIT_RECORDS, portraitSourceFor, type PortraitRecord } from "../../src/game/content/portrait-catalog.generated";
 import { PORTRAIT_HD_AVAILABLE, portraitHdAssetUrls, portraitHdEntry } from "../../src/game/content/portrait-hd";
 import { PORTRAIT_HD_ENTRIES, PORTRAIT_HD_SIZE } from "../../src/game/content/portrait-hd.generated";
+import { animatedPortraitMarkup } from "../../src/game/portrait";
 import {
   activePortraitHd,
   markPortraitHdFailed,
@@ -108,6 +109,31 @@ describe("REMAKE-192 portrait style resolution", () => {
     expect(takePortraitHdFailureNotice()).toBe(true);
     expect(takePortraitHdFailureNotice()).toBe(false);
     warn.mockRestore();
+    setPortraitStyle("original");
+  });
+
+  it("REMAKE-194: the full-screen combat panel stays the original still, loops in HD, and keeps a possessed face original", () => {
+    const panel = (record: number, redEyes = false) => animatedPortraitMarkup(record as PortraitRecord, {
+      alt: "肖像",
+      channel: "full-combat-left",
+      className: "full-status-portrait",
+      redEyes,
+      originalStill: true,
+    });
+    const original = panel(46);
+    expect(original).toContain('data-original-still="true"');
+    expect(original).toContain('data-portrait-style="original"');
+    // Module 29 draws the status panel once on entry: base image only, no eye or mouth overlay.
+    expect(original).toContain(portraitSourceFor(46));
+    expect(original).not.toMatch(/portrait-eye|portrait-mouth|portrait-red-eyes/u);
+    setPortraitStyle("hd");
+    const hd = panel(46);
+    expect(hd).toContain('data-portrait-style="hd"');
+    expect(hd).toContain("canvas class=\"portrait-hd-canvas\"");
+    expect(hd).toContain("/assets/original/portraits/hd/0046/portrait.mp4");
+    const possessed = panel(2, true);
+    expect(possessed).toContain('data-portrait-style="original"');
+    expect(possessed).not.toMatch(/portrait-hd|portrait-red-eyes|portrait-eye/u);
     setPortraitStyle("original");
   });
 });

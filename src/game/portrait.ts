@@ -32,6 +32,11 @@ interface PortraitMarkupOptions {
   baseTestId?: string;
   /** Draw the record's frame-7 red eyes in place of every blink frame. */
   redEyes?: boolean;
+  /**
+   * `REMAKE-194` 原版只畫一次肖像的表面（全景戰鬥狀態框）：原版風格只有主圖，不眨眼也不動嘴；
+   * 高清風格照樣播待機循環。
+   */
+  originalStill?: boolean;
 }
 
 const HALF_FRAME_MS = 85;
@@ -131,13 +136,19 @@ function hdPortraitLayers(entry: PortraitHdEntry, alt: string, baseTestId?: stri
       src="${stagedRenderAssetSource(entry.video.source)}" data-source-url="${entry.video.source}" aria-hidden="true"></video>`;
 }
 
-function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: string, redEyes = false): string {
+function portraitLayers(
+  portrait: PortraitRecord,
+  alt: string,
+  baseTestId?: string,
+  redEyes = false,
+  originalStill = false,
+): string {
   const hd = activePortraitHd(portrait, { redEyes });
   if (hd) return hdPortraitLayers(hd, alt, baseTestId);
   const portraitSource = portraitSourceFor(portrait);
   const animation: PortraitAnimationAssets | null = PORTRAIT_CATALOG[portrait].animation;
   const base = `${PORTRAIT_UNDERLAY}<img class="portrait-base" ${baseTestId ? `data-testid="${baseTestId}"` : ""} src="${stagedRenderAssetSource(portraitSource)}" data-source-url="${portraitSource}" alt="${alt}" />`;
-  if (!animation) return base;
+  if (!animation || originalStill) return base;
   const eyeStyle = [
     `left:${percentage(animation.eyeOrigin.x)}`,
     `top:${percentage(animation.eyeOrigin.y)}`,
@@ -183,9 +194,10 @@ export function animatedPortraitMarkup(portrait: PortraitRecord, options: Portra
       data-talk-count="0"
       data-speaking="false"
       data-speech-driver="glyph"
-      data-red-eyes="${options.redEyes ? "true" : "false"}"
+      data-red-eyes="${options.redEyes ? "true" : "false"}"${options.originalStill ? `
+      data-original-still="true"` : ""}
       data-portrait-ready="false">
-      ${portraitLayers(portrait, options.alt, options.baseTestId, options.redEyes ?? false)}
+      ${portraitLayers(portrait, options.alt, options.baseTestId, options.redEyes ?? false, options.originalStill ?? false)}
     </span>`;
 }
 
@@ -221,7 +233,7 @@ export function configureAnimatedPortrait(
       element.dataset.speechDriver = "glyph";
       speechStates.delete(element);
     }
-    element.innerHTML = portraitLayers(portrait, alt, baseTestId, redEyes);
+    element.innerHTML = portraitLayers(portrait, alt, baseTestId, redEyes, element.dataset.originalStill === "true");
     return;
   }
   const base = element.querySelector<HTMLImageElement>(".portrait-base");
@@ -519,7 +531,7 @@ export function startPortraitAnimations(
         tickHd(element, portrait, paused, clockNow);
         continue;
       }
-      if (!PORTRAIT_CATALOG[portrait].animation) continue;
+      if (!PORTRAIT_CATALOG[portrait].animation || element.dataset.originalStill === "true") continue;
       tickOriginalVoice(element, paused, clockNow);
       let blinkState = blinkStates.get(channel);
       if (!blinkState || blinkState.portrait !== portrait) {
