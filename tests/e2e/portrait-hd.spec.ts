@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { captureVisualAudit } from "./visual-audit";
 
 /**
  * `REMAKE-192` optional HD portraits and voice-paced speech. The stage 0
@@ -69,11 +70,12 @@ const sampleActivePortrait = (page: Page, name: string, duration: number) =>
     return values;
   }, [name, duration] as const);
 
-test("REMAKE-192: 原版 is the default, the switch sits in the host chrome and no HD file is requested", async ({ page }) => {
+test("REMAKE-192: 原版 is the default and no HD file is requested", async ({ page }) => {
   const requests = hdRequests(page);
   await openPrebattleStory(page);
-  await expect(page.getByTestId("portrait-style-original")).toHaveAttribute("aria-checked", "true");
-  await expect(page.getByTestId("portrait-style-hd")).toHaveAttribute("aria-checked", "false");
+  // REMAKE-193: the switch is not in the page chrome below the game screen.
+  await expect(page.getByTestId("display-settings")).toBeVisible();
+  await expect(page.getByTestId("display-settings").getByText("肖像")).toHaveCount(0);
   await typingDone(page);
   await dialogue(page).click();
   await expect(dialogue(page)).toHaveAttribute("data-source-wait", "2");
@@ -85,42 +87,89 @@ test("REMAKE-192: 原版 is the default, the switch sits in the host chrome and 
   expect(requests).toEqual([]);
 });
 
-test("REMAKE-192: choosing 高清 mid-story downloads this stage's records, swaps the face in place and persists", async ({ page }) => {
+test("REMAKE-193: the entry panel offers 肖像風格 with the other remake options", async ({ page }) => {
   const requests = hdRequests(page);
-  await openPrebattleStory(page);
-  await typingDone(page);
-  await dialogue(page).click();
-  await expect(dialogue(page)).toHaveAttribute("data-source-wait", "2");
-  await typingDone(page);
-  await page.keyboard.press("Enter");
-  await expect(dialogue(page)).toHaveAttribute("data-source-wait", "3");
-  await expect(activePortrait(page)).toHaveAttribute("data-portrait-style", "original");
+  await page.goto("/?test=1");
+  await expect(page.getByTestId("startup-enter")).toBeEnabled({ timeout: 15_000 });
+  const row = page.getByTestId("startup-portrait-style-row");
+  const original = page.getByTestId("startup-portrait-style-original");
+  const hd = page.getByTestId("startup-portrait-style-hd");
+  await expect(original).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("startup-portrait-style-hint")).toContainText("AI");
+  await expect(page.getByTestId("startup-portrait-style-hint")).toContainText("遊戲功能");
+  // The wider box still fits the 640x350 screen with every hint on one line.
+  const [box, screen] = await Promise.all([
+    page.getByTestId("startup-activation").boundingBox(),
+    page.getByTestId("startup-screen").boundingBox(),
+  ]);
+  expect(box && screen && box.y >= screen.y && box.y + box.height <= screen.y + screen.height).toBe(true);
+  await captureVisualAudit(page.getByTestId("startup-screen"), { path: "artifacts/playwright/startup-portrait-style-row.png" });
 
-  await page.getByTestId("portrait-style-hd").click();
-  await expect(page.getByTestId("portrait-style-hd")).toHaveAttribute("aria-checked", "true");
-  await expect(activePortrait(page)).toHaveAttribute("data-portrait-style", "hd");
-  await expect(activePortrait(page)).toHaveAttribute("data-portrait-hd-mode", "tween");
-  await expect(activePortrait(page)).toHaveAttribute("data-portrait-ready", "true");
-  await expect(activePortrait(page)).toHaveAttribute("data-portrait-hd-video", "playing");
-  await expect(activePortrait(page).locator("canvas.portrait-hd-canvas")).toHaveAttribute("data-drawn", "true");
-  // The loop keeps running: the drawn video time moves on.
-  const time = Number(await activePortrait(page).getAttribute("data-portrait-hd-video-time"));
-  await expect.poll(async () => Number(await activePortrait(page).getAttribute("data-portrait-hd-video-time"))).not.toBe(time);
+  // With voice off, ↓↓ goes 音樂風格 → 劇情語音 → 肖像風格 (翻頁方式 is skipped); → picks 高清.
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await expect(row).toHaveAttribute("data-row-selected", "true");
+  await page.keyboard.press("ArrowRight");
+  await expect(hd).toHaveAttribute("aria-checked", "true");
+  const stored = () => page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "{}"), DISPLAY_KEY);
+  expect(await stored()).toMatchObject({ portraitStyle: "hd" });
+  await page.keyboard.press("ArrowLeft");
+  await expect(original).toHaveAttribute("aria-checked", "true");
+  await hd.click();
+  expect(await stored()).toMatchObject({ portraitStyle: "hd" });
+  // Choosing never enters the game, and the opening has no portraits to fetch.
+  await expect(page.getByTestId("startup-screen")).toHaveAttribute("data-startup-phase", "ready");
+  expect(requests).toEqual([]);
+});
+
+test("REMAKE-193: 遊戲功能 carries 肖像風格 below the native submenu; switching mid-battle swaps the faces and persists", async ({ page }) => {
+  const requests = hdRequests(page);
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  const hud = page.getByTestId("unit-portrait-composite");
+  await expect(hud).toHaveAttribute("data-portrait-style", "original");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("system-menu")).toBeVisible();
+  await page.getByTestId("system-command-settings").click();
+  const menu = page.getByTestId("settings-menu");
+  const strip = page.getByTestId("settings-portrait-style");
+  await expect(menu).toBeVisible();
+  await expect(strip).toBeVisible();
+  // The native panel keeps its five switches; the remake row sits below its shadow.
+  await expect(menu.locator("[data-settings-index]")).toHaveCount(5);
+  const [menuBox, stripBox] = await Promise.all([menu.boundingBox(), strip.boundingBox()]);
+  expect(menuBox && stripBox && stripBox.y >= menuBox.y + menuBox.height).toBe(true);
+  await expect(page.getByTestId("settings-portrait-style-original")).toHaveAttribute("aria-checked", "true");
+
+  // ↓ five times reaches it, → picks 高清, ↓ wraps back to 人物圖像.
+  for (let step = 0; step < 5; step += 1) await page.keyboard.press("ArrowDown");
+  await expect(strip).toHaveClass(/is-selected/);
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("settings-portrait-style-hd")).toHaveAttribute("aria-checked", "true");
+  await expect(hud).toHaveAttribute("data-portrait-style", "hd");
+  await expect(hud).toHaveAttribute("data-portrait-hd-video", "playing");
+  await expect(hud.locator("canvas.portrait-hd-canvas")).toHaveAttribute("data-drawn", "true");
+  const time = Number(await hud.getAttribute("data-portrait-hd-video-time"));
+  await expect.poll(async () => Number(await hud.getAttribute("data-portrait-hd-video-time"))).not.toBe(time);
   expect(requests).toContain("/assets/original/portraits/hd/0046/portrait.mp4");
-  expect(requests).toContain("/assets/original/portraits/hd/0046/poster.webp");
-  // Only this stage's faces were fetched, each once.
   expect(new Set(requests).size).toBe(requests.length);
-  expect(requests.every((url) => /\/portraits\/hd\/00(?:15|42|43|44|45|46|47|48)\//u.test(url))).toBe(true);
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/settings-portrait-style.png" });
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("portraits-button")).toHaveClass(/is-selected/);
+
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await expect(strip).toBeHidden();
 
   await page.reload();
-  await page.waitForFunction(() => window.__ANGEL2__?.getState().phase === "prebattleStory");
-  await expect(page.getByTestId("portrait-style-hd")).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-style", "hd");
   const stored = await page.evaluate((key) => localStorage.getItem(key), DISPLAY_KEY);
   expect(JSON.parse(stored ?? "{}")).toMatchObject({ portraitStyle: "hd" });
 
-  // Back to 原版: the same face returns to the pixel layers without a download.
-  await page.getByTestId("portrait-style-original").click();
-  await expect(page.locator(".dialogue-portrait[data-portrait-style=hd]")).toHaveCount(0);
+  // Back to 原版 with a click: the same face returns to the pixel layers.
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-settings").click();
+  await page.getByTestId("settings-portrait-style-original").click();
+  await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-style", "original");
 });
 
 test("REMAKE-192: an unvoiced HD page talks only while it types", async ({ page }) => {

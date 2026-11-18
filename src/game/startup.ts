@@ -51,6 +51,9 @@ import {
 import type { Difficulty, SaveData } from "./types";
 import type { PreparedStartupMusic } from "./startup-music";
 import { StartupNarration } from "./startup-narration";
+import { PORTRAIT_HD_AVAILABLE } from "./content/portrait-hd";
+import { portraitStyle as storedPortraitStyle, setPortraitStyle } from "./portrait-style";
+import type { PortraitStyle } from "./preferences";
 import type { VoiceUrlLoader } from "./voice";
 import {
   loadMusicPreferences,
@@ -204,7 +207,9 @@ export function mountStartup(
   /** `REMAKE-191`：「翻頁方式」即「音效開關」的「自動翻頁」，同一個偏好。 */
   let voiceAutoAdvance = loadVoicePreferences(localStorage).autoAdvance;
   /** 左右方向鍵切換的那一列；上下方向鍵在各列之間移動（語音關閉時跳過「翻頁方式」）。 */
-  let entryRow: "music" | "voice" | "voiceMode" = "music";
+  let entryRow: "music" | "voice" | "voiceMode" | "portrait" = "music";
+  /** `REMAKE-193`：與遊戲裡「遊戲功能」下方的「肖像風格」同一個設備偏好。 */
+  let portraitStyleChoice: PortraitStyle = storedPortraitStyle();
   const loadedImages = new Map<string, HTMLImageElement>();
 
   root.innerHTML = `
@@ -227,8 +232,8 @@ export function mountStartup(
                   data-testid="startup-music-style-orchestral">交響</button>
               </div>
               <p data-testid="startup-music-style-hint">${
-                isTauriDesktopRuntime() ? "交響為 AI 改編版。" : "交響為 AI 改編版，需額外下載。"
-              }<br>遊戲中可在「音樂開關」隨時切換。</p>
+                isTauriDesktopRuntime() ? "交響為 AI 改編版" : "交響為 AI 改編版，需額外下載"
+              }；遊戲中可在「音樂開關」隨時切換。</p>
               <div class="startup-music-style startup-voice" role="radiogroup" aria-labelledby="startup-voice-label"
                 data-testid="startup-voice-row">
                 <span id="startup-voice-label">劇情語音</span>
@@ -246,8 +251,19 @@ export function mountStartup(
                   data-testid="startup-voice-mode-manual">手動</button>
               </div>
               <p data-testid="startup-voice-hint">${
-                isTauriDesktopRuntime() ? "劇情語音為 AI 合成。" : "劇情語音為 AI 合成，需額外下載。"
-              }<br>遊戲中可在「音效開關」隨時調整。</p>
+                isTauriDesktopRuntime() ? "劇情語音為 AI 合成" : "劇情語音為 AI 合成，需額外下載"
+              }；遊戲中可在「音效開關」隨時調整。</p>
+              ${PORTRAIT_HD_AVAILABLE ? `<div class="startup-music-style startup-portrait-style" role="radiogroup"
+                aria-labelledby="startup-portrait-style-label" data-testid="startup-portrait-style-row">
+                <span id="startup-portrait-style-label">肖像風格</span>
+                <button type="button" role="radio" data-startup-action="portrait-style" data-portrait-style="original"
+                  data-testid="startup-portrait-style-original">原版</button>
+                <button type="button" role="radio" data-startup-action="portrait-style" data-portrait-style="hd"
+                  data-testid="startup-portrait-style-hd">高清</button>
+              </div>
+              <p data-testid="startup-portrait-style-hint">${
+                isTauriDesktopRuntime() ? "高清為 AI 重繪的動態肖像" : "高清為 AI 重繪的動態肖像，需額外下載"
+              }；遊戲中可在「遊戲功能」隨時切換。</p>` : ""}
               <span class="visually-hidden" aria-live="polite" data-testid="startup-music-style-status"></span>
               <!-- 就緒後這一行留空：標題與按鈕已經說明要做什麼，說明文字只是佔位。
                    它仍然承載準備中、解鎖中與失敗訊息，所以保留一行高度，避免方框
@@ -368,6 +384,8 @@ export function mountStartup(
   const voiceRow = required<HTMLElement>(root, "[data-testid=startup-voice-row]");
   const voiceModeButtons = root.querySelectorAll<HTMLButtonElement>("[data-startup-action=voice-mode]");
   const voiceModeRow = required<HTMLElement>(root, "[data-testid=startup-voice-mode-row]");
+  const portraitStyleButtons = root.querySelectorAll<HTMLButtonElement>("[data-startup-action=portrait-style]");
+  const portraitStyleRow = root.querySelector<HTMLElement>("[data-testid=startup-portrait-style-row]");
   const stopScaling = configureGameScaling(viewport, screen);
   /**
    * [OF] `REMAKE-114` withdrew the loop `REMAKE-112` had inferred: MUSIC/1 plays
@@ -408,9 +426,25 @@ export function mountStartup(
     }
     voiceModeRow.dataset.disabled = String(!voiceEnabled);
     if (!voiceEnabled && entryRow === "voiceMode") entryRow = "voice";
+    for (const button of portraitStyleButtons) {
+      button.setAttribute("aria-checked", String(button.dataset.portraitStyle === portraitStyleChoice));
+      button.disabled = activationPending && !awaitingRemix;
+    }
     musicStyleRow.dataset.rowSelected = String(entryRow === "music");
     voiceRow.dataset.rowSelected = String(entryRow === "voice");
     voiceModeRow.dataset.rowSelected = String(entryRow === "voiceMode");
+    if (portraitStyleRow) portraitStyleRow.dataset.rowSelected = String(entryRow === "portrait");
+  };
+  /**
+   * `REMAKE-193`：肖像風格只改偏好；高清檔案由第 0 關的預取與各關資源門按這個選擇下載，
+   * 開場本身沒有肖像，不必等它。
+   */
+  const choosePortraitStyle = (style: PortraitStyle) => {
+    if ((activationPending && !awaitingRemix) || style === portraitStyleChoice) return;
+    portraitStyleChoice = style;
+    setPortraitStyle(style);
+    updateMusicStyleControls();
+    musicStyleStatus.textContent = style === "hd" ? "肖像風格：高清" : "肖像風格：原版";
   };
   /**
    * `REMAKE-188`: the same device preference as the 音效開關 panel. Turning it on
@@ -880,12 +914,18 @@ export function mountStartup(
       event.preventDefault();
       const direction = keyboardDirection(event.key);
       if (direction?.y) {
-        const rows: (typeof entryRow)[] = voiceEnabled ? ["music", "voice", "voiceMode"] : ["music", "voice"];
+        const rows: (typeof entryRow)[] = [
+          "music",
+          "voice",
+          ...(voiceEnabled ? ["voiceMode" as const] : []),
+          ...(portraitStyleRow ? ["portrait" as const] : []),
+        ];
         const index = Math.max(0, rows.indexOf(entryRow));
         entryRow = rows[(index + (direction.y > 0 ? 1 : rows.length - 1)) % rows.length];
         updateMusicStyleControls();
       } else if (direction?.x && entryRow === "voice") chooseVoice(direction.x > 0);
       else if (direction?.x && entryRow === "voiceMode") chooseVoiceMode(direction.x < 0);
+      else if (direction?.x && entryRow === "portrait") choosePortraitStyle(direction.x < 0 ? "original" : "hd");
       else if (direction?.x) chooseMusicStyle(direction.x < 0 ? "original" : "orchestral");
       else activateStartup();
       return;
@@ -1004,6 +1044,13 @@ export function mountStartup(
     if (button.dataset.startupAction === "voice-mode") {
       entryRow = "voiceMode";
       chooseVoiceMode(button.dataset.voiceMode === "auto");
+      updateMusicStyleControls();
+      if (!activationButton.disabled) activationButton.focus({ preventScroll: true });
+      return;
+    }
+    if (button.dataset.startupAction === "portrait-style") {
+      entryRow = "portrait";
+      choosePortraitStyle(button.dataset.portraitStyle === "hd" ? "hd" : "original");
       updateMusicStyleControls();
       if (!activationButton.disabled) activationButton.focus({ preventScroll: true });
       return;

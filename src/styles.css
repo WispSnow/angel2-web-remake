@@ -95,11 +95,6 @@ html[data-desktop-runtime="true"] .display-settings {
   padding: 8px 12px;
   background: #0b080be8;
 }
-/* `REMAKE-192`：第二行從說明文字換成「肖像」按鈕組，高了 9 px；桌面版窄窗（960 寬）因此
-   少了一點高度、畫面不再剛好填滿。窄窗時收緊上下留白與行距，宿主列總高不變。 */
-@media (max-width: 1100px) {
-  html[data-desktop-runtime="true"] .display-settings { gap: 6px; padding-top: 6px; padding-bottom: 6px; }
-}
 html[data-desktop-runtime="true"] .stage49-help { display: none; }
 
 /* Phaser writes `image-rendering: pixelated` straight onto its canvas element
@@ -130,9 +125,10 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   inset: 0;
   display: grid;
   align-content: center;
-  gap: 8px;
+  gap: 7px;
   box-sizing: border-box;
-  width: 280px;
+  /* `REMAKE-193` 加了「肖像風格」之後放寬，每段說明縮成一行，方框仍在 350 高的畫面內。 */
+  width: 452px;
   /* `fit-content` keeps `inset: 0; margin: auto` centring while still letting a
      wrapped failure message grow the box instead of spilling past its border. */
   height: fit-content;
@@ -188,6 +184,9 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .startup-activation button:focus-visible { outline: 2px solid #f3dcad; outline-offset: 3px; }
 .startup-music-style {
   display: grid;
+  justify-self: center;
+  width: 100%;
+  max-width: 300px;
   grid-template-columns: auto 1fr 1fr;
   align-items: center;
   gap: 6px;
@@ -954,6 +953,34 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
    `ON` 與 `OFF` 才會共用同一條左緣，而不是各自依字寬左右浮動。 */
 .native-settings-label,
 .native-settings-state { display: flex; align-items: center; }
+/* `REMAKE-193`：子選單下方的復刻列「肖像風格」。子選單本身的 128×175 面板、五項與投影都照原版不動；
+   這一列落在投影之下（y 231 起），寬度與面板連同投影對齊，用「音樂開關」那套復刻面板的樣式與現代字體，
+   一眼看得出不是原版選項。 */
+.settings-portrait-style {
+  position: absolute;
+  z-index: 14;
+  left: 280px;
+  top: 236px;
+  width: 144px;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 6px;
+  border-width: 3px;
+}
+.settings-portrait-style[hidden] { display: none; }
+.settings-portrait-style-label { color: #f3d466; font-size: 10px; white-space: nowrap; }
+/* 權重高過後面通用的 `.modal-panel button`（最小寬 90 px），按鈕才會收在 144 px 的列裡。 */
+.settings-portrait-style.modal-panel > button { min-width: 0; padding: 3px 2px; font-size: 11px; line-height: 1.2; }
+.settings-portrait-style.modal-panel > button[aria-checked="true"] {
+  color: #fff;
+  background: #8d342f;
+  box-shadow: inset 0 0 0 1px #f4d34b;
+}
+/* 鍵盤或手把移到這一列時，與子選單各項的虛線焦點同色。 */
+.settings-portrait-style.is-selected { outline: 1px dotted #ffdf10; outline-offset: 1px; }
 .sound-settings-menu { position: absolute; z-index: 15; left: 288px; top: 42px; width: 208px; padding: 12px 16px 14px; }
 .sound-settings-menu h2 { margin: 3px 0 8px; color: #f3d466; font-size: 18px; }
 .sound-volume-control { margin-bottom: 8px; }
@@ -2527,11 +2554,6 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   box-shadow: 0 0 0 2px #7fd18b, 0 0 6px 1px rgba(127, 209, 139, .55);
 }
 .display-settings-hint { flex: 1 1 100%; margin: 0; color: #8d7c65; font-size: 11px; }
-/* `REMAKE-192`：第一行（畫面縮放、介面縮放與右端入口）照舊；「肖像」排在第二行、正對「畫面縮放」下方，
-   與說明文字同一行。第一行已經排滿 640 寬的 Web 畫面，放進去會把右端入口擠到下一行。 */
-.display-settings-secondary { display: flex; flex: 1 1 100%; align-items: center; gap: 8px; min-width: 0; }
-.display-settings-secondary > .display-settings-group + .display-settings-hint { margin-left: 8px; }
-.display-settings-secondary > .display-settings-hint { flex: 1 1 auto; min-width: 0; }
 
 @media (max-width: 560px) {
   .page-shell { width: 100%; padding: 12px 0 28px; }

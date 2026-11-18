@@ -38,7 +38,7 @@ import {
   TACTICAL_PANEL_CHROME_COMPOSITE,
   UNIT_DETAIL_CHROME_COMPOSITE,
 } from "./chrome-composite";
-import type { CombatPresentation, GameController, UnitCommandId } from "./controller";
+import { SETTINGS_PORTRAIT_STYLE_INDEX, type CombatPresentation, type GameController, type UnitCommandId } from "./controller";
 import {
   FULL_COMBAT_FRAME_META,
   type FullCombatSpriteState,
@@ -123,6 +123,7 @@ import {
   stopPortraitSpeech,
 } from "./portrait";
 import { onPortraitPresentationChange, portraitStillSourceFor, takePortraitHdFailureNotice } from "./portrait-style";
+import { PORTRAIT_HD_AVAILABLE } from "./content/portrait-hd";
 import {
   configureGameScaling,
   LOGICAL_SCREEN_HEIGHT,
@@ -213,6 +214,14 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               data-kind="system" role="menu" aria-label="戰鬥系統選單" hidden></section>
             <section class="settings-menu native-settings-menu" id="settings-menu" data-testid="settings-menu"
               role="menu" aria-label="子 選 單" hidden></section>
+            ${PORTRAIT_HD_AVAILABLE ? `<section class="settings-portrait-style modal-panel" id="settings-portrait-style"
+              data-testid="settings-portrait-style" role="radiogroup" aria-labelledby="settings-portrait-style-label" hidden>
+              <span class="settings-portrait-style-label" id="settings-portrait-style-label">肖像風格</span>
+              <button type="button" role="radio" data-action="portrait-style" data-portrait-style="original"
+                data-settings-index="${SETTINGS_PORTRAIT_STYLE_INDEX}" data-testid="settings-portrait-style-original">原版</button>
+              <button type="button" role="radio" data-action="portrait-style" data-portrait-style="hd"
+                data-settings-index="${SETTINGS_PORTRAIT_STYLE_INDEX}" data-testid="settings-portrait-style-hd">高清</button>
+            </section>` : ""}
             <section class="sound-settings-menu modal-panel" id="sound-settings-menu"
               data-testid="sound-settings-menu" role="dialog" aria-label="音效開關" hidden>
               <span class="panel-kicker">SOUND</span><h2>音效開關</h2>
@@ -472,6 +481,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const roundBox = required(root, "#bottom-round");
   const systemMenu = required(root, "#system-menu");
   const settingsMenu = required(root, "#settings-menu");
+  const settingsPortraitStyle = root.querySelector<HTMLElement>("#settings-portrait-style");
   const soundSettingsMenu = required(root, "#sound-settings-menu");
   const musicSettingsMenu = required(root, "#music-settings-menu");
   const sidePanelTooltip = required(root, "#side-panel-tooltip");
@@ -1133,6 +1143,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       controller.setSoundEffectVolume(Number(button.dataset.soundEffectLevel));
     }
     else if (action === "voice-volume") controller.setVoiceVolume(Number(button.dataset.voiceLevel));
+    else if (action === "portrait-style") controller.setPortraitStyle(button.dataset.portraitStyle === "hd" ? "hd" : "original");
     else if (action === "voice-auto-advance") {
       controller.setVoiceAutoAdvance(button.dataset.voiceAutoAdvance === "true");
     }
@@ -1667,6 +1678,16 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           }).join("")}
         </div>`;
       paintNativeDomTextIn(settingsMenu);
+    }
+    // `REMAKE-193`：子選單本身維持原版五項；「肖像風格」是貼在它下方的復刻列，隨它開闔。
+    if (settingsPortraitStyle && setMenuOpen(settingsPortraitStyle, controller.settingsOpen)) {
+      for (const button of settingsPortraitStyle.querySelectorAll<HTMLButtonElement>("[data-portrait-style]")) {
+        button.setAttribute("aria-checked", String(button.dataset.portraitStyle === controller.portraitStyle));
+      }
+      settingsPortraitStyle.classList.toggle(
+        "is-selected",
+        controller.settingsMenuIndex === SETTINGS_PORTRAIT_STYLE_INDEX,
+      );
     }
     setMenuOpen(soundSettingsMenu, controller.soundSettingsOpen);
     setMenuOpen(musicSettingsMenu, controller.musicSettingsOpen);

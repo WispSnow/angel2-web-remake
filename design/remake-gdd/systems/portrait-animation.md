@@ -77,7 +77,8 @@
 
 ## 5. 可选高清肖像与说话动画跟随语音（`REMAKE-192`）
 
-- `[DD]` 宿主栏「肖像　原版／高清」，默认原版，写 `angel2.preferences.display.v1` 的 `portraitStyle`；不进模拟、PRNG、规则身份或存档。
+- `[DD]` 「肖像風格　原版／高清」在「開場準備完成」方框与「遊戲功能」子选单下方的复刻列（`REMAKE-193`；子选单本身仍是原版五项），默认原版，
+  写 `angel2.preferences.display.v1` 的 `portraitStyle`；不进模拟、PRNG、规则身份或存档。
 - `[DD]` 高清目录 `src/game/content/portrait-hd.generated.ts` 由 `scripts/generate-portrait-hd.mjs`（`pnpm content:portraits-hd`）从素材包
   `portraits/hd/hd-manifest.json` 生成，同样只按 `portrait` 记录号索引；原版目录与上面第 3 节的产物不动。67 条记录：逐字切换口型的 60 条、
   只有待机的 `D/47、48、52、53`、整幅说话画面淡入的 `D/56、66`、静止图 `D/67`；`D/63` 没有高清版。

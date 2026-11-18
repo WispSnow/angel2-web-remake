@@ -118,6 +118,9 @@ import {
   type StageStoryPhase,
 } from "./content/dialogue";
 import { portraitAssetUrlsForRecords, stageDialoguePortraitRecords } from "./content/portrait-assets";
+import { PORTRAIT_HD_AVAILABLE } from "./content/portrait-hd";
+import { portraitStyle as storedPortraitStyle, setPortraitStyle as storePortraitStyle } from "./portrait-style";
+import type { PortraitStyle } from "./preferences";
 import {
   deferredAllyClassIds,
   stageSimulationEffectFor,
@@ -522,6 +525,12 @@ const MEMORY_ONLY_SYSTEM_COMMANDS: ReadonlyArray<{ id: SystemCommandId; label: s
 ];
 
 const GAME_FUNCTION_COUNT = 5;
+/**
+ * `REMAKE-193`：「遊戲功能」的子選單維持原版五項；高清素材包在時，貼在它下方的復刻列
+ * 「肖像風格」是第六個焦點位置，上下方向鍵依序經過它，左右或確認切換。
+ */
+export const SETTINGS_PORTRAIT_STYLE_INDEX = GAME_FUNCTION_COUNT;
+const SETTINGS_FOCUS_COUNT = GAME_FUNCTION_COUNT + (PORTRAIT_HD_AVAILABLE ? 1 : 0);
 
 export interface MovementPresentation {
   unitId: string;
@@ -4921,8 +4930,8 @@ export class GameController {
   moveSettingsMenuSelection(delta: number): void {
     if (!this.settingsOpen || delta === 0) return;
     this.settingsMenuIndex = (
-      this.settingsMenuIndex + delta + GAME_FUNCTION_COUNT
-    ) % GAME_FUNCTION_COUNT;
+      this.settingsMenuIndex + delta + SETTINGS_FOCUS_COUNT
+    ) % SETTINGS_FOCUS_COUNT;
     this.emit();
   }
 
@@ -4930,7 +4939,7 @@ export class GameController {
     if (
       !this.settingsOpen
       || index < 0
-      || index >= GAME_FUNCTION_COUNT
+      || index >= SETTINGS_FOCUS_COUNT
       || index === this.settingsMenuIndex
     ) return;
     this.settingsMenuIndex = index;
@@ -4943,7 +4952,23 @@ export class GameController {
     else if (this.settingsMenuIndex === 1) this.toggleBattlePresentation();
     else if (this.settingsMenuIndex === 2) this.toggleGrid();
     else if (this.settingsMenuIndex === 3) this.toggleEdgeScroll();
+    else if (this.settingsMenuIndex === SETTINGS_PORTRAIT_STYLE_INDEX) this.togglePortraitStyle();
     else this.toggleAiDialogue();
+  }
+
+  /** `REMAKE-192`／`REMAKE-193` 肖像風格：設備級宿主偏好，由 `portrait-style.ts` 保存並通知各表面。 */
+  get portraitStyle(): PortraitStyle {
+    return storedPortraitStyle();
+  }
+
+  setPortraitStyle(style: PortraitStyle): void {
+    if (!PORTRAIT_HD_AVAILABLE || style === storedPortraitStyle()) return;
+    storePortraitStyle(style);
+    this.emit();
+  }
+
+  togglePortraitStyle(): void {
+    this.setPortraitStyle(storedPortraitStyle() === "hd" ? "original" : "hd");
   }
 
   openSoundSettings(): void {
@@ -7118,6 +7143,9 @@ export class GameController {
     }
     if (this.settingsOpen) {
       if (delta.y !== 0) this.moveSettingsMenuSelection(delta.y);
+      else if (delta.x !== 0 && this.settingsMenuIndex === SETTINGS_PORTRAIT_STYLE_INDEX) {
+        this.setPortraitStyle(delta.x < 0 ? "original" : "hd");
+      }
       return;
     }
     if (this.systemMenuOpen) {
@@ -7941,6 +7969,7 @@ export class GameController {
       campaignPersistenceEnabled: this.campaignPersistenceEnabled,
       settingsOpen: this.settingsOpen,
       settingsMenuIndex: this.settingsMenuIndex,
+      portraitStyle: this.portraitStyle,
       soundSettingsOpen: this.soundSettingsOpen,
       soundSettingsReturn: this.soundSettingsReturn,
       musicSettingsOpen: this.musicSettingsOpen,

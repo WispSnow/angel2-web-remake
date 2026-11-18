@@ -1,13 +1,9 @@
-import { PORTRAIT_HD_AVAILABLE } from "./content/portrait-hd";
 import { mountHostChromeRadioGroup } from "./host-chrome-radio";
-import { isTauriDesktopRuntime } from "./desktop-runtime";
-import { onPortraitStyleChange, portraitStyle, setPortraitStyle } from "./portrait-style";
 import {
   DEFAULT_DISPLAY_PREFERENCES,
   loadDisplayPreferences,
   saveDisplayPreferences,
   type ImageScalingMode,
-  type PortraitStyle,
 } from "./preferences";
 
 /**
@@ -25,22 +21,6 @@ export const IMAGE_SCALING_OPTIONS: readonly {
   { mode: "sharp", label: "銳利", hint: "最近鄰取樣，忠於原版；非整數倍時像素大小不均。" },
   { mode: "smooth", label: "平滑", hint: "雙線性取樣，非整數倍時邊緣均勻，但畫面偏柔。" },
   { mode: "integer", label: "整數倍", hint: "鎖定整數倍裝置像素；桌面版會同步調整外部視窗，Web 版保留留邊。" },
-];
-
-/** `REMAKE-192`：與「畫面縮放」同屬宿主顯示偏好，放在同一行（計畫文件第 9.1 節）。 */
-export const PORTRAIT_STYLE_OPTIONS: readonly {
-  style: PortraitStyle;
-  label: string;
-  hint: string;
-}[] = [
-  { style: "original", label: "原版", hint: "原版點陣肖像，逐字切換口型。" },
-  {
-    style: "hd",
-    label: "高清",
-    hint: isTauriDesktopRuntime()
-      ? "AI 重繪的動態高清肖像，口型隨說話節奏與語音開合。"
-      : "AI 重繪的動態高清肖像，口型隨說話節奏與語音開合；需額外下載。",
-  },
 ];
 
 const listeners = new Set<(mode: ImageScalingMode) => void>();
@@ -116,10 +96,7 @@ export function mountImageScalingControls(viewport: HTMLElement): () => void {
     <div class="display-settings-group" data-image-scaling-slot></div>
     <div class="display-settings-interface"></div>
     <div class="display-settings-extras"></div>
-    <div class="display-settings-secondary">
-      <div class="display-settings-group" data-portrait-style-slot></div>
-      <p class="display-settings-hint" data-testid="image-scaling-hint"></p>
-    </div>`;
+    <p class="display-settings-hint" data-testid="image-scaling-hint"></p>`;
   host.insertBefore(panel, viewport.nextSibling);
 
   const hint = panel.querySelector<HTMLParagraphElement>(".display-settings-hint");
@@ -146,29 +123,8 @@ export function mountImageScalingControls(viewport: HTMLElement): () => void {
     },
   });
 
-  const portraitSlot = panel.querySelector<HTMLElement>("[data-portrait-style-slot]");
-  // 高清素材包整個下架時目錄為空，這一組不出現（計畫文件第 10 節「回退層級」第 4 項）。
-  const unmountPortraitGroup = portraitSlot && PORTRAIT_HD_AVAILABLE
-    ? mountHostChromeRadioGroup<PortraitStyle>({
-      container: portraitSlot,
-      labelId: "portrait-style-label",
-      labelText: "肖像",
-      datasetKey: "portraitStyle",
-      options: PORTRAIT_STYLE_OPTIONS.map(({ style, label, hint: title }) => ({
-        value: style,
-        label,
-        testid: `portrait-style-${style}`,
-        title,
-      })),
-      read: portraitStyle,
-      write: setPortraitStyle,
-      subscribe: onPortraitStyleChange,
-    })
-    : () => portraitSlot?.remove();
-
   return () => {
     unmountGroup();
-    unmountPortraitGroup();
     panel.remove();
   };
 }
