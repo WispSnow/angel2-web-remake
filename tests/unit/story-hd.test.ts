@@ -1,18 +1,21 @@
 import { describe, expect, test } from "vitest";
 import { STORY_HD_ENTRIES, STORY_HD_HEIGHT, STORY_HD_WIDTH } from "../../src/game/content/story-hd.generated";
 import {
+  STORY_HD_EPILOGUE,
   STORY_HD_INTRO,
   STORY_HD_TITLE,
   storyHdAssetUrls,
   storyHdEntryForSource,
+  storyHdEpilogueSpread,
   storyHdIntroAssetUrls,
   storyHdIntroWindow,
   storyHdTitleAssetUrls,
 } from "../../src/game/content/story-hd";
 import { STARTUP_INTRO, STARTUP_TITLE } from "../../src/game/content/startup.generated";
-import { VOICE_STARTUP_NARRATION } from "../../src/game/content/voice-catalog";
+import { STAGE49_ENDING_ASSETS, STAGE49_EPILOGUE_SEGMENTS } from "../../src/game/content/stage49-ending";
+import { VOICE_STARTUP_NARRATION, epilogueNarrationFor } from "../../src/game/content/voice-catalog";
 import { STAGE_RUNTIME_MANIFEST, loadStageRuntime, stageStoryBackgroundUrls } from "../../src/game/stage-runtime";
-import { storyHdUrlsForStyle } from "../../src/game/story-hd-style";
+import { epilogueHdUrlsForStyle, storyHdUrlsForStyle } from "../../src/game/story-hd-style";
 
 describe("REMAKE-196 HD story illustrations", () => {
   test("the HD frame is the 640x350 logical screen at 2.2x, within a pixel per side under object-fit: cover", () => {
@@ -184,5 +187,48 @@ describe("REMAKE-198 HD opening crawl", () => {
     // BK/44 comes in at the pause inside sentence 3: 經過了無數次戰爭的蹂躪後，|「拉那洛」和「瓦爾克麗」兩族，終於合併。
     expect(cueMs[2]).toBeGreaterThan(starts[2]);
     expect(cueMs[2]).toBeLessThan(starts[2] + VOICE_STARTUP_NARRATION[2].durationMs / 2);
+  });
+});
+
+describe("REMAKE-200 HD ending epilogue", () => {
+  const epilogue = STORY_HD_EPILOGUE;
+  const variants = STAGE49_EPILOGUE_SEGMENTS.flatMap((segment) => segment.variants.map((variant) => ({ segment, variant })));
+  const halves = ({ variant }: (typeof variants)[number]) =>
+    [STAGE49_ENDING_ASSETS.epilogue(variant.illustrationRecords[0]), STAGE49_ENDING_ASSETS.epilogue(variant.illustrationRecords[1])] as const;
+
+  test("has exactly one clip for every spread the epilogue segments can show", () => {
+    if (!epilogue) throw new Error("no HD epilogue");
+    expect(epilogue.spreads).toHaveLength(variants.length);
+    for (const entry of variants) {
+      const [left, right] = halves(entry);
+      const spread = storyHdEpilogueSpread(left, right);
+      expect(spread, `${entry.segment.id}:${entry.variant.selector}`).toBeDefined();
+      expect(spread?.video.source).toMatch(/^\/assets\/original\/story\/hd\/epilogue\/\d+\.mp4$/u);
+      expect([spread?.video.width, spread?.video.height]).toEqual([STORY_HD_WIDTH, STORY_HD_HEIGHT]);
+    }
+    const urls = epilogue.spreads.map(({ video }) => video.source);
+    expect(new Set(urls).size).toBe(urls.length);
+    // halves never pair the other way round
+    expect(storyHdEpilogueSpread(STAGE49_ENDING_ASSETS.epilogue(5), STAGE49_ENDING_ASSETS.epilogue(4))).toBeUndefined();
+  });
+
+  test("each clip lasts as long as its segment stays up: the native limit, or longer while the narration speaks", () => {
+    for (const entry of variants) {
+      const [left, right] = halves(entry);
+      const spread = storyHdEpilogueSpread(left, right);
+      if (!spread) throw new Error(`no HD spread for ${left}`);
+      const holdMs = Math.max(entry.segment.waitNativeTicks, entry.variant.typingNativeTicks) * 10;
+      const spokenMs = epilogueNarrationFor(entry.segment.id, entry.variant.selector)?.durationMs ?? 0;
+      expect(spread.video.frames / spread.video.fps * 1000, `${entry.segment.id}:${entry.variant.selector}`)
+        .toBeGreaterThanOrEqual(Math.max(holdMs, spokenMs));
+    }
+  });
+
+  test("the route gate fetches the chosen spreads only in 高清", () => {
+    const chosen = variants.filter(({ variant }) => variant.selector === 0).map(halves);
+    expect(epilogueHdUrlsForStyle(chosen, "original")).toEqual([]);
+    const urls = epilogueHdUrlsForStyle(chosen, "hd");
+    expect(urls).toHaveLength(chosen.length);
+    expect(urls).toEqual(chosen.map(([left, right]) => storyHdEpilogueSpread(left, right)?.video.source));
   });
 });

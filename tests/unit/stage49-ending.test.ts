@@ -104,6 +104,26 @@ describe("stage 49 main ending", () => {
     });
   });
 
+  it("lists all four epilogue segments up front exactly as they will play (REMAKE-200 route gate)", () => {
+    const counters = Array<number>(75).fill(0);
+    counters[0] = 101;
+    for (const session of [
+      new Stage49EndingSession(campaignWith(), 100),
+      new Stage49EndingSession(campaignWith(Array<UnitClassId>(23).fill("magician"), counters), 101),
+    ]) {
+      const upFront = session.epiloguePresentations.map(({ variant }) => variant.illustrationRecords);
+      expect(session.epiloguePresentation).toBeUndefined();
+      advanceToEpilogue(session);
+      const played: (readonly number[])[] = [];
+      while (session.section === "epilogue") {
+        played.push(session.epiloguePresentation?.variant.illustrationRecords ?? []);
+        session.advance();
+      }
+      expect(upFront).toEqual(played);
+      expect(played).toHaveLength(4);
+    }
+  });
+
   it("keeps the record-total branch music selected across all four epilogue segments", () => {
     // Native module 35 starts the closing track at entry (0000:0457/045A),
     // before the first segment, so it must not arrive only with segment 4.

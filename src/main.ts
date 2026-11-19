@@ -28,6 +28,7 @@ import { CREDITS_MUSIC_PROGRAM } from "./game/content/credits";
 import { loadMusicPreferences } from "./game/preferences";
 import type { PortraitRecord } from "./game/types";
 import {
+  STAGE49_ENDING_ASSETS,
   STAGE49_ENDING_MUSIC,
   STAGE49_ENDING_PORTRAIT_RECORDS,
   STAGE49_ENDING_SUPPLEMENTAL_ASSETS,
@@ -38,7 +39,7 @@ import {
   onPortraitStyleChange,
   portraitHdUrlsForStyle,
 } from "./game/portrait-style";
-import { storyHdUrlsForStyle } from "./game/story-hd-style";
+import { epilogueHdUrlsForStyle, storyHdUrlsForStyle } from "./game/story-hd-style";
 import { stageStoryBackgroundUrls } from "./game/stage-runtime";
 import {
   prepareStartupMusic,
@@ -121,6 +122,13 @@ const stageAssetGate: StageAssetGate = (stageId, resolveRequirements) => {
     },
   );
 };
+
+/** `REMAKE-200`：這次結局四段尾聲的左右半圖（選段只看已完成的戰役，進結局前就確定）。 */
+const endingEpilogueHalves = (controller: GameController): readonly (readonly [string, string])[] =>
+  (controller.stage49Ending?.epiloguePresentations ?? []).map(({ variant }) => {
+    const [left, right] = variant.illustrationRecords;
+    return [STAGE49_ENDING_ASSETS.epilogue(left), STAGE49_ENDING_ASSETS.epilogue(right)] as const;
+  });
 
 const controllerAssetRequirements = (controller: GameController): StageAssetRequirements => ({
   // 部署名單的候選還沒上場，職業與肖像都可能是棋盤上沒有的。正式流程由 `loadRuntime`
@@ -264,6 +272,8 @@ const mountController = (
           [
             ...STAGE49_ENDING_SUPPLEMENTAL_ASSETS,
             ...portraitHdUrlsForStyle(STAGE49_ENDING_PORTRAIT_RECORDS),
+            // `REMAKE-200`：選了高清才帶這次四段尾聲的高清畫面。
+            ...epilogueHdUrlsForStyle(endingEpilogueHalves(controller)),
             ...remixMusicUrls([
               STAGE49_ENDING_MUSIC.story,
               STAGE49_ENDING_MUSIC.roster,
@@ -318,7 +328,10 @@ const mountController = (
     if (style !== "hd" || !stagedResources) return;
     let urls: readonly string[];
     if (controller.phase === "ending") {
-      urls = portraitHdUrlsForStyle(STAGE49_ENDING_PORTRAIT_RECORDS, style);
+      urls = [
+        ...portraitHdUrlsForStyle(STAGE49_ENDING_PORTRAIT_RECORDS, style),
+        ...epilogueHdUrlsForStyle(endingEpilogueHalves(controller), style),
+      ];
     } else {
       const { portraitRecords, nativeStage, storyBackgroundUrls } = controllerAssetRequirements(controller);
       urls = [

@@ -32,6 +32,13 @@
 // one cross-fade length. The originals are pinned by hash, and every clip must
 // last from the start of its fade-in to the end of the next plate's.
 //
+// Version 5 adds the ending epilogue (REMAKE-200, user request 2026-11-19) under
+// `epilogue`: one one-shot clip per spread module 35 shows behind the typed text
+// (two 320x350 halves side by side, full screen). The spreads must be exactly the
+// pairs the epilogue segments name, the halves are pinned by hash, and every clip
+// must last as long as its segment stays up: max(wait, typing) native ticks, or
+// longer while the REMAKE-189 narration is still speaking.
+//
 // `--import <workbench export>` first copies the files from the git-ignored
 // workbench (tmp/cutscene-hd/export, made by its tools/export.py) into the asset
 // pack and rewrites the manifest. The workbench never ships.
@@ -49,7 +56,7 @@ const manifestPath = path.join(hdRoot, "hd-manifest.json");
 const contentRoot = path.join(root, "src/game/content");
 const generatedModule = path.join(contentRoot, "story-hd.generated.ts");
 const FORMAT = "ANGEL2 HD story illustrations";
-const VERSION = 4;
+const VERSION = 5;
 /** REMAKE-198 crawl clips: 2.316x the 608x257 plate (2.366x vertically; H3 sizes step by 32), shown stretched into it. */
 const INTRO_WIDTH = 1408;
 const INTRO_HEIGHT = 608;
@@ -62,6 +69,9 @@ const WIDTH = 1408;
 const HEIGHT = 768;
 const ORIGINAL_WIDTH = 320;
 const ORIGINAL_HEIGHT = 200;
+/** REMAKE-200: module 35 blits two 320x350 halves side by side; the clips cover the whole screen like the story loops. */
+const EPILOGUE_HALF_WIDTH = 320;
+const EPILOGUE_HALF_HEIGHT = 350;
 
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
 const pad = (background) => `bk${String(background).padStart(2, "0")}`;
@@ -287,9 +297,66 @@ async function validateIntro(intro, expectedFiles) {
   return plate;
 }
 
+/** STAGE49_EPILOGUE_SEGMENTS and the epilogue narration lengths, as their generators wrote them. */
+async function epilogueSegments() {
+  const ending = await readFile(path.join(contentRoot, "stage49-ending.generated.ts"), "utf8");
+  const match = ending.match(/export const STAGE49_EPILOGUE_SEGMENTS = (\[.*?\]) as const;/su);
+  if (!match) fail("stage49-ending.generated.ts has no STAGE49_EPILOGUE_SEGMENTS");
+  const voice = await readFile(path.join(contentRoot, "voice-catalog.generated.ts"), "utf8");
+  const narration = new Map([...voice.matchAll(/"(\w+:\d+)": \{ key: "epilogue:[^"]+", source: "[^"]+", durationMs: (\d+) \}/gu)]
+    .map((m) => [m[1], Number(m[2])]));
+  const spreads = new Map();
+  for (const segment of JSON.parse(match[1])) {
+    for (const variant of segment.variants) {
+      const [left, right] = variant.illustrationRecords;
+      const holdMs = Math.max(segment.waitNativeTicks, variant.typingNativeTicks) * NATIVE_TICK_MS;
+      const spokenMs = narration.get(`${segment.id}:${variant.selector}`) ?? 0;
+      spreads.set(`${left}+${right}`, { left, right, label: `${segment.id}:${variant.selector}`, ms: Math.max(holdMs, spokenMs) });
+    }
+  }
+  return spreads;
+}
+
+const epilogueOriginal = (record) => `/assets/original/ending/epilogue/${String(record).padStart(2, "0")}.png`;
+
+async function epilogueOriginalSha256(original) {
+  const file = path.join(assetRoot, original.replace(/^\/assets\/original\//u, ""));
+  if (!existsSync(file)) fail(`${original} does not exist`);
+  const buffer = await readFile(file);
+  const size = pngSize(buffer);
+  if (size.width !== EPILOGUE_HALF_WIDTH || size.height !== EPILOGUE_HALF_HEIGHT) fail(`${original} is not a 320x350 epilogue half`);
+  return sha256(buffer);
+}
+
+/** The HD epilogue (REMAKE-200): one spread per segment variant, halves pinned, clips as long as their segment. */
+async function validateEpilogue(epilogue, expectedFiles) {
+  const wanted = await epilogueSegments();
+  if (!Array.isArray(epilogue.spreads) || epilogue.spreads.length !== wanted.size) fail(`the epilogue needs ${wanted.size} spreads`);
+  const seen = new Set();
+  for (const spread of epilogue.spreads) {
+    const records = spread.originals.map((url) => Number(url.match(/\/ending\/epilogue\/(\d+)\.png$/u)?.[1] ?? NaN));
+    const key = records.join("+");
+    const segment = wanted.get(key);
+    if (!segment || spread.originals[0] !== epilogueOriginal(segment.left) || spread.originals[1] !== epilogueOriginal(segment.right)) {
+      fail(`epilogue spread ${spread.originals.join(" + ")} is not one the epilogue segments show`);
+    }
+    if (seen.has(key)) fail(`epilogue spread ${key} appears twice`);
+    seen.add(key);
+    for (const [index, original] of spread.originals.entries()) {
+      if (spread.originalsSha256[index] !== await epilogueOriginalSha256(original)) {
+        fail(`epilogue spread ${key}: ${original} changed; review the HD epilogue before shipping it`);
+      }
+    }
+    await checkFile(spread.video, "video");
+    const need = Math.ceil(segment.ms / 1000 * spread.video.fps);
+    if (spread.video.frames < need) fail(`${spread.video.output} has ${spread.video.frames} frames, ${segment.label} stays up for ${need}`);
+    expectedFiles.add(path.relative("story/hd", spread.video.output));
+  }
+}
+
 async function importWorkbench(workbench) {
   const exported = JSON.parse(await readFile(path.join(workbench, "manifest.json"), "utf8"));
-  if (exported.format !== "angel2-story-hd-export" || exported.version !== 4) fail("unexpected workbench export format");
+  if (exported.format !== "angel2-story-hd-export" || exported.version !== 5) fail("unexpected workbench export format");
   await rm(hdRoot, { recursive: true, force: true });
   const copied = new Set();
   // the export folder mirrors story/hd/; a strip two records share is copied once
@@ -352,6 +419,18 @@ async function importWorkbench(workbench) {
       });
     }
   }
+  let epilogue;
+  if (exported.epilogue) {
+    epilogue = { spreads: [] };
+    for (const spread of exported.epilogue.spreads) {
+      const originals = spread.originals.map((original) => `/assets/original/${original}`);
+      epilogue.spreads.push({
+        originals,
+        originalsSha256: await Promise.all(originals.map(epilogueOriginalSha256)),
+        video: await ship(spread.video, { frames: spread.video.frames, fps: spread.video.fps }),
+      });
+    }
+  }
   const manifest = {
     format: FORMAT,
     version: VERSION,
@@ -372,6 +451,12 @@ async function importWorkbench(workbench) {
       intro: {
         note: "REMAKE-198 opening crawl: one one-shot clip per plate, each fully on screen from `cue` (scroll updates), cross-fades centred on the cues",
         ...intro,
+      },
+    } : {}),
+    ...(epilogue ? {
+      epilogue: {
+        note: "REMAKE-200 ending epilogue: one one-shot clip per spread (left and right 320x350 halves), as long as its segment stays up",
+        ...epilogue,
       },
     } : {}),
   };
@@ -419,6 +504,7 @@ async function validate(manifest) {
   }
   if (manifest.title) await validateTitle(manifest.title, expectedFiles);
   if (manifest.intro) introPlate = await validateIntro(manifest.intro, expectedFiles);
+  if (manifest.epilogue) await validateEpilogue(manifest.epilogue, expectedFiles);
   const stray = shipped.filter((file) => !expectedFiles.has(file));
   if (stray.length > 0) fail(`stray files under story/hd/: ${stray.join(", ")}`);
 }
@@ -477,10 +563,26 @@ function introModule(intro) {
     "",
   ];
 }
+function epilogueModule(epilogue) {
+  if (!epilogue) return ["export const STORY_HD_EPILOGUE: StoryHdEpilogue | undefined = undefined;", ""];
+  return [
+    "export const STORY_HD_EPILOGUE: StoryHdEpilogue | undefined = {",
+    "  spreads: [",
+    ...epilogue.spreads.map((spread) => [
+      "    {",
+      `      originals: [${spread.originals.map((original) => JSON.stringify(original)).join(", ")}],`,
+      `      video: { source: ${url(spread.video.output)}, width: ${spread.video.width}, height: ${spread.video.height}, frames: ${spread.video.frames}, fps: ${spread.video.fps} },`,
+      "    },",
+    ].join("\n")),
+    "  ],",
+    "};",
+    "",
+  ];
+}
 const records = [...manifest.records].sort((a, b) => a.background - b.background);
 await writeFile(generatedModule, [
   "// Generated by scripts/generate-story-hd.mjs from story/hd/hd-manifest.json; do not edit by hand.",
-  "import type { StoryHdEntry, StoryHdIntro, StoryHdTitle } from \"./story-hd\";",
+  "import type { StoryHdEntry, StoryHdEpilogue, StoryHdIntro, StoryHdTitle } from \"./story-hd\";",
   "",
   `export const STORY_HD_WIDTH = ${WIDTH};`,
   `export const STORY_HD_HEIGHT = ${HEIGHT};`,
@@ -499,6 +601,7 @@ await writeFile(generatedModule, [
   "",
   ...titleModule(manifest.title),
   ...introModule(manifest.intro),
+  ...epilogueModule(manifest.epilogue),
 ].join("\n"));
 const shippedBytes = new Map();
 for (const entry of records) for (const file of [entry.poster, entry.video, entry.sky]) if (file) shippedBytes.set(file.output, file.bytes);
@@ -507,5 +610,6 @@ if (manifest.title) {
   for (const file of [t.frame, t.women, ...t.variants.flatMap((v) => [v.logo, v.land, v.sky])]) shippedBytes.set(file.output, file.bytes);
 }
 if (manifest.intro) for (const scene of manifest.intro.scenes) shippedBytes.set(scene.video.output, scene.video.bytes);
+if (manifest.epilogue) for (const spread of manifest.epilogue.spreads) shippedBytes.set(spread.video.output, spread.video.bytes);
 const bytes = [...shippedBytes.values()].reduce((sum, size) => sum + size, 0);
-console.log(`story HD catalog: ${records.length} records${manifest.title ? " + title" : ""}${manifest.intro ? " + intro" : ""}, ${(bytes / 1024 / 1024).toFixed(1)} MiB -> ${path.relative(root, generatedModule)}`);
+console.log(`story HD catalog: ${records.length} records${manifest.title ? " + title" : ""}${manifest.intro ? " + intro" : ""}${manifest.epilogue ? " + epilogue" : ""}, ${(bytes / 1024 / 1024).toFixed(1)} MiB -> ${path.relative(root, generatedModule)}`);

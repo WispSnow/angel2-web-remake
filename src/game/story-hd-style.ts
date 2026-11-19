@@ -2,7 +2,9 @@ import {
   storyHdAssetUrls,
   storyHdAssetUrlsForSources,
   storyHdEntryForSource,
+  storyHdEpilogueSpread,
   type StoryHdEntry,
+  type StoryHdEpilogueSpread,
 } from "./content/story-hd";
 import { notifyPortraitPresentationChanged, portraitStyle } from "./portrait-style";
 import type { PortraitStyle } from "./preferences";
@@ -46,4 +48,38 @@ export function takeStoryHdFailureNotice(): boolean {
 /** 資源門要為這些原版插圖額外下載的高清檔案；偏好為原版時為空，不發任何高清請求。 */
 export function storyHdUrlsForStyle(sources: Iterable<string>, style: PortraitStyle = portraitStyle()): readonly string[] {
   return style === "hd" ? storyHdAssetUrlsForSources(sources) : [];
+}
+
+const failedEpilogueClips = new Set<string>();
+
+/**
+ * `REMAKE-200` 結局尾聲這一段此刻要換成的高清畫面；同一個「美術風格」偏好。偏好為原版、這對半圖沒有
+ * 高清版、檔案還不在資源租約裡，或這段視訊本次執行已失敗時回傳 `undefined`，照原版畫兩張半圖。
+ */
+export function activeEpilogueHd(left: string, right: string): StoryHdEpilogueSpread | undefined {
+  if (portraitStyle() !== "hd") return undefined;
+  const spread = storyHdEpilogueSpread(left, right);
+  if (!spread || failedEpilogueClips.has(spread.video.source)) return undefined;
+  return stagedRenderAssetAvailable(spread.video.source) ? spread : undefined;
+}
+
+/** 播放器在載入或解碼失敗時呼叫：這段尾聲本次執行改畫原版。 */
+export function markEpilogueHdFailed(spread: StoryHdEpilogueSpread, reason: string): void {
+  if (failedEpilogueClips.has(spread.video.source)) return;
+  failedEpilogueClips.add(spread.video.source);
+  console.warn(`HD epilogue ${spread.originals.join(" + ")} falls back to the original: ${reason}`);
+}
+
+/** 結局路由門要為這幾段尾聲（左右半圖）額外下載的高清視訊；偏好為原版時為空。 */
+export function epilogueHdUrlsForStyle(
+  halves: Iterable<readonly [string, string]>,
+  style: PortraitStyle = portraitStyle(),
+): readonly string[] {
+  if (style !== "hd") return [];
+  const urls = new Set<string>();
+  for (const [left, right] of halves) {
+    const spread = storyHdEpilogueSpread(left, right);
+    if (spread) urls.add(spread.video.source);
+  }
+  return [...urls];
 }

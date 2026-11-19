@@ -13,7 +13,7 @@ import {
 } from "../../src/game/debug-scenario-catalog";
 import { STAGE_INDEX } from "../../src/game/content/stage-index";
 import { STORY_HD_ENTRIES } from "../../src/game/content/story-hd.generated";
-import { STORY_HD_INTRO, STORY_HD_TITLE, storyHdAssetUrls, storyHdIntroAssetUrls, storyHdTitleAssetUrls } from "../../src/game/content/story-hd";
+import { STORY_HD_EPILOGUE, STORY_HD_INTRO, STORY_HD_TITLE, storyHdAssetUrls, storyHdIntroAssetUrls, storyHdTitleAssetUrls } from "../../src/game/content/story-hd";
 import { musicProgramFor } from "../../src/game/content/music";
 import {
   parseResourceManifest,
@@ -213,6 +213,7 @@ describe("versioned resource manifest", () => {
       ...STORY_HD_ENTRIES.flatMap((entry) => storyHdAssetUrls(entry)),
       ...(STORY_HD_TITLE ? storyHdTitleAssetUrls(STORY_HD_TITLE) : []),
       ...(STORY_HD_INTRO ? storyHdIntroAssetUrls(STORY_HD_INTRO) : []),
+      ...(STORY_HD_EPILOGUE?.spreads.map(({ video }) => video.source) ?? []),
     ]);
     expect(storyHd.size).toBe(storyHdFiles.size + 1);
     for (const url of storyHdFiles) {

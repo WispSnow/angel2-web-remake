@@ -12,6 +12,7 @@ import { STAGE_INDEX } from "./content/stage-index";
 import type { GameController } from "./controller";
 import type { AudioManager } from "./audio";
 import { VOICE_AUTO_ADVANCE_DELAY_MS, epilogueNarrationFor } from "./content/voice-catalog";
+import { EpilogueHdPlayer } from "./epilogue-hd";
 import { drawEpilogueGlyphs, loadEpilogueFont } from "./epilogue-text";
 import { prepareDomImageElements } from "./dom-image-readiness";
 import { renderNativeDialogueText } from "./dialogue-text";
@@ -28,6 +29,7 @@ import {
 import { onPortraitPresentationChange, portraitStillSourceFor } from "./portrait-style";
 import { configureGameScaling } from "./scaling";
 import { decodeStagedRenderImages, stagedRenderAssetSource } from "./staged-render-asset-cache";
+import { activeEpilogueHd } from "./story-hd-style";
 import type { DialoguePage } from "./types";
 import {
   clearProgramTimeout,
@@ -205,6 +207,8 @@ export function mountStage49EndingUi(
   let epilogueGeneration = 0;
   let finishEpilogueTyping: (() => boolean) | undefined;
   let renderGeneration = 0;
+  /** `REMAKE-200` 這段尾聲的高清畫面；美術風格為原版或高清版不可用時沒有。 */
+  let epilogueHd: EpilogueHdPlayer | undefined;
   let segmentReady = false;
   let segmentFailed = false;
 
@@ -318,6 +322,8 @@ export function mountStage49EndingUi(
     const canvas = screen.querySelector<HTMLCanvasElement>(".stage49-epilogue-text");
     if (!presentation || !canvas) return;
     const { variant, segment } = presentation;
+    // `REMAKE-200`：高清畫面與文字、旁白同時從這一刻開始。
+    epilogueHd?.start(startedAt);
     const glyphs = variant.glyphs;
     const total = glyphs.length / 3;
     const colors = { ink: variant.inkColor, shadow: variant.shadowColor };
@@ -401,6 +407,8 @@ export function mountStage49EndingUi(
     voiceAdvanceCancelled = false;
     cancelVoiceAdvance();
     stopEpilogueTyping();
+    epilogueHd?.dispose();
+    epilogueHd = undefined;
     stopSpeaking(storyPortrait);
     storyText = undefined;
     storyPortrait = undefined;
@@ -422,6 +430,17 @@ export function mountStage49EndingUi(
           : boundaryMarkup();
     screen.dataset.storyTyping = "false";
     screen.dataset.epilogueTyping = "false";
+    delete screen.dataset.epilogueStyle;
+    if (session.section === "epilogue") {
+      const presentation = session.epiloguePresentation;
+      const host = screen.querySelector<HTMLElement>(".stage49-epilogue");
+      if (presentation && host) {
+        const [left, right] = presentation.variant.illustrationRecords;
+        const spread = activeEpilogueHd(STAGE49_ENDING_ASSETS.epilogue(left), STAGE49_ENDING_ASSETS.epilogue(right));
+        if (spread) epilogueHd = new EpilogueHdPlayer(host, spread, host.querySelector(".stage49-epilogue-text"));
+      }
+      screen.dataset.epilogueStyle = epilogueHd ? "hd" : "original";
+    }
     let beginStoryTyping: (() => void) | undefined;
     if (session.section === "story") {
       for (const text of screen.querySelectorAll<HTMLElement>(".stage49-dialogue-copy p")) {
@@ -443,6 +462,13 @@ export function mountStage49EndingUi(
       readiness.push(decodeStagedRenderImages([STAGE49_ENDING_ASSETS.rosterBackground]));
     }
     if (session.section === "epilogue") readiness.push(loadEpilogueFont().then(() => undefined));
+    // 高清畫面等到第一幀才開始這段尾聲；逾時或失敗時它自己退回原版，不會讓這段失敗。
+    if (epilogueHd) {
+      const player = epilogueHd;
+      readiness.push(player.ready().then((ok) => {
+        if (!ok && generation === renderGeneration) screen.dataset.epilogueStyle = "original";
+      }));
+    }
     void Promise.all(readiness).then(() => {
       if (generation !== renderGeneration) return;
       segmentReady = true;
@@ -518,6 +544,8 @@ export function mountStage49EndingUi(
     cancelVoiceAdvance();
     audio?.voice.endPage();
     stopEpilogueTyping();
+    epilogueHd?.dispose();
+    epilogueHd = undefined;
     stopSpeaking(storyPortrait);
     unsubscribe();
     stopPortraitPresentationRefresh();

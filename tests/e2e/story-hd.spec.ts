@@ -462,3 +462,64 @@ test("REMAKE-198: in 原版 the crawl keeps the original plates and no HD clip i
   await expect(page.getByTestId("intro-hd-canvas")).toHaveCount(0);
   expect(requests).toEqual([]);
 });
+
+// `REMAKE-200` ending epilogue. The warrior-statue debug entry runs the native cadence (no `?test=1`): module 35 types
+// the text over the two 320x350 halves, and in 高清 one one-shot clip per spread plays between the halves and the text.
+const EPILOGUE = `${HD}/epilogue`;
+const openWarriorStatue = async (page: Page) => {
+  await page.goto("/?debugScenario=stage-49-warrior-statue&difficulty=0&roster=representative-growth&growth=100");
+  const screen = page.locator("#stage49-screen");
+  await expect(page.getByTestId("stage49-epilogue")).toHaveAttribute("data-segment", "warriorStatue");
+  await expect(screen).toHaveAttribute("data-segment-ready", "true");
+  return screen;
+};
+
+test("REMAKE-200: in 高清 each epilogue segment plays its HD spread under the typed text, paused with the program", async ({ page }) => {
+  test.setTimeout(90_000);
+  const requests = storyHdRequests(page);
+  await useHd(page);
+  const screen = await openWarriorStatue(page);
+  await expect(screen).toHaveAttribute("data-epilogue-style", "hd");
+  const video = page.getByTestId("stage49-epilogue-hd");
+  await expect(video).toHaveAttribute("data-source-url", `${EPILOGUE}/11.mp4`);
+  // between the original halves (left in place underneath) and the text canvas, covering the screen
+  const layers = await page.getByTestId("stage49-epilogue").evaluate((host) => [...host.children].map((child) => child.className));
+  expect(layers.slice(0, 4)).toEqual(["stage49-epilogue-left", "stage49-epilogue-right", "stage49-epilogue-hd", "stage49-epilogue-text"]);
+  const [videoBox, screenBox] = await Promise.all([video.boundingBox(), screen.boundingBox()]);
+  expect(videoBox && screenBox && Math.abs(videoBox.width - screenBox.width) < 1 && Math.abs(videoBox.height - screenBox.height) < 1).toBe(true);
+  expect(await video.evaluate((element) => getComputedStyle(element).imageRendering)).toBe("auto");
+  // the route gate fetched this campaign's four spreads and nothing else from the epilogue folder
+  const clips = [...new Set(requests.filter((url) => url.startsWith(`${EPILOGUE}/`)))];
+  expect(clips).toHaveLength(4);
+  expect(clips).toContain(`${EPILOGUE}/11.mp4`);
+  // it plays in step with the segment, and the text is typed on top of it
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime), { timeout: 10_000 }).toBeGreaterThan(1.5);
+  expect(await video.evaluate((element: HTMLVideoElement) => !element.paused && element.muted)).toBe(true);
+  await captureVisualAudit(screen, { path: "artifacts/playwright/epilogue-hd.png" });
+  // program pause freezes the clip with the typing; resuming carries on from there
+  await page.keyboard.press("p");
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.paused)).toBe(true);
+  const frozen = await video.evaluate((element: HTMLVideoElement) => element.currentTime);
+  await page.waitForTimeout(600);
+  expect(await video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBe(frozen);
+  await page.keyboard.press("p");
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(frozen + 0.2);
+  // first press finishes the text, the second moves on: the next segment brings its own spread
+  await screen.click();
+  await expect(screen).toHaveAttribute("data-epilogue-typing", "false");
+  await screen.click();
+  const epilogue = page.getByTestId("stage49-epilogue");
+  await expect(epilogue).toHaveAttribute("data-segment", "saveCountOutcome");
+  const left = (await epilogue.getAttribute("data-selector")) === "0" ? 17 : 19;
+  await expect(page.getByTestId("stage49-epilogue-hd")).toHaveAttribute("data-source-url", `${EPILOGUE}/${left}.mp4`);
+  await expect(page.getByTestId("stage49-epilogue-hd")).toHaveCount(1);
+  expect(clips).toContain(`${EPILOGUE}/${left}.mp4`);
+});
+
+test("REMAKE-200: in 原版 the epilogue keeps the original halves and no HD clip is requested", async ({ page }) => {
+  const requests = storyHdRequests(page);
+  const screen = await openWarriorStatue(page);
+  await expect(screen).toHaveAttribute("data-epilogue-style", "original");
+  await expect(page.getByTestId("stage49-epilogue-hd")).toHaveCount(0);
+  expect(requests.filter((url) => url.startsWith(`${EPILOGUE}/`))).toEqual([]);
+});

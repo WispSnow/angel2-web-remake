@@ -253,7 +253,9 @@ pnpm exec playwright install ffmpeg
   标志带抠出标志字），框内是高清地景与卷动云层，两名女子各自生成待机循环后合成一段叠加式视频；原版标题的五张图一变就拒绝生成。
   清单第 4 版另带高清开场画面（`REMAKE-198`，`intro-hd.ts`，由 `startup-hd.ts` 与标题一起管理下载与每轮的选择）：七张 `BK/41、43..48`
   各一段只播一次的视频，`cue` 是完全出现的卷动更新（跟随 `REMAKE-189` 旁白每句开口，单元测试按旁白时长核对），工作台 `tools/intro.py`；
-  旁白时长一变就要重排切换点并重出视频。
+  旁白时长一变就要重排切换点并重出视频。清单第 5 版另带高清结局尾声（`REMAKE-200`，`epilogue-hd.ts`）：模组 35 八组左右半图各一段
+  只播一次的视频，长度至少是该段停留时间（`max(等待, 打字)`，旁白更长时取旁白），生成器按尾声计时与旁白时长核对，工作台 `tools/epilogue.py`；
+  旁白变长就要重出视频。
 - `src/game/content/character-catalog.generated.ts` 由 `scripts/generate-character-catalog.mjs`
   生成，来源是原版角色描述子表、关卡模板、胜负条件表、逐关事件处理器与对白语料；修改证据后
   运行 `pnpm content:characters`。角色出场关卡必须同时合并静态模板、名单候选、事件生成与对白

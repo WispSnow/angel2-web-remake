@@ -85,7 +85,19 @@ export class Stage49EndingSession {
   get epiloguePresentation(): Stage49EpiloguePresentation | undefined {
     if (this.section !== "epilogue") return undefined;
     const segment = STAGE49_EPILOGUE_SEGMENTS[this.index];
-    if (!segment) return undefined;
+    return segment ? this.presentationFor(segment) : undefined;
+  }
+
+  /**
+   * All four segments as this campaign will show them. The selectors depend only
+   * on the finished campaign, so the route gate can fetch each segment's optional
+   * HD clip (`REMAKE-200`) before the ending starts.
+   */
+  get epiloguePresentations(): readonly Stage49EpiloguePresentation[] {
+    return STAGE49_EPILOGUE_SEGMENTS.map((segment) => this.presentationFor(segment));
+  }
+
+  private presentationFor(segment: Stage49EpiloguePresentation["segment"]): Stage49EpiloguePresentation {
     const selector = this.selectorForSegment(segment.id);
     const variant = segment.variants.find((candidate) => candidate.selector === selector)
       ?? segment.variants[0];

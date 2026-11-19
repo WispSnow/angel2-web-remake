@@ -1,4 +1,4 @@
-import { STORY_HD_ENTRIES, STORY_HD_INTRO, STORY_HD_TITLE } from "./story-hd.generated";
+import { STORY_HD_ENTRIES, STORY_HD_EPILOGUE, STORY_HD_INTRO, STORY_HD_TITLE } from "./story-hd.generated";
 
 /**
  * `REMAKE-196` 可選的高清劇情插圖：每張 `BK/<id>` 一段 AI 重繪的全畫面待機循環。
@@ -126,6 +126,27 @@ export function storyHdIntroWindow(intro: StoryHdIntro, index: number, updateMs:
     start: index === 0 ? 0 : scene.cue * updateMs - half,
     end: next ? next.cue * updateMs + half : Number.POSITIVE_INFINITY,
   };
+}
+
+/**
+ * 結局尾聲的一張高清畫面（`REMAKE-200`）：原版模組 35 每段把左右兩張 320×350 的半圖拼成整個畫面，
+ * 再把文字直接打在上面。高清版每對半圖一段只播一次的視訊，長度涵蓋整段尾聲。
+ */
+export interface StoryHdEpilogueSpread {
+  /** 取代的原版左右半圖（`ending/epilogue/<記錄號>.png`，順序同 `illustrationRecords`）。 */
+  readonly originals: readonly [string, string];
+  readonly video: StoryHdVideo;
+}
+
+export interface StoryHdEpilogue {
+  readonly spreads: readonly StoryHdEpilogueSpread[];
+}
+
+export { STORY_HD_EPILOGUE };
+
+/** 原版左右半圖對應的高清尾聲畫面；沒有時照原版畫。 */
+export function storyHdEpilogueSpread(left: string, right: string): StoryHdEpilogueSpread | undefined {
+  return STORY_HD_EPILOGUE?.spreads.find(({ originals }) => originals[0] === left && originals[1] === right);
 }
 
 /** 高清標題要下載的全部檔案（兩組都要：閒置重播會換組）。 */
