@@ -72,7 +72,7 @@ const contentTypeFor = (url: string): string => {
 export function isStagedRenderAssetUrl(url: string): boolean {
   return url.startsWith("/assets/original/")
     && (url.endsWith(".png") || url.endsWith(".json") || url.endsWith(".svg")
-      || isPortraitHdAssetUrl(url));
+      || isPortraitHdAssetUrl(url) || isStoryHdAssetUrl(url));
 }
 
 /**
@@ -81,6 +81,12 @@ export function isStagedRenderAssetUrl(url: string): boolean {
  */
 export function isPortraitHdAssetUrl(url: string): boolean {
   return url.startsWith("/assets/original/portraits/hd/")
+    && (url.endsWith(".webp") || url.endsWith(".mp4"));
+}
+
+/** `REMAKE-196` 高清劇情插圖的封面與循環視訊，理由同上。 */
+export function isStoryHdAssetUrl(url: string): boolean {
+  return url.startsWith("/assets/original/story/hd/")
     && (url.endsWith(".webp") || url.endsWith(".mp4"));
 }
 

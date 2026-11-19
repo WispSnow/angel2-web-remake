@@ -234,6 +234,26 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   image-rendering: var(--image-rendering, pixelated);
   pointer-events: none;
 }
+/* REMAKE-197: the HD title canvas sits over the original canvas and under the menu
+ * frames and menus. Its backing follows the displayed size, so it maps about one to
+ * one onto screen pixels and draws the original pixels nearest-neighbour itself; the
+ * stacked loop of the two women decodes underneath it, fully transparent. */
+.startup-title > canvas.startup-hd-canvas {
+  position: absolute;
+  inset: 0;
+  width: 640px;
+  height: 350px;
+  image-rendering: auto !important;
+  pointer-events: none;
+}
+.startup-title > video.startup-hd-video {
+  position: absolute;
+  inset: 0;
+  width: 640px;
+  height: 350px;
+  opacity: 0;
+  pointer-events: none;
+}
 /* 0000:19F2 draws BK/40 image 0 at (480,45) and 0000:1B7E image 1 at (480,21);
  * both positions come from the generated evidence as inline styles. */
 .startup-menu-frame { z-index: 3; width: 144px; height: auto; }
@@ -618,6 +638,26 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
     var(--story-illustration) 160px 80px / 320px 200px no-repeat,
     var(--story-backdrop) 0 0 / 40px 40px repeat;
 }
+/* `REMAKE-196`：高清劇情插圖鋪滿整個 640×350 畫面，`A/20` 底紋與 `(160,80)` 的原版插圖
+   都不畫。視訊明確設回平滑縮放：`image-rendering` 會繼承宿主的像素化偏好。 */
+.story-background[data-story-style="hd"],
+.logical-screen[data-phase="prebattleStory"] .story-background[data-story-style="hd"] { background: #000; }
+.story-background > video.story-hd-video,
+.story-background > canvas.story-hd-canvas,
+.story-background > img.story-hd-still {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: auto;
+  pointer-events: none;
+}
+/* 有雲層的插圖：疊加式視訊（上半前景、下半透明度）只供畫布取幀，本身不顯示。畫布同高清肖像要
+   `!important` 才蓋得過全域的 `canvas { … !important }`。 */
+.story-background > video.story-hd-video[data-alpha="stacked"] { opacity: 0; }
+.story-background > canvas.story-hd-canvas { image-rendering: auto !important; }
 .logical-screen[data-phase="prebattleStory"] .unit-hud,
 .logical-screen[data-phase="prebattleStory"] .side-panel-hotspot,
 .logical-screen[data-phase="prebattleStory"] .system-menu,

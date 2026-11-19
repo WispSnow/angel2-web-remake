@@ -7,7 +7,7 @@ import {
 import { STAGE_INDEX } from "./content/stage-index";
 import type { CampaignRouteId } from "./content/stage-effects";
 import type { EnemyPhaseTailPresentationDefinition } from "./enemy-phase-tail-presentation";
-import { createStage0Units } from "./content/stage0";
+import { ASSETS as STAGE0_ASSETS, createStage0Units } from "./content/stage0";
 import { stage37BossMaximumLifeByDifficulty } from "./content/enemy-scaling";
 import { presentationActionIdsForClass, type BattleActionId } from "./content/actions";
 import { promotionReachableClassIds } from "./content/classes";
@@ -47,6 +47,20 @@ export function stageFigureUrls(assets: StageRuntimeAssets | undefined): string[
     ...Object.values(assets?.unitSprites ?? {}),
     ...Object.values(assets?.unitFiguresById ?? {}),
   ];
+}
+
+/**
+ * 這一關劇情會畫的原版插圖 URL（`REMAKE-196` 資源門據此帶上高清循環）。第 0 關的執行期沒有
+ * `assets`，介面改用 `stage0` 的 `ASSETS.storyBackground`（宮殿），這裡跟著回落到同一張。
+ */
+export function stageStoryBackgroundUrls(
+  assets: Pick<StageRuntimeAssets, "storyBackground" | "storyBackgrounds"> | undefined,
+): string[] {
+  const primary = assets ? assets.storyBackground : STAGE0_ASSETS.storyBackground;
+  return [...new Set([
+    ...(primary ? [primary] : []),
+    ...Object.values(assets?.storyBackgrounds ?? {}).filter((url): url is string => url !== undefined),
+  ])];
 }
 
 export interface RoutePulsePresentationDefinition {

@@ -17,7 +17,7 @@ import "./credits.css";
 import { ResourcePackLoader } from "./game/resource-loader";
 import { classPresentationAssetUrls } from "./game/content/class-presentation-assets";
 import { originalDebugEditorAssetUrls } from "./game/original-debug-mode";
-import { createStage0Units } from "./game/content/stage0";
+import { ASSETS as STAGE0_ASSETS, createStage0Units } from "./game/content/stage0";
 import { stageDialoguePortraitRecords } from "./game/content/portrait-assets";
 import { STAGE0_DEFINITION } from "./game/content/stages";
 import { remixMusicUrls, stageRemixMusicUrls } from "./game/content/music-remix";
@@ -36,6 +36,8 @@ import {
   onPortraitStyleChange,
   portraitHdUrlsForStyle,
 } from "./game/portrait-style";
+import { storyHdUrlsForStyle } from "./game/story-hd-style";
+import { stageStoryBackgroundUrls } from "./game/stage-runtime";
 import {
   prepareStartupMusic,
   type PreparedStartupMusic,
@@ -100,6 +102,8 @@ const stageAssetGate: StageAssetGate = (stageId, resolveRequirements) => {
         // `REMAKE-192`：選了高清才把本關各張臉的高清檔案放進資源門；原版模式不發任何高清請求。
         // `REMAKE-195`：這一關被操控的角色另外帶上紅眼版。
         ...portraitHdUrlsForStyle(requirements.portraitRecords, undefined, requirements.nativeStage),
+        // `REMAKE-196`：高清劇情插圖同一規則，只帶本關劇情用到、而且有高清版的那幾張。
+        ...storyHdUrlsForStyle(requirements.storyBackgroundUrls ?? []),
       ];
     },
     async () => {
@@ -135,6 +139,7 @@ const controllerAssetRequirements = (controller: GameController): StageAssetRequ
     controller.usesDeploymentSurface ? controller.battle.stage.nativeStage : undefined,
   ),
   voiceUrls: gateVoiceUrls(controller.battle.stage.id, controller.voiceVolume),
+  storyBackgroundUrls: stageStoryBackgroundUrls(controller.currentStageAssets),
 });
 const stage0Units = createStage0Units();
 const stage0PortraitRecords: readonly PortraitRecord[] = [...new Set<PortraitRecord>([
@@ -304,8 +309,12 @@ const mountController = (
     if (controller.phase === "ending") {
       urls = portraitHdUrlsForStyle(STAGE49_ENDING_PORTRAIT_RECORDS, style);
     } else {
-      const { portraitRecords, nativeStage } = controllerAssetRequirements(controller);
-      urls = portraitHdUrlsForStyle(portraitRecords, style, nativeStage);
+      const { portraitRecords, nativeStage, storyBackgroundUrls } = controllerAssetRequirements(controller);
+      urls = [
+        ...portraitHdUrlsForStyle(portraitRecords, style, nativeStage),
+        // `REMAKE-196`：本關劇情插圖的高清循環一併補進租約。
+        ...storyHdUrlsForStyle(storyBackgroundUrls ?? [], style),
+      ];
     }
     void stagedResources.extendActiveStage(urls)
       .then(() => notifyPortraitPresentationChanged())
@@ -406,8 +415,9 @@ else {
       resourceLoader.prefetchStage("stage-00", [
         ...stage0PresentationAssets,
         ...portraitHdUrlsForStyle(stage0PortraitRecords),
+        ...storyHdUrlsForStyle(stageStoryBackgroundUrls(STAGE0_ASSETS)),
         ...stageRemixMusicUrls(STAGE0_DEFINITION.music, loadMusicPreferences(localStorage).musicStyle),
       ]);
-    }, (urls) => resourceLoader.ensureVoice(urls));
+    }, (urls) => resourceLoader.ensureVoice(urls), (urls) => resourceLoader.extendActiveStage(urls));
   });
 }

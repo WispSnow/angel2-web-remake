@@ -52,6 +52,8 @@ import type { Difficulty, SaveData } from "./types";
 import type { PreparedStartupMusic } from "./startup-music";
 import { StartupNarration } from "./startup-narration";
 import { PORTRAIT_HD_AVAILABLE } from "./content/portrait-hd";
+import { STORY_HD_TITLE, storyHdTitleAssetUrls } from "./content/story-hd";
+import { TitleHdLayer } from "./title-hd";
 import { portraitStyle as storedPortraitStyle, setPortraitStyle } from "./portrait-style";
 import type { PortraitStyle } from "./preferences";
 import type { VoiceUrlLoader } from "./voice";
@@ -164,6 +166,8 @@ export function mountStartup(
   onEntered: () => void,
   /** `REMAKE-189`：開場旁白走資源門的同一條下載路徑；沒有時直接請求。 */
   voiceLoader?: VoiceUrlLoader,
+  /** `REMAKE-197`：把高清標題的檔案下載進開場的資源租約；沒有時標題一律照原版畫。 */
+  titleHdLoader?: (urls: readonly string[]) => Promise<void>,
 ): () => void {
   applyStagedNativeUiAssets(root);
   const testMode = new URLSearchParams(location.search).has("test");
@@ -211,6 +215,12 @@ export function mountStartup(
   /** `REMAKE-193`：與遊戲裡「遊戲功能」下方的「肖像風格」同一個設備偏好。 */
   let portraitStyleChoice: PortraitStyle = storedPortraitStyle();
   const loadedImages = new Map<string, HTMLImageElement>();
+  /** `REMAKE-197` 高清標題：選了高清才下載；每次組成標題時（含閒置重播後）才決定這一輪畫不畫高清。 */
+  let titleHd: TitleHdLayer | undefined;
+  let titleHdRequested = false;
+  let titleHdActive = false;
+  /** 上半圖與標誌帶目前溶入到的步數，高清畫布每幀照抄（`-1`：還沒開始）。 */
+  let titleReveal = { upper: -1, lower: -1 };
 
   root.innerHTML = `
     <div class="page-shell startup-shell">
@@ -255,14 +265,14 @@ export function mountStartup(
               }；遊戲中可在「音效開關」隨時調整。</p>
               ${PORTRAIT_HD_AVAILABLE ? `<div class="startup-music-style startup-portrait-style" role="radiogroup"
                 aria-labelledby="startup-portrait-style-label" data-testid="startup-portrait-style-row">
-                <span id="startup-portrait-style-label">肖像風格</span>
+                <span id="startup-portrait-style-label">美術風格</span>
                 <button type="button" role="radio" data-startup-action="portrait-style" data-portrait-style="original"
                   data-testid="startup-portrait-style-original">原版</button>
                 <button type="button" role="radio" data-startup-action="portrait-style" data-portrait-style="hd"
                   data-testid="startup-portrait-style-hd">高清</button>
               </div>
               <p data-testid="startup-portrait-style-hint">${
-                isTauriDesktopRuntime() ? "高清為 AI 重繪的動態肖像" : "高清為 AI 重繪的動態肖像，需額外下載"
+                isTauriDesktopRuntime() ? "高清為 AI 重繪的肖像與插圖" : "高清為 AI 重繪的肖像與插圖，需額外下載"
               }；遊戲中可在「遊戲功能」隨時切換。</p>` : ""}
               <span class="visually-hidden" aria-live="polite" data-testid="startup-music-style-status"></span>
               <!-- 就緒後這一行留空：標題與按鈕已經說明要做什麼，說明文字只是佔位。
@@ -435,16 +445,33 @@ export function mountStartup(
     voiceModeRow.dataset.rowSelected = String(entryRow === "voiceMode");
     if (portraitStyleRow) portraitStyleRow.dataset.rowSelected = String(entryRow === "portrait");
   };
+  const requestTitleHd = () => {
+    if (titleHdRequested || !STORY_HD_TITLE || !titleHdLoader) return;
+    titleHdRequested = true;
+    const spec = STORY_HD_TITLE;
+    void titleHdLoader(storyHdTitleAssetUrls(spec)).then(async () => {
+      if (disposed) return;
+      const layer = new TitleHdLayer(title, spec, () => loadedImages.get(STARTUP_TITLE.background));
+      titleHd = layer;
+      const ready = await layer.prepare();
+      screen.dataset.titleHdReady = String(ready);
+    }).catch((error: unknown) => {
+      console.warn("HD title download failed", error);
+      screen.dataset.titleHdReady = "false";
+    });
+  };
   /**
    * `REMAKE-193`：肖像風格只改偏好；高清檔案由第 0 關的預取與各關資源門按這個選擇下載，
-   * 開場本身沒有肖像，不必等它。
+   * 開場本身沒有肖像，不必等它。`REMAKE-197`：選高清時在背景下載高清標題，也不等它——
+   * 開場動畫播完（或被跳過）時還沒備妥，這一輪標題照原版畫。
    */
   const choosePortraitStyle = (style: PortraitStyle) => {
     if ((activationPending && !awaitingRemix) || style === portraitStyleChoice) return;
     portraitStyleChoice = style;
     setPortraitStyle(style);
+    if (style === "hd") requestTitleHd();
     updateMusicStyleControls();
-    musicStyleStatus.textContent = style === "hd" ? "肖像風格：高清" : "肖像風格：原版";
+    musicStyleStatus.textContent = style === "hd" ? "美術風格：高清" : "美術風格：原版";
   };
   /**
    * `REMAKE-188`: the same device preference as the 音效開關 panel. Turning it on
@@ -644,6 +671,10 @@ export function mountStartup(
     screen.dataset.startupPhase = "title-assemble";
     intro.hidden = true;
     title.hidden = false;
+    titleReveal = { upper: -1, lower: -1 };
+    titleHdActive = portraitStyleChoice === "hd" && Boolean(titleHd?.isReady);
+    titleHd?.show(titleHdActive);
+    screen.dataset.titleStyle = titleHdActive ? "hd" : "original";
     // 0000:19F2 draws the BK/40 surround together with the labels, so nothing of
     // the menu may show while the art is still dissolving in.
     titleMenuFrame.hidden = true;
@@ -726,6 +757,7 @@ export function mountStartup(
     title.hidden = true;
     titleMenuFrame.hidden = true;
     titleMenu.hidden = true;
+    titleHd?.show(false);
     intro.hidden = false;
     startupMusic.playIntro();
     narration.start();
@@ -758,6 +790,13 @@ export function mountStartup(
       STARTUP_TITLE.backgroundFadeSteps,
     );
     const upperSteps = Math.floor((elapsed - backgroundFadeMs) / dissolveStepMs);
+    titleReveal = {
+      upper: Math.min(upperSteps, STARTUP_TITLE.upperReveal.dissolveSteps.length - 1),
+      lower: Math.min(
+        Math.floor((elapsed - lowerStart) / dissolveStepMs),
+        STARTUP_TITLE.lowerReveal.dissolveSteps.length - 1,
+      ),
+    };
     for (const [index, step] of STARTUP_TITLE.upperReveal.dissolveSteps.entries()) {
       if (index > upperSteps) break;
       drawDissolvedImage(context, upper, STARTUP_TITLE.upperReveal.x, STARTUP_TITLE.upperReveal.y, step);
@@ -1221,6 +1260,9 @@ export function mountStartup(
     else if (phase === "title" && now - idleSince >= STARTUP_TITLE.idleReplayNativeTicks * NATIVE_TICK_MS) {
       replayIntro();
     }
+    if (titleHdActive && !title.hidden) {
+      titleHd?.paint(canvas, titleVariant, titleReveal.upper, titleReveal.lower, now);
+    }
     animationFrame = requestAnimationFrame(animate);
   };
 
@@ -1228,6 +1270,7 @@ export function mountStartup(
     if (disposed) return;
     disposed = true;
     cancelAnimationFrame(animationFrame);
+    titleHd?.dispose();
     startupMusic.dispose();
     narration.dispose();
     stopScaling();
@@ -1253,6 +1296,7 @@ export function mountStartup(
   // the time the player picks it. Only a player who chose it pays for the decode.
   if (musicStyle === "orchestral") startupMusic.prepareRemix();
   else startupMusic.downloadRemix();
+  if (portraitStyleChoice === "hd") requestTitleHd();
   screen.dataset.startupAssetsReady = "false";
   updateStartupMusicDebugState();
   const unsubscribeProgramPause = onProgramPauseChange((paused) => {

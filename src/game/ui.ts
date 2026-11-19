@@ -123,6 +123,8 @@ import {
   stopPortraitSpeech,
 } from "./portrait";
 import { onPortraitPresentationChange, takePortraitHdFailureNotice } from "./portrait-style";
+import { StoryHdLayer } from "./story-hd-player";
+import { activeStoryHd, takeStoryHdFailureNotice } from "./story-hd-style";
 import { PORTRAIT_HD_AVAILABLE } from "./content/portrait-hd";
 import {
   configureGameScaling,
@@ -216,7 +218,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               role="menu" aria-label="子 選 單" hidden></section>
             ${PORTRAIT_HD_AVAILABLE ? `<section class="settings-portrait-style modal-panel" id="settings-portrait-style"
               data-testid="settings-portrait-style" role="radiogroup" aria-labelledby="settings-portrait-style-label" hidden>
-              <span class="settings-portrait-style-label" id="settings-portrait-style-label">肖像風格</span>
+              <span class="settings-portrait-style-label" id="settings-portrait-style-label">美術風格</span>
               <button type="button" role="radio" data-action="portrait-style" data-portrait-style="original"
                 data-settings-index="${SETTINGS_PORTRAIT_STYLE_INDEX}" data-testid="settings-portrait-style-original">原版</button>
               <button type="button" role="radio" data-action="portrait-style" data-portrait-style="hd"
@@ -430,6 +432,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     `url("${stagedRenderAssetSource(defaultStoryBackgroundSource)}")`,
   );
   storyBackground.style.setProperty("--story-illustration-source", defaultStoryBackgroundSource);
+  const storyHdLayer = new StoryHdLayer(storyBackground);
   const objectivePanel = required(root, "#objective-panel");
   // `12E7:0008` draws the stage's own SAY record with that stage's font subset,
   // so the panel's whole content is fixed once the stage is known. Surfaces with
@@ -627,6 +630,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const stopPortraitPresentationRefresh = onPortraitPresentationChange(() => {
     refreshAnimatedPortraits(root);
     if (takePortraitHdFailureNotice()) controller.reportPortraitHdUnavailable();
+    if (takeStoryHdFailureNotice()) controller.reportStoryHdUnavailable();
     render();
   });
   /** 貼上一扇對話窗的肖像與姓名牌；回傳這次是否換了一張臉。 */
@@ -1411,6 +1415,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     storyBackground.style.setProperty("--story-illustration-source", source);
     if (page?.source.backgroundId === undefined) delete storyBackground.dataset.backgroundId;
     else storyBackground.dataset.backgroundId = String(page.source.backgroundId);
+    // `REMAKE-196`：選了高清而這張插圖有高清版時，改成鋪滿整個畫面的待機循環；底紋與
+    // `(160,80)` 的原版插圖都被它蓋住。插圖不顯示時連同視訊一起拆掉。
+    storyHdLayer.show(storyBackground.hidden ? undefined : activeStoryHd(source));
   };
 
   /**
@@ -2106,6 +2113,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     unsubscribe();
     stopNativePresentationAssetRefresh();
     stopPortraitPresentationRefresh();
+    storyHdLayer.destroy();
     stopScaling();
     stopOriginalDebugSubscription();
     stopGamepad();

@@ -12,6 +12,8 @@ import {
   debugRosterStageId,
 } from "../../src/game/debug-scenario-catalog";
 import { STAGE_INDEX } from "../../src/game/content/stage-index";
+import { STORY_HD_ENTRIES } from "../../src/game/content/story-hd.generated";
+import { STORY_HD_TITLE, storyHdAssetUrls, storyHdTitleAssetUrls } from "../../src/game/content/story-hd";
 import { musicProgramFor } from "../../src/game/content/music";
 import {
   parseResourceManifest,
@@ -200,6 +202,25 @@ describe("versioned resource manifest", () => {
     for (const pack of manifest.packs.filter(({ id }) => id !== "stream:portraits-hd")) {
       for (const url of resolvedPackUrls(manifest, pack.id)) {
         expect(url.includes("/portraits/hd/"), `${pack.id} must not carry ${url}`).toBe(false);
+      }
+    }
+
+    // `REMAKE-196`: the HD story illustrations (posters, loops and sky strips, shared strips once) and their
+    // manifest, likewise in no stage or route pack.
+    const storyHd = resolvedPackUrls(manifest, "stream:story-hd");
+    // `REMAKE-197`: the HD title's layers stream from the same pack.
+    const storyHdFiles = new Set([
+      ...STORY_HD_ENTRIES.flatMap((entry) => storyHdAssetUrls(entry)),
+      ...(STORY_HD_TITLE ? storyHdTitleAssetUrls(STORY_HD_TITLE) : []),
+    ]);
+    expect(storyHd.size).toBe(storyHdFiles.size + 1);
+    for (const url of storyHdFiles) {
+      expect(storyHd).toContain(url);
+    }
+    expect(storyHd).toContain("/assets/original/story/hd/hd-manifest.json");
+    for (const pack of manifest.packs.filter(({ id }) => id !== "stream:story-hd")) {
+      for (const url of resolvedPackUrls(manifest, pack.id)) {
+        expect(url.includes("/story/hd/"), `${pack.id} must not carry ${url}`).toBe(false);
       }
     }
   });

@@ -227,6 +227,7 @@ import {
   STAGE_RUNTIME_MANIFEST,
   stageFigureUrls,
   stageRuntimeSourceForDestination,
+  stageStoryBackgroundUrls,
   type LoadedStageRuntime,
 } from "./stage-runtime";
 import type { ActionMode, AttackResult, BattleSaveData, BattleUnit, CampaignState, DialoguePage, Difficulty, GamePhase, PortraitRecord, Position, SaveData, StageId, UnitClassId, UnitStats } from "./types";
@@ -261,6 +262,11 @@ export interface StageAssetRequirements {
    * 只在玩家開了語音時隨資源門下載，下載失敗的頁面當作無語音頁。
    */
   voiceUrls?: readonly string[];
+  /**
+   * `REMAKE-196` 這一關劇情用到的原版插圖（`storyBackground` 與 `storyBackgrounds`）。
+   * 原版插圖本身已在關卡資源包裡；資源門只在選了高清時據此帶上對應的高清循環。
+   */
+  storyBackgroundUrls?: readonly string[];
 }
 
 /**
@@ -717,6 +723,7 @@ export class GameController {
   /** 語音下載或解碼失敗只在狀態列提示一次。 */
   private voiceFailureNoticed = false;
   private portraitHdFailureNoticed = false;
+  private storyHdFailureNoticed = false;
   private voiceLineHold?: () => Promise<void>;
   speechEnabled: boolean;
   movementSoundEnabled: boolean;
@@ -1112,6 +1119,7 @@ export class GameController {
           runtime.preparation ? runtime.definition.nativeStage : undefined,
         ),
         voiceUrls: gateVoiceUrls(stageId, this.voiceVolume),
+        storyBackgroundUrls: stageStoryBackgroundUrls(runtime.assets),
       };
     };
     if (this.stageAssetGate) await this.stageAssetGate(stageId, resolveRequirements);
@@ -6478,6 +6486,14 @@ export class GameController {
     if (this.portraitHdFailureNoticed) return;
     this.portraitHdFailureNoticed = true;
     this.statusMessage = "高清肖像載入失敗，相關角色改用原版肖像。";
+    this.emit();
+  }
+
+  /** `REMAKE-196`：高清劇情插圖載入或播放失敗、退回原版插圖時，狀態列提示一次。 */
+  reportStoryHdUnavailable(): void {
+    if (this.storyHdFailureNoticed) return;
+    this.storyHdFailureNoticed = true;
+    this.statusMessage = "高清劇情插圖載入失敗，改用原版插圖。";
     this.emit();
   }
 

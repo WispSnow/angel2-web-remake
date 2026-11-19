@@ -245,6 +245,12 @@ pnpm exec playwright install ffmpeg
   `scripts/generate-portrait-hd.mjs` 从素材包 `portraits/hd/hd-manifest.json` 生成（`pnpm content:portraits-hd`，
   从 git 忽略的工作台导入用 `-- --import tmp/portrait-hd/export`）；原版主图一变它就拒绝生成，要先复审对应的高清记录。
   被操控红眼版（`REMAKE-195`）只给原版有 `eye-red.png` 的记录，由工作台 `tools/red_eyes.py` 从一般循环派生。
+- 可选高清剧情插图（`REMAKE-196`）的 `story-hd.generated.ts` 由 `scripts/generate-story-hd.mjs` 从素材包
+  `story/hd/hd-manifest.json` 生成（`pnpm content:story-hd`，从 git 忽略的工作台导入用 `-- --import tmp/cutscene-hd/export`）；
+  以原版插图 URL 对应，原图一变就拒绝生成，各关不另登记 `BK` 号。有云的插图另带可平铺云层 `sky.webp` 与上下叠加
+  （颜色／透明度）的前景视频，由画布卷动合成；剧情里来回切换的变体插图共用同一张云层。同一份清单（第 3 版）还带高清标题画面
+  （`REMAKE-197`，`title-hd.ts`）：蓝底、画框与标志保留原版像素（工作台 `tools/title.py` 按四向对称重建被人物挡住的画框、从两组
+  标志带抠出标志字），框内是高清地景与卷动云层，两名女子各自生成待机循环后合成一段叠加式视频；原版标题的五张图一变就拒绝生成。
 - `src/game/content/character-catalog.generated.ts` 由 `scripts/generate-character-catalog.mjs`
   生成，来源是原版角色描述子表、关卡模板、胜负条件表、逐关事件处理器与对白语料；修改证据后
   运行 `pnpm content:characters`。角色出场关卡必须同时合并静态模板、名单候选、事件生成与对白

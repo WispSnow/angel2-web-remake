@@ -102,6 +102,7 @@
     "content:music-remix": "node scripts/generate-music-remix.mjs",
     "content:voice": "node scripts/generate-voice-catalog.mjs",
     "content:portraits-hd": "node scripts/generate-portrait-hd.mjs",
+    "content:story-hd": "node scripts/generate-story-hd.mjs",
     "assets:audit": "node scripts/audit-image-assets.mjs"
   },
   "dependencies": {

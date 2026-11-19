@@ -246,6 +246,25 @@ for (const file of portraitHdManifest.records.flatMap((entry) =>
     throw new Error(`release HD portrait differs from its manifest: ${file.output}`);
   }
 }
+// `REMAKE-196`: HD story illustrations follow the same rule. The manifest exists only once
+// the asset pack carries at least one HD illustration. A still (BK/13) has no loop, a
+// shared sky strip is listed by every record using it, and `REMAKE-197` adds the title's
+// layers.
+const storyHdManifestPath = path.join(releaseDirectory, "assets/original/story/hd/hd-manifest.json");
+if (await pathExists(storyHdManifestPath)) {
+  const storyHdManifest = JSON.parse(await readFile(storyHdManifestPath, "utf8"));
+  const title = storyHdManifest.title;
+  const storyHdFiles = [
+    ...storyHdManifest.records.flatMap((entry) => [entry.poster, entry.video, entry.sky]),
+    ...(title ? [title.frame, title.women, ...title.variants.flatMap((variant) => [variant.logo, variant.land, variant.sky])] : []),
+  ].filter(Boolean);
+  for (const file of new Map(storyHdFiles.map((entry) => [entry.output, entry])).values()) {
+    const released = await readFile(path.join(releaseDirectory, "assets/original", file.output));
+    if (createHash("sha256").update(released).digest("hex") !== file.sha256) {
+      throw new Error(`release HD story illustration differs from its manifest: ${file.output}`);
+    }
+  }
+}
 const legacyMusic = files.filter((file) => {
   const relative = path.relative(releaseDirectory, file);
   return /(?:^|\/)(?:story-stage\d+(?:-loop-seamless)?|battle-stage\d+-(?:player|enemy)-(?:entry|loop)(?:-seamless)?)\.wav$/u.test(relative)
