@@ -3,8 +3,10 @@ import {
   storyHdAssetUrlsForSources,
   storyHdEntryForSource,
   storyHdEpilogueSpread,
+  STORY_HD_THE_END,
   type StoryHdEntry,
   type StoryHdEpilogueSpread,
+  type StoryHdTheEnd,
 } from "./content/story-hd";
 import { notifyPortraitPresentationChanged, portraitStyle } from "./portrait-style";
 import type { PortraitStyle } from "./preferences";
@@ -82,4 +84,27 @@ export function epilogueHdUrlsForStyle(
     if (spread) urls.add(spread.video.source);
   }
   return [...urls];
+}
+
+let theEndFailed = false;
+
+/**
+ * `REMAKE-201` 製作人員表之後的「The end」此刻要換成的高清循環；同一個「美術風格」偏好。偏好為原版、沒有高清版、
+ * 檔案還不在資源租約裡，或視訊本次執行已失敗時回傳 `undefined`，照原版畫第 0 幀與四幀小角色動畫。
+ */
+export function activeTheEndHd(): StoryHdTheEnd | undefined {
+  if (portraitStyle() !== "hd" || !STORY_HD_THE_END || theEndFailed) return undefined;
+  return stagedRenderAssetAvailable(STORY_HD_THE_END.video.source) ? STORY_HD_THE_END : undefined;
+}
+
+/** 播放器在載入或解碼失敗時呼叫：「The end」本次執行改畫原版。 */
+export function markTheEndHdFailed(reason: string): void {
+  if (theEndFailed) return;
+  theEndFailed = true;
+  console.warn(`HD "The end" falls back to the original: ${reason}`);
+}
+
+/** 製作人員表路由門要額外下載的高清檔案；偏好為原版時為空。 */
+export function theEndHdUrlsForStyle(style: PortraitStyle = portraitStyle()): readonly string[] {
+  return style === "hd" && STORY_HD_THE_END ? [STORY_HD_THE_END.video.source] : [];
 }

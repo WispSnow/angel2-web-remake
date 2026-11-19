@@ -1,4 +1,4 @@
-import { STORY_HD_ENTRIES, STORY_HD_EPILOGUE, STORY_HD_INTRO, STORY_HD_TITLE } from "./story-hd.generated";
+import { STORY_HD_ENTRIES, STORY_HD_EPILOGUE, STORY_HD_INTRO, STORY_HD_THE_END, STORY_HD_TITLE } from "./story-hd.generated";
 
 /**
  * `REMAKE-196` 可選的高清劇情插圖：每張 `BK/<id>` 一段 AI 重繪的全畫面待機循環。
@@ -148,6 +148,21 @@ export { STORY_HD_EPILOGUE };
 export function storyHdEpilogueSpread(left: string, right: string): StoryHdEpilogueSpread | undefined {
   return STORY_HD_EPILOGUE?.spreads.find(({ originals }) => originals[0] === left && originals[1] === right);
 }
+
+/**
+ * 製作人員表之後的「The end」高清畫面（`REMAKE-201`）：原版模組 46 把 `UN/54` 第 0 幀（408×301：左上 320×200 的插圖，
+ * 下方與右方是手寫的 The end 與愛心）畫在 `(160,27)`，再在插圖裡疊四幀小角色動畫，永久循環。高清版只換那張插圖：
+ * 一段無縫循環的視訊，連同小角色的動作都在裡面；手寫字與愛心照原版像素。
+ */
+export interface StoryHdTheEnd {
+  /** 取代的原版第 0 幀（`credits/end/00.png`）。 */
+  readonly original: string;
+  /** 插圖在第 0 幀裡的位置（原版像素）；視訊拉伸蓋在這裡。 */
+  readonly picture: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  readonly video: StoryHdVideo;
+}
+
+export { STORY_HD_THE_END };
 
 /** 高清標題要下載的全部檔案（兩組都要：閒置重播會換組）。 */
 export function storyHdTitleAssetUrls(title: StoryHdTitle): readonly string[] {

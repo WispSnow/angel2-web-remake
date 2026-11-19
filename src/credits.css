@@ -36,6 +36,9 @@
 .credits-final-base { position: absolute; left: 160px; top: 27px; width: 408px; height: 301px; }
 .credits-final-overlay { position: absolute; left: 352px; top: 161px; width: 48px; height: 56px; }
 .credits-final-overlay img { position: absolute; inset: 0; }
+/* `REMAKE-201`：高清「The end」循環蓋住第 0 幀的插圖（位置由播放器按清單寫入），手寫字與愛心露在外面；
+   視訊明確設回平滑縮放（`image-rendering` 會繼承宿主的像素化偏好）。 */
+.credits-final-hd { position: absolute; object-fit: fill; image-rendering: auto; pointer-events: none; }
 .credits-asset-error {
   position: absolute;
   z-index: 10;

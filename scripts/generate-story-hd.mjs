@@ -39,6 +39,14 @@
 // must last as long as its segment stays up: max(wait, typing) native ticks, or
 // longer while the REMAKE-189 narration is still speaking.
 //
+// Version 6 adds the "The end" screen after the credits (REMAKE-201, user request
+// 2026-11-19) under `theEnd`: one seamless loop over the 320x200 picture inside
+// UN/54 frame 0 (the hand-written lettering and the heart around it stay the
+// original pixels), the four-frame arm gesture module 46 overlays inside it
+// included. Frame 0 and the four overlay frames are pinned by hash, the picture
+// rectangle must lie inside frame 0 and contain the overlay, and the clip must have
+// the picture's aspect.
+//
 // `--import <workbench export>` first copies the files from the git-ignored
 // workbench (tmp/cutscene-hd/export, made by its tools/export.py) into the asset
 // pack and rewrites the manifest. The workbench never ships.
@@ -56,7 +64,7 @@ const manifestPath = path.join(hdRoot, "hd-manifest.json");
 const contentRoot = path.join(root, "src/game/content");
 const generatedModule = path.join(contentRoot, "story-hd.generated.ts");
 const FORMAT = "ANGEL2 HD story illustrations";
-const VERSION = 5;
+const VERSION = 6;
 /** REMAKE-198 crawl clips: 2.316x the 608x257 plate (2.366x vertically; H3 sizes step by 32), shown stretched into it. */
 const INTRO_WIDTH = 1408;
 const INTRO_HEIGHT = 608;
@@ -72,6 +80,11 @@ const ORIGINAL_HEIGHT = 200;
 /** REMAKE-200: module 35 blits two 320x350 halves side by side; the clips cover the whole screen like the story loops. */
 const EPILOGUE_HALF_WIDTH = 320;
 const EPILOGUE_HALF_HEIGHT = 350;
+/** REMAKE-201: module 46 draws UN/54 frame 0 (408x301) at (160,27) and overlays frames 1-4 (48x56) at (352,161). */
+const THE_END_ORIGINAL = "/assets/original/credits/end/00.png";
+const THE_END_OVERLAYS = [1, 2, 3, 4].map((frame) => `/assets/original/credits/end/0${frame}.png`);
+const THE_END_SIZE = { width: 408, height: 301 };
+const THE_END_OVERLAY = { x: 352 - 160, y: 161 - 27, width: 48, height: 56 };
 
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
 const pad = (background) => `bk${String(background).padStart(2, "0")}`;
@@ -192,6 +205,14 @@ async function checkFile(file, kind) {
     if (tracks[0].width !== INTRO_WIDTH || tracks[0].height !== INTRO_HEIGHT || file.width !== INTRO_WIDTH || file.height !== INTRO_HEIGHT) {
       fail(`${file.output} is ${tracks[0].width}x${tracks[0].height}, expected ${INTRO_WIDTH}x${INTRO_HEIGHT}`);
     }
+    if (!(Number.isInteger(file.frames) && file.frames > 24 && file.fps === 24)) fail(`${file.output} frame count or rate out of range`);
+  } else if (kind === "the-end-video") {
+    const tracks = mp4Tracks(buffer);
+    if (tracks.length !== 1 || tracks[0].handler !== "vide") fail(`${file.output} must hold exactly one video track and no audio`);
+    if (tracks[0].width !== file.width || tracks[0].height !== file.height) {
+      fail(`${file.output} is ${tracks[0].width}x${tracks[0].height}, the manifest says ${file.width}x${file.height}`);
+    }
+    if (file.width % 32 !== 0 || file.height % 32 !== 0 || file.width < 640 || file.width > 1920) fail(`${file.output} size out of range`);
     if (!(Number.isInteger(file.frames) && file.frames > 24 && file.fps === 24)) fail(`${file.output} frame count or rate out of range`);
   } else if (kind === "png") {
     const size = pngSize(buffer);
@@ -354,9 +375,40 @@ async function validateEpilogue(epilogue, expectedFiles) {
   }
 }
 
+async function theEndOriginalSha256(original, size) {
+  const file = path.join(assetRoot, original.replace(/^\/assets\/original\//u, ""));
+  if (!existsSync(file)) fail(`${original} does not exist`);
+  const buffer = await readFile(file);
+  const actual = pngSize(buffer);
+  if (actual.width !== size.width || actual.height !== size.height) fail(`${original} is not ${size.width}x${size.height}`);
+  return sha256(buffer);
+}
+
+/** The HD "The end" (REMAKE-201): one loop over the picture inside UN/54 frame 0, the originals pinned. */
+async function validateTheEnd(theEnd, expectedFiles) {
+  if (theEnd.original !== THE_END_ORIGINAL) fail(`the end must replace ${THE_END_ORIGINAL}`);
+  if (theEnd.originalSha256 !== await theEndOriginalSha256(THE_END_ORIGINAL, THE_END_SIZE)) {
+    fail(`${THE_END_ORIGINAL} changed; review the HD "The end" before shipping it`);
+  }
+  if (!Array.isArray(theEnd.overlaysSha256) || theEnd.overlaysSha256.length !== THE_END_OVERLAYS.length) fail("the end needs four overlay hashes");
+  for (const [index, overlay] of THE_END_OVERLAYS.entries()) {
+    if (theEnd.overlaysSha256[index] !== await theEndOriginalSha256(overlay, THE_END_OVERLAY)) {
+      fail(`${overlay} changed; the HD "The end" loop acts out the original gesture, review it`);
+    }
+  }
+  const { x, y, width, height } = theEnd.picture ?? {};
+  if (![x, y, width, height].every(Number.isInteger) || x < 0 || y < 0 || width < 1 || height < 1
+    || x + width > THE_END_SIZE.width || y + height > THE_END_SIZE.height) fail("the end picture lies outside frame 0");
+  const o = THE_END_OVERLAY;
+  if (o.x < x || o.y < y || o.x + o.width > x + width || o.y + o.height > y + height) fail("the end picture must contain the overlay gesture");
+  await checkFile(theEnd.video, "the-end-video");
+  if (theEnd.video.width * height !== theEnd.video.height * width) fail(`${theEnd.video.output} does not have the picture's aspect`);
+  expectedFiles.add(path.relative("story/hd", theEnd.video.output));
+}
+
 async function importWorkbench(workbench) {
   const exported = JSON.parse(await readFile(path.join(workbench, "manifest.json"), "utf8"));
-  if (exported.format !== "angel2-story-hd-export" || exported.version !== 5) fail("unexpected workbench export format");
+  if (exported.format !== "angel2-story-hd-export" || exported.version !== 6) fail("unexpected workbench export format");
   await rm(hdRoot, { recursive: true, force: true });
   const copied = new Set();
   // the export folder mirrors story/hd/; a strip two records share is copied once
@@ -431,6 +483,17 @@ async function importWorkbench(workbench) {
       });
     }
   }
+  let theEnd;
+  if (exported.theEnd) {
+    const t = exported.theEnd;
+    theEnd = {
+      original: THE_END_ORIGINAL,
+      originalSha256: await theEndOriginalSha256(THE_END_ORIGINAL, THE_END_SIZE),
+      overlaysSha256: await Promise.all(THE_END_OVERLAYS.map((overlay) => theEndOriginalSha256(overlay, THE_END_OVERLAY))),
+      picture: t.picture,
+      video: await ship(t.video, { frames: t.video.frames, fps: t.video.fps }),
+    };
+  }
   const manifest = {
     format: FORMAT,
     version: VERSION,
@@ -457,6 +520,12 @@ async function importWorkbench(workbench) {
       epilogue: {
         note: "REMAKE-200 ending epilogue: one one-shot clip per spread (left and right 320x350 halves), as long as its segment stays up",
         ...epilogue,
+      },
+    } : {}),
+    ...(theEnd ? {
+      theEnd: {
+        note: "REMAKE-201 The end: one seamless loop stretched over `picture` (original pixels of UN/54 frame 0), the overlay gesture acted out inside it",
+        ...theEnd,
       },
     } : {}),
   };
@@ -505,6 +574,7 @@ async function validate(manifest) {
   if (manifest.title) await validateTitle(manifest.title, expectedFiles);
   if (manifest.intro) introPlate = await validateIntro(manifest.intro, expectedFiles);
   if (manifest.epilogue) await validateEpilogue(manifest.epilogue, expectedFiles);
+  if (manifest.theEnd) await validateTheEnd(manifest.theEnd, expectedFiles);
   const stray = shipped.filter((file) => !expectedFiles.has(file));
   if (stray.length > 0) fail(`stray files under story/hd/: ${stray.join(", ")}`);
 }
@@ -579,10 +649,22 @@ function epilogueModule(epilogue) {
     "",
   ];
 }
+function theEndModule(theEnd) {
+  if (!theEnd) return ["export const STORY_HD_THE_END: StoryHdTheEnd | undefined = undefined;", ""];
+  const { picture, video } = theEnd;
+  return [
+    "export const STORY_HD_THE_END: StoryHdTheEnd | undefined = {",
+    `  original: ${JSON.stringify(theEnd.original)},`,
+    `  picture: { x: ${picture.x}, y: ${picture.y}, width: ${picture.width}, height: ${picture.height} },`,
+    `  video: { source: ${url(video.output)}, width: ${video.width}, height: ${video.height}, frames: ${video.frames}, fps: ${video.fps} },`,
+    "};",
+    "",
+  ];
+}
 const records = [...manifest.records].sort((a, b) => a.background - b.background);
 await writeFile(generatedModule, [
   "// Generated by scripts/generate-story-hd.mjs from story/hd/hd-manifest.json; do not edit by hand.",
-  "import type { StoryHdEntry, StoryHdEpilogue, StoryHdIntro, StoryHdTitle } from \"./story-hd\";",
+  "import type { StoryHdEntry, StoryHdEpilogue, StoryHdIntro, StoryHdTheEnd, StoryHdTitle } from \"./story-hd\";",
   "",
   `export const STORY_HD_WIDTH = ${WIDTH};`,
   `export const STORY_HD_HEIGHT = ${HEIGHT};`,
@@ -602,6 +684,7 @@ await writeFile(generatedModule, [
   ...titleModule(manifest.title),
   ...introModule(manifest.intro),
   ...epilogueModule(manifest.epilogue),
+  ...theEndModule(manifest.theEnd),
 ].join("\n"));
 const shippedBytes = new Map();
 for (const entry of records) for (const file of [entry.poster, entry.video, entry.sky]) if (file) shippedBytes.set(file.output, file.bytes);
@@ -611,5 +694,6 @@ if (manifest.title) {
 }
 if (manifest.intro) for (const scene of manifest.intro.scenes) shippedBytes.set(scene.video.output, scene.video.bytes);
 if (manifest.epilogue) for (const spread of manifest.epilogue.spreads) shippedBytes.set(spread.video.output, spread.video.bytes);
+if (manifest.theEnd) shippedBytes.set(manifest.theEnd.video.output, manifest.theEnd.video.bytes);
 const bytes = [...shippedBytes.values()].reduce((sum, size) => sum + size, 0);
-console.log(`story HD catalog: ${records.length} records${manifest.title ? " + title" : ""}${manifest.intro ? " + intro" : ""}${manifest.epilogue ? " + epilogue" : ""}, ${(bytes / 1024 / 1024).toFixed(1)} MiB -> ${path.relative(root, generatedModule)}`);
+console.log(`story HD catalog: ${records.length} records${manifest.title ? " + title" : ""}${manifest.intro ? " + intro" : ""}${manifest.epilogue ? " + epilogue" : ""}${manifest.theEnd ? " + the end" : ""}, ${(bytes / 1024 / 1024).toFixed(1)} MiB -> ${path.relative(root, generatedModule)}`);

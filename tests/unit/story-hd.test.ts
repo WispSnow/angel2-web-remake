@@ -3,6 +3,7 @@ import { STORY_HD_ENTRIES, STORY_HD_HEIGHT, STORY_HD_WIDTH } from "../../src/gam
 import {
   STORY_HD_EPILOGUE,
   STORY_HD_INTRO,
+  STORY_HD_THE_END,
   STORY_HD_TITLE,
   storyHdAssetUrls,
   storyHdEntryForSource,
@@ -12,10 +13,12 @@ import {
   storyHdTitleAssetUrls,
 } from "../../src/game/content/story-hd";
 import { STARTUP_INTRO, STARTUP_TITLE } from "../../src/game/content/startup.generated";
+import { CREDITS_FINAL_SCREEN, CREDITS_FINAL_TIMELINE } from "../../src/game/content/credits";
 import { STAGE49_ENDING_ASSETS, STAGE49_EPILOGUE_SEGMENTS } from "../../src/game/content/stage49-ending";
 import { VOICE_STARTUP_NARRATION, epilogueNarrationFor } from "../../src/game/content/voice-catalog";
 import { STAGE_RUNTIME_MANIFEST, loadStageRuntime, stageStoryBackgroundUrls } from "../../src/game/stage-runtime";
-import { epilogueHdUrlsForStyle, storyHdUrlsForStyle } from "../../src/game/story-hd-style";
+import { epilogueHdUrlsForStyle, storyHdUrlsForStyle, theEndHdUrlsForStyle } from "../../src/game/story-hd-style";
+import { loopPhaseDistance } from "../../src/game/the-end-hd";
 
 describe("REMAKE-196 HD story illustrations", () => {
   test("the HD frame is the 640x350 logical screen at 2.2x, within a pixel per side under object-fit: cover", () => {
@@ -230,5 +233,43 @@ describe("REMAKE-200 HD ending epilogue", () => {
     const urls = epilogueHdUrlsForStyle(chosen, "hd");
     expect(urls).toHaveLength(chosen.length);
     expect(urls).toEqual(chosen.map(([left, right]) => storyHdEpilogueSpread(left, right)?.video.source));
+  });
+});
+
+describe("REMAKE-201 HD The end", () => {
+  test("replaces the picture inside UN/54 frame 0 and leaves the lettering and heart around it", () => {
+    const theEnd = STORY_HD_THE_END;
+    if (!theEnd) throw new Error("no HD The end");
+    expect(theEnd.original).toBe(CREDITS_FINAL_SCREEN.base);
+    // the picture is the 320x200 top left of the 408x301 frame; the lettering lies below it and the heart to its right
+    expect(theEnd.picture).toEqual({ x: 0, y: 0, width: 320, height: 200 });
+    // module 46 overlays the 48x56 arm frames at (352,161), (192,134) inside frame 0: the loop covers that gesture
+    const overlay = { x: 352 - 160, y: 161 - 27, width: 48, height: 56 };
+    expect(overlay.x + overlay.width).toBeLessThanOrEqual(theEnd.picture.x + theEnd.picture.width);
+    expect(overlay.y + overlay.height).toBeLessThanOrEqual(theEnd.picture.y + theEnd.picture.height);
+    expect(theEnd.video.source).toBe("/assets/original/story/hd/the-end/loop.mp4");
+    expect(theEnd.video.width * theEnd.picture.height).toBe(theEnd.video.height * theEnd.picture.width);
+    expect(theEnd.video.fps).toBe(24);
+  });
+
+  test("one loop holds the whole native cycle's gesture at about its length", () => {
+    const theEnd = STORY_HD_THE_END;
+    if (!theEnd) throw new Error("no HD The end");
+    const cycleMs = CREDITS_FINAL_TIMELINE.reduce((sum, step) => sum + step.waitNativeTicks * 10, 0);
+    expect(cycleMs).toBe(7_120);
+    const loopMs = theEnd.video.frames / theEnd.video.fps * 1000;
+    expect(loopMs).toBeGreaterThan(cycleMs * 0.6);
+    expect(loopMs).toBeLessThan(cycleMs * 1.6);
+  });
+
+  test("the credits route gate fetches the loop only in 高清", () => {
+    expect(theEndHdUrlsForStyle("original")).toEqual([]);
+    expect(theEndHdUrlsForStyle("hd")).toEqual([STORY_HD_THE_END?.video.source]);
+  });
+
+  test("the loop phase distance wraps around the seam", () => {
+    expect(loopPhaseDistance(0.1, 6.9, 7)).toBeCloseTo(0.2, 6);
+    expect(loopPhaseDistance(3, 3.2, 7)).toBeCloseTo(0.2, 6);
+    expect(loopPhaseDistance(10.5, 3.5, 7)).toBeCloseTo(0, 6);
   });
 });

@@ -8,14 +8,21 @@ import {
 } from "./content/credits";
 import type { GameController } from "./controller";
 import { prepareDomImageElements } from "./dom-image-readiness";
+import { onPortraitPresentationChange } from "./portrait-style";
 import { configureGameScaling } from "./scaling";
 import {
   bindProgramAnimation,
   clearProgramTimeout,
+  programNow,
   setProgramTimeout,
   type ProgramTimeout,
 } from "./program-clock";
 import { stagedRenderAssetSource } from "./staged-render-asset-cache";
+import { activeTheEndHd } from "./story-hd-style";
+import { TheEndHdPlayer } from "./the-end-hd";
+
+/** 原版模組 46 把 `UN/54` 第 0 幀畫在這裡（與 `.credits-final-base` 的位置一致）。 */
+const FINAL_BASE_ORIGIN = { x: 160, y: 27 } as const;
 
 const escapeHtml = (value: string): string => value
   .replaceAll("&", "&amp;")
@@ -81,6 +88,13 @@ export function mountCreditsUi(root: HTMLElement, controller: GameController): (
   let finalStepIndex = 0;
   let renderGeneration = 0;
   let segmentFailed = false;
+  /** `REMAKE-201` 「The end」的高清循環；美術風格為原版或高清版不可用時沒有。 */
+  let theEndHd: TheEndHdPlayer | undefined;
+
+  const stopTheEndHd = () => {
+    theEndHd?.dispose();
+    theEndHd = undefined;
+  };
 
   const stopFinalAnimation = () => {
     if (finalTimer !== undefined) clearProgramTimeout(finalTimer);
@@ -147,25 +161,46 @@ export function mountCreditsUi(root: HTMLElement, controller: GameController): (
     const generation = ++renderGeneration;
     stopFinalAnimation();
     stopScrollAnimation();
+    stopTheEndHd();
+    delete screen.dataset.theEndStyle;
     const credits = controller.credits;
     if (!credits) return;
     segmentFailed = false;
     screen.dataset.segmentReady = "false";
     delete screen.dataset.segmentError;
+    const readiness: Promise<unknown>[] = [];
     if (credits.section === "the-end") {
       screen.innerHTML = finalMarkup();
       screen.setAttribute("aria-label", "The End");
+      const host = screen.querySelector<HTMLElement>(".credits-final");
+      const theEnd = activeTheEndHd();
+      if (host && theEnd) {
+        const player = new TheEndHdPlayer(host, theEnd, FINAL_BASE_ORIGIN);
+        theEndHd = player;
+        // 高清循環等到第一幀才開始；逾時或失敗時它自己退回原版，不會讓這一段失敗。
+        readiness.push(player.ready().then((ok) => {
+          if (ok || generation !== renderGeneration) return;
+          screen.dataset.theEndStyle = "original";
+          if (theEndHd === player) theEndHd = undefined;
+        }));
+      }
+      screen.dataset.theEndStyle = theEndHd ? "hd" : "original";
     } else {
       screen.innerHTML = scrollMarkup(credits.transitionIndex);
       screen.setAttribute("aria-label", `製作人員表轉場 ${credits.transitionIndex + 1}／${CREDITS_TRANSITION.count}`);
     }
-    void prepareDomImageElements(screen.querySelectorAll<HTMLImageElement>("img"), {
-      abandoned: () => generation !== renderGeneration,
-    }).then(() => {
+    void Promise.all([
+      prepareDomImageElements(screen.querySelectorAll<HTMLImageElement>("img"), {
+        abandoned: () => generation !== renderGeneration,
+      }),
+      ...readiness,
+    ]).then(() => {
       if (generation !== renderGeneration) return;
       screen.dataset.segmentReady = "true";
-      if (credits.section === "the-end") startFinalAnimation();
-      else startScrollAnimation();
+      if (credits.section === "the-end") {
+        startFinalAnimation();
+        theEndHd?.start(programNow());
+      } else startScrollAnimation();
     }).catch((error: unknown) => {
       if (generation !== renderGeneration) return;
       segmentFailed = true;
@@ -183,6 +218,11 @@ export function mountCreditsUi(root: HTMLElement, controller: GameController): (
   };
 
   const unsubscribe = controller.onChange(render);
+  // 「The end」期間改了美術風格（或高清檔案剛補進租約）：重畫這一段，換成或撤掉高清循環。
+  const stopPresentationRefresh = onPortraitPresentationChange(() => {
+    if (controller.credits?.section !== "the-end") return;
+    if (Boolean(activeTheEndHd()) !== Boolean(theEndHd)) render();
+  });
   screen.addEventListener("click", retryFailedSegment);
   render();
   return () => {
@@ -190,7 +230,9 @@ export function mountCreditsUi(root: HTMLElement, controller: GameController): (
     renderGeneration += 1;
     stopFinalAnimation();
     stopScrollAnimation();
+    stopTheEndHd();
     unsubscribe();
+    stopPresentationRefresh();
     screen.removeEventListener("click", retryFailedSegment);
     destroyScaling();
   };

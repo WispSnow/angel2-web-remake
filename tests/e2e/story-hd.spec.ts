@@ -523,3 +523,64 @@ test("REMAKE-200: in 原版 the epilogue keeps the original halves and no HD cli
   await expect(page.getByTestId("stage49-epilogue-hd")).toHaveCount(0);
   expect(requests.filter((url) => url.startsWith(`${EPILOGUE}/`))).toEqual([]);
 });
+
+// `REMAKE-201` "The end" after the credits. The stage-38-cleared debug entry starts the credits; `?test=1` shortens the
+// eight scroll transitions to 160 ms each. In 高清 one seamless loop covers the 320x200 picture inside UN/54 frame 0 while
+// the original frame 0 (with the hand-written lettering and the heart) and its arm overlay keep running underneath.
+const THE_END_LOOP = `${HD}/the-end/loop.mp4`;
+const openTheEnd = async (page: Page) => {
+  await page.goto("/?debugScenario=stage-38-cleared&difficulty=0&test=1");
+  const screen = page.getByTestId("credits-screen");
+  await expect(page.getByTestId("credits-final")).toBeVisible({ timeout: 20_000 });
+  await expect(screen).toHaveAttribute("data-segment-ready", "true");
+  return screen;
+};
+
+test("REMAKE-201: in 高清 The end loops its HD picture over the original frame 0, paused with the program", async ({ page }) => {
+  test.setTimeout(60_000);
+  const requests = storyHdRequests(page);
+  await useHd(page);
+  const screen = await openTheEnd(page);
+  await expect(screen).toHaveAttribute("data-the-end-style", "hd");
+  const video = page.getByTestId("credits-final-hd");
+  await expect(video).toHaveAttribute("data-source-url", THE_END_LOOP);
+  // above the original frame 0 and its overlay, which stay in place underneath
+  const layers = await page.getByTestId("credits-final").evaluate((host) => [...host.children].map((child) => child.className));
+  expect(layers).toEqual(["credits-final-base", "credits-final-overlay", "credits-final-hd"]);
+  // exactly over the picture: the top left 320x200 of the 408x301 frame, so the lettering and the heart stay visible
+  const [videoBox, baseBox] = await Promise.all([video.boundingBox(), page.locator(".credits-final-base").boundingBox()]);
+  if (!videoBox || !baseBox) throw new Error("The end layers have no box");
+  expect(Math.abs(videoBox.x - baseBox.x)).toBeLessThan(1);
+  expect(Math.abs(videoBox.y - baseBox.y)).toBeLessThan(1);
+  expect(Math.abs(videoBox.width - baseBox.width * 320 / 408)).toBeLessThan(1);
+  expect(Math.abs(videoBox.height - baseBox.height * 200 / 301)).toBeLessThan(1);
+  expect(await video.evaluate((element) => getComputedStyle(element).imageRendering)).toBe("auto");
+  expect(await video.evaluate((element: HTMLVideoElement) => element.loop && element.muted)).toBe(true);
+  // the credits route gate fetched the loop and nothing else from story/hd
+  expect([...new Set(requests)]).toEqual([THE_END_LOOP]);
+  // it loops: past its own length the clock keeps going while the video time wraps
+  const duration = await video.evaluate((element: HTMLVideoElement) => element.duration);
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime), { timeout: 10_000 }).toBeGreaterThan(1);
+  expect(await video.evaluate((element: HTMLVideoElement) => !element.paused)).toBe(true);
+  await captureVisualAudit(screen, { path: "artifacts/playwright/the-end-hd.png" });
+  // program pause freezes the loop; resuming carries on from there
+  await page.keyboard.press("p");
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.paused)).toBe(true);
+  const frozen = await video.evaluate((element: HTMLVideoElement) => element.currentTime);
+  await page.waitForTimeout(600);
+  expect(await video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBe(frozen);
+  await page.keyboard.press("p");
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.paused)).toBe(false);
+  await expect.poll(async () => {
+    const time = await video.evaluate((element: HTMLVideoElement) => element.currentTime);
+    return Math.min(Math.abs(time - frozen), duration - Math.abs(time - frozen));
+  }).toBeGreaterThan(0.2);
+});
+
+test("REMAKE-201: in 原版 The end keeps the original frames and no HD loop is requested", async ({ page }) => {
+  const requests = storyHdRequests(page);
+  const screen = await openTheEnd(page);
+  await expect(screen).toHaveAttribute("data-the-end-style", "original");
+  await expect(page.getByTestId("credits-final-hd")).toHaveCount(0);
+  expect(requests).toEqual([]);
+});

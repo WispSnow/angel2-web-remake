@@ -39,7 +39,7 @@ import {
   onPortraitStyleChange,
   portraitHdUrlsForStyle,
 } from "./game/portrait-style";
-import { epilogueHdUrlsForStyle, storyHdUrlsForStyle } from "./game/story-hd-style";
+import { epilogueHdUrlsForStyle, storyHdUrlsForStyle, theEndHdUrlsForStyle } from "./game/story-hd-style";
 import { stageStoryBackgroundUrls } from "./game/stage-runtime";
 import {
   prepareStartupMusic,
@@ -297,7 +297,11 @@ const mountController = (
         await stagedResources?.ensureRoute(
           "credits",
           "讀取製作人員表資料",
-          remixMusicUrls([CREDITS_MUSIC_PROGRAM], controller.musicStyle),
+          [
+            ...remixMusicUrls([CREDITS_MUSIC_PROGRAM], controller.musicStyle),
+            // `REMAKE-201`：選了高清才帶「The end」的高清循環。
+            ...theEndHdUrlsForStyle(),
+          ],
         );
         if (generation !== surfaceGeneration || controller.phase !== "credits") return;
         destroySurface = mountCreditsUi(root, controller);
@@ -332,6 +336,8 @@ const mountController = (
         ...portraitHdUrlsForStyle(STAGE49_ENDING_PORTRAIT_RECORDS, style),
         ...epilogueHdUrlsForStyle(endingEpilogueHalves(controller), style),
       ];
+    } else if (controller.phase === "credits") {
+      urls = theEndHdUrlsForStyle(style);
     } else {
       const { portraitRecords, nativeStage, storyBackgroundUrls } = controllerAssetRequirements(controller);
       urls = [
