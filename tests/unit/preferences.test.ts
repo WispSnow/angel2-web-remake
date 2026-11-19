@@ -20,6 +20,8 @@ import {
   saveVoicePreferences,
   SOUND_PREFERENCES_KEY,
   VOICE_PREFERENCES_KEY,
+  VOICE_VOLUME_LABELS,
+  withVoiceVolume,
   type PreferenceStorage,
 } from "../../src/game/preferences";
 
@@ -181,6 +183,14 @@ describe("REMAKE-188 voice preferences", () => {
     // The sound and music payloads are untouched by the voice preference.
     expect(storage.getItem(SOUND_PREFERENCES_KEY)).toBeNull();
     expect(storage.getItem(MUSIC_PREFERENCES_KEY)).toBeNull();
+  });
+
+  test("REMAKE-191: turning voice on from 關 restores auto-advance, other changes keep the choice", () => {
+    expect(Object.values(VOICE_VOLUME_LABELS)).toEqual(["關", "1", "2", "3", "最大"]);
+    expect(withVoiceVolume({ voiceVolume: 0, autoAdvance: false }, 4)).toEqual({ voiceVolume: 4, autoAdvance: true });
+    expect(withVoiceVolume({ voiceVolume: 2, autoAdvance: false }, 4)).toEqual({ voiceVolume: 4, autoAdvance: false });
+    expect(withVoiceVolume({ voiceVolume: 3, autoAdvance: false }, 0)).toEqual({ voiceVolume: 0, autoAdvance: false });
+    expect(withVoiceVolume({ voiceVolume: 0, autoAdvance: false }, 0)).toEqual({ voiceVolume: 0, autoAdvance: false });
   });
 });
 

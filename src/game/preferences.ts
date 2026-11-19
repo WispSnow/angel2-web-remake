@@ -72,6 +72,26 @@ export interface VoicePreferences {
 
 export type VoiceVolume = VolumeLevel;
 
+/** 語音音量各檔的按鈕文字；遊戲內「音效開關」與調試中心共用。 */
+export const VOICE_VOLUME_LABELS: Readonly<Record<VoiceVolume, string>> = {
+  0: "關",
+  1: "1",
+  2: "2",
+  3: "3",
+  4: "最大",
+};
+
+/**
+ * `REMAKE-191`：語音從「關」開啟時改回自動翻頁，其他音量變化保留原本的翻頁方式。開場方框、
+ * 遊戲內「音效開關」與調試中心都經這裡寫入，才不會各自漂移。
+ */
+export function withVoiceVolume(current: VoicePreferences, voiceVolume: VoiceVolume): VoicePreferences {
+  return {
+    voiceVolume,
+    autoAdvance: current.voiceVolume === 0 && voiceVolume > 0 ? true : current.autoAdvance,
+  };
+}
+
 export interface PreferenceStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;

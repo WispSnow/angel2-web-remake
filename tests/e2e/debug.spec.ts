@@ -439,7 +439,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await captureVisualAudit(page, { path: `${ARTIFACT_DIR}/debug-hub.png`, fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await captureVisualAudit(page.locator(".debug-options"), {
+  await captureVisualAudit(page.locator(".debug-options[aria-label='調試選項']"), {
     path: `${ARTIFACT_DIR}/debug-growth-controls-narrow.png`,
   });
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -1128,6 +1128,56 @@ test("dispel uses its original map animation and releases a frozen ally", async 
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/debug-stage1-dispel-result.png`,
   });
+});
+
+test("debug hub sets the shared art-style, voice and music preferences before entering a scenario", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/debug.html");
+  const settings = page.getByTestId("debug-presentation-settings");
+  const portraitStyle = page.getByTestId("debug-portrait-style");
+  const voiceVolume = page.getByTestId("debug-voice-volume");
+  const autoAdvance = page.getByTestId("debug-voice-auto-advance");
+  const musicStyle = page.getByTestId("debug-music-style");
+  await expect(settings).toBeVisible();
+  // The game's own defaults: 原版, voice 關 (so 自動翻頁 is greyed), 原版 music.
+  await expect(portraitStyle).toHaveValue("original");
+  await expect(voiceVolume).toHaveValue("0");
+  await expect(autoAdvance).toBeDisabled();
+  await expect(musicStyle).toHaveValue("original");
+
+  await voiceVolume.selectOption("4");
+  // REMAKE-191: turning voice on starts in 自動翻頁, the same rule as the in-game panel.
+  await expect(autoAdvance).toBeEnabled();
+  await expect(autoAdvance).toHaveValue("true");
+  await autoAdvance.selectOption("false");
+  await portraitStyle.selectOption("hd");
+  await musicStyle.selectOption("orchestral");
+  await expect(page.getByTestId("debug-presentation-status")).toHaveText("已儲存：音樂風格 交響");
+  expect(await page.evaluate(() => Object.fromEntries(["display", "voice", "music"].map((name) =>
+    [name, JSON.parse(localStorage.getItem(`angel2.preferences.${name}.v1`) ?? "null") as unknown])))).toEqual({
+    display: { imageScaling: "sharp", interfaceZoom: 100, portraitStyle: "hd" },
+    voice: { voiceVolume: 4, autoAdvance: false },
+    music: { musicVolume: 4, musicStyle: "orchestral" },
+  });
+  await captureVisualAudit(settings, { path: `${ARTIFACT_DIR}/debug-presentation-settings.png` });
+
+  // A change made in another tab (for example the game itself) shows up here without a reload.
+  const other = await context.newPage();
+  await other.goto("/debug.html");
+  await other.getByTestId("debug-voice-volume").selectOption("2");
+  await other.close();
+  await expect(voiceVolume).toHaveValue("2");
+  await expect(autoAdvance).toHaveValue("false");
+
+  await page.getByTestId("debug-scenario-stage-00-prebattle").click();
+  await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+  // The opening narration page has no face yet; the HD palace illustration shows the style took.
+  await expect(page.locator("#story-background")).toHaveAttribute("data-story-style", "hd");
+  await expect(page.getByTestId("voice-volume-2")).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("voice-auto-advance-off")).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("music-style-orchestral")).toHaveAttribute("aria-checked", "true");
 });
 
 test("debug hub remains usable at a narrow reduced-motion viewport", async ({ page }) => {

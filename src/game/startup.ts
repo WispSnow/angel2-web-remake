@@ -61,6 +61,7 @@ import {
   loadVoicePreferences,
   saveMusicPreferences,
   saveVoicePreferences,
+  withVoiceVolume,
   type MusicStyle,
 } from "./preferences";
 import { isTauriDesktopRuntime } from "./desktop-runtime";
@@ -472,11 +473,10 @@ export function mountStartup(
     if ((activationPending && !awaitingRemix) || enabled === voiceEnabled) return;
     voiceEnabled = enabled;
     const current = loadVoicePreferences(localStorage);
-    const voiceVolume = enabled ? (current.voiceVolume === 0 ? 4 : current.voiceVolume) : 0;
-    const autoAdvance = enabled ? true : current.autoAdvance;
-    voiceAutoAdvance = autoAdvance;
-    saveVoicePreferences(localStorage, { voiceVolume, autoAdvance });
-    narration.setVolume(voiceVolume);
+    const next = withVoiceVolume(current, enabled ? (current.voiceVolume === 0 ? 4 : current.voiceVolume) : 0);
+    voiceAutoAdvance = next.autoAdvance;
+    saveVoicePreferences(localStorage, next);
+    narration.setVolume(next.voiceVolume);
     updateMusicStyleControls();
     musicStyleStatus.textContent = enabled ? "劇情語音：開，自動翻頁" : "劇情語音：關";
   };

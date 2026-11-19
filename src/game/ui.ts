@@ -126,6 +126,7 @@ import { onPortraitPresentationChange, takePortraitHdFailureNotice } from "./por
 import { StoryHdLayer } from "./story-hd-player";
 import { activeStoryHd, takeStoryHdFailureNotice } from "./story-hd-style";
 import { PORTRAIT_HD_AVAILABLE } from "./content/portrait-hd";
+import { VOICE_VOLUME_LABELS } from "./preferences";
 import {
   configureGameScaling,
   LOGICAL_SCREEN_HEIGHT,
@@ -243,7 +244,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 <div class="voice-settings-row" role="radiogroup" aria-labelledby="voice-volume-label"
                   data-testid="voice-volume-group">
                   <span class="voice-settings-label" id="voice-volume-label">語音</span>
-                  ${["關", "1", "2", "3", "最大"].map((label, level) =>
+                  ${Object.values(VOICE_VOLUME_LABELS).map((label, level) =>
                     `<button role="radio" data-action="voice-volume" data-voice-level="${level}"
                       data-testid="voice-volume-${level}" aria-label="語音音量 ${label}">${label}</button>`).join("")}
                 </div>

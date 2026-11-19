@@ -154,6 +154,41 @@ body.debug-hub-page {
   font-size: 13px;
 }
 
+/* 「表現設定」緊接在調試選項下面，兩塊之間不留整段外距。 */
+.debug-options:has(+ .debug-presentation-settings) {
+  margin-bottom: 10px;
+}
+
+.debug-options-title {
+  flex: 0 0 auto;
+  margin: 0 6px 0 0;
+  color: #fff2d3;
+  font-size: 15px;
+}
+
+.debug-options select:disabled {
+  color: #756361;
+  border-color: #4b3537;
+  background: #24181a;
+  cursor: not-allowed;
+}
+
+.debug-preference {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.debug-presentation-settings output {
+  flex: 1 0 100%;
+  color: #c7afa0;
+  font-size: 13px;
+}
+
+.debug-presentation-settings output:empty {
+  display: none;
+}
+
 .debug-growth-form {
   display: grid;
   grid-template-columns: auto auto auto auto minmax(220px, 1fr);
@@ -447,6 +482,20 @@ body.debug-hub-page {
 
   .debug-growth-form {
     grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .debug-options-title {
+    flex-basis: 100%;
+  }
+
+  .debug-preference {
+    flex: 1 1 calc(50% - 6px);
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .debug-preference select {
     width: 100%;
   }
 

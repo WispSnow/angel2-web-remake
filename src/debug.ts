@@ -20,6 +20,10 @@ import {
   parseDebugRosterSourceId,
   type DebugRosterSourceId,
 } from "./game/debug-roster-profiles";
+import {
+  bindDebugPresentationSettings,
+  debugPresentationSettingsMarkup,
+} from "./game/debug-presentation-settings";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
@@ -76,6 +80,7 @@ root.innerHTML = `
         <output data-debug-growth-status aria-live="polite"></output>
       </form>
     </section>
+    ${debugPresentationSettingsMarkup()}
     <nav class="debug-tool-links" aria-label="專項實驗室">
       <a href="/arena.html" data-testid="debug-arena-link"><b>全地形競技場</b><span>自由配置目前可用職業，使用正式規則與 AI 開戰</span></a>
       <a href="/class-showdown.html" data-testid="debug-class-showdown-link"><b>全職業對陣場</b><span>35 組同職業敵我相鄰，以統一等級直接開戰</span></a>
@@ -118,6 +123,10 @@ root.innerHTML = `
       <p>代表性成長與分支覆蓋是確定性調試夾具，不是唯一標準陣容；正式記錄來源只讀取 roster 與 PRNG。普通 <code>/</code> 仍不載入或暴露這些介面。</p>
     </footer>
   </div>`;
+
+const presentationSettings = root.querySelector<HTMLElement>("[data-testid='debug-presentation-settings']");
+if (!presentationSettings) throw new Error("debug presentation settings not found");
+bindDebugPresentationSettings(presentationSettings, localStorage);
 
 const difficultySelect = root.querySelector<HTMLSelectElement>("#debug-difficulty");
 if (!difficultySelect) throw new Error("debug difficulty selector not found");
