@@ -206,6 +206,12 @@ function validateCast(clip, label) {
   if (!cast || clip.platform !== cast.platform || clip.voiceId !== cast.voiceId) {
     fail(`${label} uses ${clip.platform}:${clip.voiceId}, the cast says ${cast?.platform}:${cast?.voiceId}`);
   }
+  // `voiceId` above is copied from the voice script; the take's own record says
+  // which voice actually spoke it. A recast (REMAKE-199) leaves the old voice's
+  // takes in the workbench under the same story keys, so check both.
+  if (clip.generation?.voiceId !== cast.voiceId) {
+    fail(`${label} was synthesised with ${clip.generation?.voiceId ?? "an unrecorded voice"}, the cast says ${cast.voiceId}; regenerate it`);
+  }
   if (clip.model !== modelFor(cast.platform)) fail(`${label} uses model ${clip.model}`);
 }
 

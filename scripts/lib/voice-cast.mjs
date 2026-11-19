@@ -37,8 +37,11 @@ export const VOICE_CAST = Object.freeze({
   leinajifu: { speaker: "蕾娜吉芙", platform: "elevenlabs", voiceId: "0ZxyP1BdNxALHVAwb6LU", voiceName: "设计音色（蕾娜吉芙）" },
   longwang: { speaker: "龍王", platform: "elevenlabs", voiceId: "2RUo2qBYrlYjcsr1ypkN", voiceName: "设计音色（龍王）" },
   yaolong: { speaker: "妖龍", platform: "elevenlabs", voiceId: "sIsggdzHMh1FrAHERUH8", voiceName: "设计音色（妖龍）" },
-  allySoldier: { speaker: "我方士兵／戰士", platform: "elevenlabs", voiceId: "s2LjOZIlsH2Yu4p6MtAK", voiceName: "Bobo" },
-  enemySoldier: { speaker: "敵方士兵", platform: "elevenlabs", voiceId: "GgmlugwQ4LYXBbEXENWm", voiceName: "Maya" },
+  // REMAKE-199 (2026-11-18): after listening the user found Bobo and the shared
+  // Maya wrong for the soldiers and picked two Voice Designs (round 5); the
+  // half-dragon family that borrowed Bobo follows the ally soldier.
+  allySoldier: { speaker: "我方士兵／戰士", platform: "elevenlabs", voiceId: "Z8p0MlPvzTFHOcAHKWvy", voiceName: "设计音色（我方士兵）" },
+  enemySoldier: { speaker: "敵方士兵", platform: "elevenlabs", voiceId: "beNkyvjHANgYeFc6IcWa", voiceName: "设计音色（敵方士兵）" },
   cavalry: { speaker: "騎兵", platform: "elevenlabs", voiceId: "kAIqZ7fZv234ClKXwzDx", voiceName: "Susan - Clear and Calm Storyteller" },
   priest: { speaker: "祭司", platform: "elevenlabs", voiceId: "5qr5FEpvZGzmVOPBS55W", voiceName: "Zi Yue" },
   ghost: { speaker: "亡灵", platform: "elevenlabs", voiceId: "JZLpE3AGwpKYZI2X65hN", voiceName: "Mingyao Ye" },
@@ -48,7 +51,8 @@ export const VOICE_CAST = Object.freeze({
   // stage-38 ghost passage (data/ghost.json); the ally sister/archer/engineer
   // families take the last native Mandarin library voices (Shuishui, Kathy,
   // Helen); the half-dragon family shares the soldier/warrior voice; the twelve
-  // roster allies rotate over the five ally voices in portrait order.
+  // roster allies rotate over the five ally voices in portrait order. Since
+  // REMAKE-199 the half-dragon family's shared voice is the ally soldier design.
   kuanmeiyi: { speaker: "庫安梅伊", platform: "elevenlabs", voiceId: "QAe8SYEl8U8qnxlfuLRz", voiceName: "Serena" },
   aixikeluo: { speaker: "艾西柯羅", platform: "elevenlabs", voiceId: "0H4ruoQ81Ei2FCwjW5j1", voiceName: "Susan (warm)" },
   meidi: { speaker: "梅蒂", platform: "elevenlabs", voiceId: "QAe8SYEl8U8qnxlfuLRz", voiceName: "Serena" },
@@ -63,19 +67,19 @@ export const VOICE_CAST = Object.freeze({
   enemyWarrior: { speaker: "戰士（敵）", platform: "elevenlabs", voiceId: "0H4ruoQ81Ei2FCwjW5j1", voiceName: "Susan (warm)" },
   enemyArcher: { speaker: "弓兵（敵）", platform: "elevenlabs", voiceId: "SyNyPD84lTuHqi1HONfV", voiceName: "Willow" },
   waterWarrior: { speaker: "水戰士", platform: "elevenlabs", voiceId: "m7QGIiNrWASyI5oJn4I8", voiceName: "Xiaoran" },
-  halfDragon: { speaker: "半龍戰士", platform: "elevenlabs", voiceId: "s2LjOZIlsH2Yu4p6MtAK", voiceName: "Bobo" },
+  halfDragon: { speaker: "半龍戰士", platform: "elevenlabs", voiceId: "Z8p0MlPvzTFHOcAHKWvy", voiceName: "设计音色（我方士兵）" },
   allySister: { speaker: "修女", platform: "elevenlabs", voiceId: "bss6xwA9ygVKRihgIbhZ", voiceName: "Shuishui" },
   allyArcher: { speaker: "弓兵", platform: "elevenlabs", voiceId: "GE494ib77Hxb5fJC33Ib", voiceName: "Kathy" },
   allyEngineer: { speaker: "工兵", platform: "elevenlabs", voiceId: "rBhzOvBlLbfbID0p19ok", voiceName: "Helen" },
   leiqidite: { speaker: "蕾奇蒂特", platform: "elevenlabs", voiceId: "bss6xwA9ygVKRihgIbhZ", voiceName: "Shuishui" },
   kelisi: { speaker: "克莉絲", platform: "elevenlabs", voiceId: "GE494ib77Hxb5fJC33Ib", voiceName: "Kathy" },
   zhuliya: { speaker: "茱莉亞", platform: "elevenlabs", voiceId: "rBhzOvBlLbfbID0p19ok", voiceName: "Helen" },
-  shufeiya: { speaker: "舒菲亞", platform: "elevenlabs", voiceId: "s2LjOZIlsH2Yu4p6MtAK", voiceName: "Bobo" },
+  shufeiya: { speaker: "舒菲亞", platform: "elevenlabs", voiceId: "Z8p0MlPvzTFHOcAHKWvy", voiceName: "设计音色（我方士兵）" },
   amanni: { speaker: "阿曼妮", platform: "elevenlabs", voiceId: "kAIqZ7fZv234ClKXwzDx", voiceName: "Susan - Clear and Calm Storyteller" },
   leiyila: { speaker: "雷伊拉", platform: "elevenlabs", voiceId: "bss6xwA9ygVKRihgIbhZ", voiceName: "Shuishui" },
   yalisha: { speaker: "亞莉沙", platform: "elevenlabs", voiceId: "GE494ib77Hxb5fJC33Ib", voiceName: "Kathy" },
   jiexika: { speaker: "潔西卡", platform: "elevenlabs", voiceId: "rBhzOvBlLbfbID0p19ok", voiceName: "Helen" },
-  malin: { speaker: "瑪琳", platform: "elevenlabs", voiceId: "s2LjOZIlsH2Yu4p6MtAK", voiceName: "Bobo" },
+  malin: { speaker: "瑪琳", platform: "elevenlabs", voiceId: "Z8p0MlPvzTFHOcAHKWvy", voiceName: "设计音色（我方士兵）" },
   molina: { speaker: "摩莉娜", platform: "elevenlabs", voiceId: "kAIqZ7fZv234ClKXwzDx", voiceName: "Susan - Clear and Calm Storyteller" },
   aiouliya: { speaker: "愛歐里雅", platform: "elevenlabs", voiceId: "bss6xwA9ygVKRihgIbhZ", voiceName: "Shuishui" },
   tasijia: { speaker: "塔絲加", platform: "elevenlabs", voiceId: "GE494ib77Hxb5fJC33Ib", voiceName: "Kathy" },

@@ -57,7 +57,8 @@ interface VoiceManifestClip {
   platform?: string;
   model?: string;
   voiceId?: string;
-  montage?: { words: Array<{ text: string; speaker: string }> };
+  generation?: { voiceId?: string };
+  montage?: { words: Array<{ text: string; speaker: string; portrait?: number; voiceId?: string }> };
   output: string;
   sha256: string;
   durationMs: number;
@@ -70,6 +71,7 @@ interface VoiceManifestLine {
   surfaces: string[];
   platform: string;
   voiceId: string;
+  generation?: { voiceId?: string };
   tempo: number;
   output: string;
   sha256: string;
@@ -218,8 +220,31 @@ describe("REMAKE-188 voice catalog", () => {
 
   test("reads 主將 as the noun zhǔjiàng (REMAKE-190)", () => {
     const request = manifest.lines.filter(({ surfaces }) => surfaces.includes("promotion:teammateRequest"));
-    expect(request).toHaveLength(39);
+    expect(request).toHaveLength(new Set(Object.values(VOICE_PORTRAIT_VOICES)).size);
     for (const line of request) expect((line as VoiceManifestLine & { spoken: string }).spoken).toContain("请主匠授我");
+  });
+
+  test("recasts both soldiers to their Voice Designs and ships no take of the old voices (REMAKE-199)", () => {
+    const ally = VOICE_CAST.allySoldier.voiceId;
+    const enemy = VOICE_CAST.enemySoldier.voiceId;
+    const bobo = "s2LjOZIlsH2Yu4p6MtAK";
+    expect([ally, enemy]).toEqual(["Z8p0MlPvzTFHOcAHKWvy", "beNkyvjHANgYeFc6IcWa"]);
+    // 士兵, 戰士 and the half-dragon family that used to borrow Bobo.
+    for (const portrait of [47, 57, 64, 17, 26]) expect(VOICE_PORTRAIT_VOICES[portrait], `D/${portrait}`).toBe(ally);
+    // The enemy soldier no longer shares 莎's Maya.
+    expect(VOICE_PORTRAIT_VOICES[48]).toBe(enemy);
+    expect(VOICE_PORTRAIT_VOICES[36]).toBe(VOICE_CAST.sha.voiceId);
+    expect(VOICE_PORTRAIT_VOICES[36]).not.toBe(enemy);
+    expect(Object.values(VOICE_PORTRAIT_VOICES)).not.toContain(bobo);
+    expect(Object.keys(VOICE_LINE_DURATIONS)).not.toContain(bobo);
+    expect(manifest.clips.filter(({ role }) => role === "allySoldier" || role === "enemySoldier")).toHaveLength(24);
+    // A recast leaves the old voice's takes under the same story keys; the voice
+    // a clip is filed under must be the one that actually spoke it.
+    for (const clip of [...manifest.clips, ...manifest.lines]) {
+      if (clip.platform) expect(clip.generation?.voiceId, clip.key).toBe(clip.voiceId);
+    }
+    const word = manifest.clips.find(({ key }) => key === "164:22")?.montage?.words.find(({ portrait }) => portrait === 48);
+    expect(word).toMatchObject({ text: "再度", voiceId: enemy });
   });
 
   test("splices SAY/0164 KY 20–23 word by word and starts KY 20 on the first speaker", () => {

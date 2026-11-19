@@ -681,6 +681,191 @@
     用户试听后也没有提出问题。
 - **仍是暂定**：只在战斗喊话里出声的说话人（第 13.2 节），第二期定战斗喊话的音色时，要回头重做这几个词。
 
+## 14. 第五轮：士兵改用设计音色（2026-11-18，`REMAKE-199`）
+
+### 14.1 起因与做法
+
+- 用户在游戏中试听后认为士兵的声音不妥，要求试用 ElevenLabs Voice Design（占槽）。
+- “士兵”可能指我方，也可能指敌方，所以两种都做了：
+  - 我方士兵／戰士写了 3 种描述，敌方士兵写了 2 种；
+  - 每种描述返回 3 个预览，共 15 个候选。
+- 试听页 `tmp/voice-over/index-r5.html` 把现行 Bobo／Maya 的游戏成品放在旁边对照。
+- 15 个预览都用本地 Whisper 分段识别过，没有漏句；错字只出现在专名同音与结巴处。
+
+### 14.2 设计音色的提示词是什么
+
+试听卡片上的中文介绍只是给人看的意译，**不是**送给接口的提示词。一次设计请求是
+`POST /v1/text-to-voice/design`，字段如下：
+
+| 字段 | 本项目的值 | 作用 |
+| --- | --- | --- |
+| `voice_description` | 一段英文描述（全文见第 14.3 节） | 唯一决定声线的提示词 |
+| `text` | 预览朗读稿，100–1000 字（接口限制） | 只决定预览读什么，不影响保存后的音色 |
+| `model_id` | `eleven_ttv_v3` | 设计模型 |
+| `loudness` | `0.5` | 预览响度 |
+| `guidance_scale` | `5` | 贴近描述的程度；越高越照字面，过高可能失真 |
+
+- **朗读稿**：用该角色自己的台词。
+  - 第五轮用的是配音稿里的简体朗读稿，按剧情顺序连读，不足 100 字时补两三句她在战斗里会说的喊话；
+  - 第二轮用的是繁体原文，规则相同。
+- **返回**：每次请求返回 3 个预览，各带一个 `generated_voice_id`。
+  - 预览不占槽；
+  - `generated_voice_id` 可能有时效，过期就要按同一描述重新生成，而且出来的声音不保证一样。
+- **保存**：用户选定后，用 `POST /v1/text-to-voice` 保存，得到正式的 `voice_id`，占 1 个槽。
+  - 请求带 `voice_name`、同一段 `voice_description`、`generated_voice_id`，以及标签 `language: zh`、`project: angel2`。
+- **正式配音时没有提示词**：调用 `POST /v1/text-to-speech/{voice_id}`（`eleven_v4`、`language_code: "zh"`、
+  按片段键派生的 `seed`），只送朗读稿，声线完全由保存的音色决定。
+  - 因此成品与设计预览是同一个声音；
+  - 但模型不同（`eleven_ttv_v3` 对 `eleven_v4`），语气可能略有差别。
+- **描述是一次性的配方，不能复现**：同一段描述再跑一次会得到另外 3 个声音，所以真正的资产是保存下来的音色。
+
+**描述的写法**（第二轮与第五轮相同）：
+
+1. **身份**：年龄、性别、身份与处境。性别一律写 female／woman，因为本作人物全是女性。
+2. **声线**：音域与质感，并写明不要什么，例如 `not cute, not childish, not breathy`。
+3. **情绪幅度**：只写她台词里真正出现的情绪，例如报急、欢呼、道歉。
+4. **固定结尾**：`Native speaker of standard Mandarin Chinese (Putonghua), no accent. Clean studio recording.`
+   对应选角规则“只用母语普通话音色”。
+
+### 14.3 全部设计提示词
+
+**已保存、正在使用的 6 个设计音色**（另见 `tmp/voice-over/data/designs-saved.json`）：
+
+| 角色 | 轮次与描述 | 选中方案 | `voice_id` |
+| --- | --- | --- | --- |
+| 我方士兵／戰士（含半龍戰士、舒菲亞、瑪琳） | 第五轮“年轻干练”（`ally-a`） | 3 | `Z8p0MlPvzTFHOcAHKWvy` |
+| 敵方士兵 | 第五轮“身不由己”（`enemy-a`） | 1 | `beNkyvjHANgYeFc6IcWa` |
+| 多莉 | 第二轮 | 1 | `LohtlKKkEkMrBywrqM8b` |
+| 蕾娜吉芙 | 第二轮 | 2 | `0ZxyP1BdNxALHVAwb6LU` |
+| 龍王 | 第二轮 | 2 | `2RUo2qBYrlYjcsr1ypkN` |
+| 妖龍 | 第二轮 | 1 | `sIsggdzHMh1FrAHERUH8` |
+
+#### 我方士兵／戰士：年轻干练（`ally-a`）
+
+```text
+A young female foot soldier in her early twenties serving in a royal army, loyal and brave. Clear, firm mid-range voice with a slightly tomboyish, no-nonsense edge; not cute, not childish, not breathy. Urgent and out of breath when rushing in with bad news, bright and cheerful when celebrating a victory. Native speaker of standard Mandarin Chinese (Putonghua), no accent. Clean studio recording.
+```
+
+预览朗读稿（第五轮我方的 3 种描述共用）：
+
+```text
+不好了……！妮雅……殿下！骑……骑士团的军队，……冲进大殿来了……！……被……被她们给……掳走了！不好了！妮雅殿下！不好了！我们中了骑士团的埋伏，很多士兵都受了伤！现在第四军团已经被包围了，所以黛西团长赶紧派我来向殿下求援……！谢谢！谢谢妮雅殿下！耶！我们赢了～！殿下，我们已将敌人全数歼灭了！你竟敢打我。要打中我没那么容易。
+```
+
+#### 敵方士兵：身不由己（`enemy-a`）
+
+```text
+A young female soldier of an enemy knight order in her early twenties, torn between duty and respect for the princess she has been ordered to stop. Clear mid-range voice, tense and apologetic yet resolute, with disciplined, clipped military delivery. Native speaker of standard Mandarin Chinese (Putonghua), no accent. Clean studio recording.
+```
+
+预览朗读稿（第五轮敌方的 2 种描述共用）：
+
+```text
+抱歉！妮雅殿下，我也是不得已的……对不起，妮雅殿下……我奉命阻挡你，即使丢掉性命也在所不惜！行了！任务已经完成，我们快离开这里！报告首领！她们的援兵赶过来了……！是！你竟敢打我。要打中我没那么容易。等我补足体力就去教训你。
+```
+
+#### 多莉
+
+```text
+A cheerful, playful young woman around eighteen who pilots an airship. Bright, bouncy, slightly childish voice with a teasing, carefree tone, lively and fast-paced intonation, easily excited or panicked. Native speaker of standard Mandarin Chinese (Putonghua), no accent. Clean studio recording.
+```
+
+```text
+妮雅殿下！有件事我想請妳幫個忙可以嗎？在遊騎兵裡，我比較不擅長戰鬥，所以這一路上就要請妳多保護我了！龍塔是嗎？沒問題，看我的好啦！不過……在我們到達之前，那些緊追在後的半龍戰士就要交給妳們對付囉……！怎麼辦……！我們被擊中了，這艘船已經無法操縱……完蛋了……！我們會掉下去的！
+```
+
+#### 蕾娜吉芙
+
+```text
+A boastful, cocky female knight in her twenties. Bright, showy voice full of arrogant laughter, smug and theatrical, who breaks into panicked screaming when things go wrong. Native speaker of standard Mandarin Chinese (Putonghua), no accent. Clean studio recording.
+```
+
+```text
+哈哈哈……！真沒想到妳們也能到達這裡！不過……遇到我，妳們可就麻煩了！好。讓妳們瞧瞧我的看家本領！哇啊……！誰快救我啊……！我快被吸進去了……！哇……！快救我……！哇……！要打中我沒那麼容易。妳竟敢打我。
+```
+
+#### 龍王
+
+```text
+An ancient, majestic female dragon queen who has just been freed from petrification. Very deep, resonant, regal voice with slow, dignified pacing, strong chest resonance, calm authority and gravitas, slightly weary. Native speaker of standard Mandarin Chinese (Putonghua), no accent. Clean studio recording.
+```
+
+```text
+在我被石化的這段時間內，很慶幸我的意識和感覺仍然存在，所以我能夠知道龍塔裡的一切事物。關於我和妮雅之間的誤會，我要在這兒向妮雅道歉。只要妮雅還留在這個世界，我龍塔的戰士們將無條件幫助妮雅，直到她完成她所要完成的事。
+```
+
+#### 妖龍
+
+```text
+A monstrous evil dragon that speaks human language. Rough, gravelly, growling deep voice with menacing low chuckles, cruel, greedy and hungry, sneering at its prey. Native speaker of standard Mandarin Chinese (Putonghua), no accent. Clean studio recording.
+```
+
+```text
+嘿嘿嘿……！妳們用不著去死亡之谷了！趁現在妳們都在這兒，我乾脆把妳們全殺了！嘿嘿嘿嘿……！妳們現在已經沒有幫手了。我可要來好好的吃掉妳們……！唔……趁現在……快逃！妳竟敢打我。等我補足體力就去教訓妳。
+```
+
+**第五轮没选中的 3 种描述**（朗读稿同上）：
+
+- 我方“老练沉稳”（`ally-b`）：
+
+  ```text
+  A seasoned female infantry soldier around thirty, sturdy and dependable. Medium-low voice with a slightly husky, grounded texture and crisp military diction, respectful toward her princess. Strained and breathless when reporting an ambush, warm and relieved when help arrives. Native speaker of standard Mandarin Chinese (Putonghua), no accent. Clean studio recording.
+  ```
+
+- 我方“少女新兵”（`ally-c`）：
+
+  ```text
+  An eager young female recruit around eighteen serving in the palace guard. Bright, energetic and sincere voice, youthful but not squeaky or cartoonish, with a hint of nervousness. Stammers when terrified, jubilant when her side wins. Native speaker of standard Mandarin Chinese (Putonghua), no accent. Clean studio recording.
+  ```
+
+- 敌方“粗砺强硬”（`enemy-b`）：
+
+  ```text
+  A tough, battle-hardened female enemy soldier around thirty. Low, firm voice with a slightly rough edge, brisk and terse, barking reports to her commander; only a trace of guilt when she apologises. Native speaker of standard Mandarin Chinese (Putonghua), no accent. Clean studio recording.
+  ```
+
+第二轮没被采用的蘭、倩、芙瑪羅妮、菲伊魯茵四个设计，描述在 `tmp/voice-over/data/designs.json`。
+
+### 14.4 用户选定与落地
+
+- **用户选定**（`tmp/voice-over/data/picks-r5.json`）：
+  - 我方士兵／戰士：“年轻干练”方案 3；
+  - 半龍戰士、舒菲亞、瑪琳原先借用 Bobo，一起换成新音色；
+  - 敵方士兵：“身不由己”方案 1，不再与莎共用 Maya，莎保留 Maya。
+- **保存**：两个方案已保存为正式音色，槽位从 5/30 变为 7/30。
+- **落地**（`REMAKE-199`）：
+  - 改 `scripts/lib/voice-cast.mjs`；
+  - 重生成 24 页剧情（我方 19、敌方 5）。这些片段用第 4 版（take 4），Bobo／Maya 的旧版仍留在工作区；
+  - 生成两个新声线的战斗台词各 32 句；Bobo 不再有人用，它的 32 句从素材包移除；
+  - 第 38 关亡灵段落第 3 页的「再度」原本是敌方士兵用 Maya 读的，按“每个说话人用自己的音色”重做。
+    第 1、2、4 页重出后与原成品逐字节一致，只换了第 3 页（旧版留在 `audition4/ghost-final-pre-199/`）。
+- **工具修正**：
+  - 工作区的 `gen.mjs`、`asr.mjs`、`finish.mjs` 原先只按朗读稿认领旧版本。改选后同一片段键下会留着旧音色的版本，
+    这样会被当成现成的。现在要求文字与音色都相符；
+  - 生成器 `generate-voice-catalog.mjs` 也补了一道校验：片段实际合成所用的音色（生成记录）必须与选角一致。
+- **检查**：88 段 Whisper 识别都没有被标记重做。差异只有：
+  - 「妮雅」写成「尼亚／妮娅」；
+  - 结巴的「骑……骑士团」；
+  - 两字咒名的同音字（「破邪」写成「破鞋」等）。
+
+### 14.5 消耗与产物
+
+- ElevenLabs：
+  - 5 次设计 711 额度；
+  - 88 段生成 466 额度；
+  - 亡灵第 3 页约 10 额度；
+  - 本月累计 17,039 / 131,000。
+
+| 文件（`tmp/voice-over/` 下） | 内容 |
+| --- | --- |
+| `data/designs5.json`、`data/designs5-results.json` | 第五轮的 5 段描述与 15 个预览（含 `generated_voice_id`） |
+| `audition5/<描述>/design-N.mp3` | 预览原文件；同目录 `.txt` 为 Whisper 识别 |
+| `index-r5.html`、`build-page5.mjs` | 试听页与生成脚本 |
+| `design5.mjs`、`save-designs5.mjs` | 设计与保存脚本 |
+| `data/picks-r5.json`、`data/designs-saved.json` | 选定与已保存音色 |
+| `audition5/ghost-199/`、`data/ghost-results-199.json` | 重做的亡灵段落；定稿已换入 `audition4/ghost-final/` |
+| `production/*.pre-199.*` | 改选前的配音稿、版本、识别与成品记录备份 |
+
 ---
 
 ## 来源
