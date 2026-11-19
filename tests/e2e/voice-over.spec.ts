@@ -350,3 +350,31 @@ test("REMAKE-191: turning voice on in the 音效開關 panel starts in 自動翻
   await page.getByTestId("voice-volume-4").click();
   await expect(page.getByTestId("voice-auto-advance-off")).toHaveAttribute("aria-checked", "true");
 });
+
+test("a debug scenario opened from /debug.html voices its very first page, before any press", async ({ page }) => {
+  await useVoice(page, { voiceVolume: 4 });
+  // Not in test mode (the hub's own link), so the voice data attributes are off:
+  // record every buffer the page starts instead. Music buffers are far longer.
+  await page.addInitScript(() => {
+    const starts: number[] = [];
+    (window as unknown as { __bufferStarts: number[] }).__bufferStarts = starts;
+    const start = AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start = function (...args: Parameters<typeof start>) {
+      starts.push(this.buffer?.duration ?? 0);
+      return start.apply(this, args);
+    };
+  });
+  await page.goto("/debug.html");
+  await page.locator('a[data-debug-scenario-id="stage-00-prebattle"]').click();
+  await page.waitForURL(/debugScenario=stage-00-prebattle/u);
+  await expect(dialogue(page)).toBeVisible({ timeout: 15_000 });
+  await expect(dialogue(page)).toHaveAttribute("data-source-wait", "1");
+  // SAY/0 KY 1 is clip 0:1 (6,416 ms). The hub's click lets audio start on this
+  // page, and the gate decoded the clip before the loading screen lifted.
+  const firstClipSeconds = 6.416;
+  await expect.poll(
+    () => page.evaluate(() => (window as unknown as { __bufferStarts: number[] }).__bufferStarts),
+    { timeout: 5_000 },
+  ).toContainEqual(expect.closeTo(firstClipSeconds, 1));
+  await expect(dialogue(page)).toHaveAttribute("data-source-wait", "1");
+});

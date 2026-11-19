@@ -4,6 +4,7 @@ import {
   VOICE_FADE_OUT_SECONDS,
   VOICE_GAIN_BY_VOLUME,
   battleLineVoiceUrls,
+  gateLeadVoiceUrls,
   gateVoiceUrls,
   voiceClipForPage,
   voiceCueForPage,
@@ -26,6 +27,21 @@ const LOOKAHEAD_PAGES = 4;
  * 解碼超過這個時間就放棄這一句（窗口照原版時序收起）。
  */
 const LINE_LATE_START_LIMIT_MS = 500;
+
+/**
+ * 進關資源門收起前要先解碼的片段：每段劇情的第一個有語音頁，加上目前停在的劇情頁與其後
+ * 前瞻的幾頁（調試場景與讀檔可能直接停在劇情中段）。語音為「關」時為空。
+ */
+export function entryVoiceDecodeUrls(controller: GameController): string[] {
+  const gate = controller.voiceGate;
+  const volume = controller.voiceVolume;
+  if (volume === 0) return [];
+  const upcoming = controller.upcomingStoryPages(LOOKAHEAD_PAGES)
+    .map((page) => voiceClipForPage(page))
+    .filter((clip): clip is VoiceClip => clip !== undefined && clip.gate === gate)
+    .map((clip) => clip.source);
+  return [...new Set([...upcoming, ...gateLeadVoiceUrls(gate, volume)])];
+}
 
 interface VoicedPage {
   readonly cue: VoiceCue;
@@ -297,7 +313,8 @@ export class VoiceDirector {
     const upcoming = this.controller.upcomingStoryPages(LOOKAHEAD_PAGES)
       .map((page) => voiceClipForPage(page))
       .filter((clip): clip is VoiceClip => clip !== undefined && clip.gate === gate);
-    // 每段劇情的第一個有語音頁也先解碼：劇情一開始就要開頁，等不及前瞻。
+    // 每段劇情的第一個有語音頁也先解碼：劇情一開始就要開頁，等不及前瞻。進關時資源門
+    // 已用 `entryVoiceDecodeUrls` 解好，這裡接手並在之後換段劇情時補上。
     const leads = VOICE_CLIPS.filter((clip) => clip.gate === gate && clip.lead === true);
     const keep = new Set([...upcoming, ...leads].map((clip) => clip.source));
     const playing = this.transport.playingUrl;

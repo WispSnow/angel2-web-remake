@@ -17,6 +17,10 @@ const VOLUME_RAMP_SECONDS = 0.015;
 const MAX_DECODED_CLIPS = 16;
 
 const encodedVoice = new Map<string, Promise<ArrayBuffer>>();
+/** `predecodeVoice` 在資源門裡解好的 PCM；播放層第一次用到時接手。 */
+const predecodedVoice = new Map<string, AudioBuffer>();
+/** 最近一次 `predecodeVoice` 要的片段；較早的呼叫解完時已不在其中的就丟掉。 */
+let predecodeWanted: ReadonlySet<string> = new Set();
 let decoderContext: OfflineAudioContext | undefined;
 
 export function isVoiceResourceUrl(url: string): boolean {
@@ -61,6 +65,35 @@ const decodeWithOfflineContext: DecodeVoice = (encoded) => {
   decoderContext ??= new OfflineAudioContext(1, 1, 48_000);
   return decoderContext.decodeAudioData(encoded.slice(0));
 };
+
+/**
+ * 資源門收起前，先把進關後馬上要開的頁面解碼好。播放層的前瞻解碼要等表面掛上才開始，
+ * 而劇情第一頁緊接著就開，解碼趕不上時那一頁只能當無語音頁。只留最近一次要求的片段；
+ * 失敗不拋出，那一頁照舊由播放層按需處理。
+ */
+export async function predecodeVoice(
+  urls: readonly string[],
+  decode: DecodeVoice = decodeWithOfflineContext,
+  fetchVoice?: FetchVoice,
+): Promise<void> {
+  const wanted = new Set(urls);
+  predecodeWanted = wanted;
+  for (const url of [...predecodedVoice.keys()]) if (!wanted.has(url)) predecodedVoice.delete(url);
+  await Promise.all([...wanted].map(async (url) => {
+    if (predecodedVoice.has(url)) return;
+    try {
+      const buffer = await decode(await loadEncodedVoice(url, fetchVoice));
+      if (!predecodeWanted.has(url)) return;
+      predecodedVoice.set(url, buffer);
+    } catch (error: unknown) {
+      console.warn("voice predecode failed", url, error);
+    }
+  }));
+}
+
+export function hasPredecodedVoice(url: string): boolean {
+  return predecodedVoice.has(url);
+}
 
 export interface VoiceTransportState {
   readonly contextState: AudioContextState | "uninitialized";
@@ -146,13 +179,14 @@ export class VoiceTransport {
     }
   }
 
+  /** 已解碼；資源門預先解好的片段在這裡被接手，所以開頁當下就算就緒。 */
   isReady(url: string): boolean {
-    return this.decoded.has(url);
+    return this.decoded.has(url) || this.adoptPredecoded(url);
   }
 
   /** 下載（或取用資源門留下的編碼資料）並解碼；回傳是否就緒。失敗不拋出。 */
   prepare(url: string): Promise<boolean> {
-    if (this.decoded.has(url)) {
+    if (this.decoded.has(url) || this.adoptPredecoded(url)) {
       this.touch(url);
       return Promise.resolve(true);
     }
@@ -267,6 +301,16 @@ export class VoiceTransport {
     this.masterGain = undefined;
     if (context) void context.close().catch(() => undefined);
     this.emitState();
+  }
+
+  private adoptPredecoded(url: string): boolean {
+    const buffer = predecodedVoice.get(url);
+    if (!buffer) return false;
+    predecodedVoice.delete(url);
+    this.decoded.set(url, buffer);
+    this.trim();
+    this.emitState();
+    return true;
   }
 
   private touch(url: string): void {

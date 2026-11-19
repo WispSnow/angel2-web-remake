@@ -21,7 +21,9 @@ import { ASSETS as STAGE0_ASSETS, createStage0Units } from "./game/content/stage
 import { stageDialoguePortraitRecords } from "./game/content/portrait-assets";
 import { STAGE0_DEFINITION } from "./game/content/stages";
 import { remixMusicUrls, stageRemixMusicUrls } from "./game/content/music-remix";
-import { gateVoiceUrls } from "./game/content/voice-catalog";
+import { gateLeadVoiceUrls, gateVoiceUrls } from "./game/content/voice-catalog";
+import { entryVoiceDecodeUrls } from "./game/voice";
+import { predecodeVoice } from "./game/voice-transport";
 import { CREDITS_MUSIC_PROGRAM } from "./game/content/credits";
 import { loadMusicPreferences } from "./game/preferences";
 import type { PortraitRecord } from "./game/types";
@@ -81,11 +83,16 @@ const loadDeploymentSurfaceModules = (): Promise<DeploymentSurfaceModules> => {
   return deploymentSurfaceModules;
 };
 
-const preloadVoice = async (urls: readonly string[] | undefined): Promise<void> => {
+const preloadVoice = async (
+  urls: readonly string[] | undefined,
+  decodeUrls: readonly string[] = [],
+): Promise<void> => {
   if (!urls?.length) return;
   await resourceLoader.ensureVoice(urls).catch((error: unknown) => {
     console.warn("voice preload failed", error);
   });
+  // 進關後馬上要開的頁面在載入頁收起前就解碼好；否則劇情第一頁比解碼先到，只能當無語音頁。
+  await predecodeVoice(decodeUrls);
 };
 
 const stageAssetGate: StageAssetGate = (stageId, resolveRequirements) => {
@@ -110,7 +117,7 @@ const stageAssetGate: StageAssetGate = (stageId, resolveRequirements) => {
       if (requirements?.usesDeploymentSurface) await loadDeploymentSurfaceModules();
       // `REMAKE-188`：語音片段在載入頁收起前一併下載，但失敗不擋進關——對應頁面只會
       // 變成無語音頁，由語音層在播到時提示一次。
-      await preloadVoice(requirements?.voiceUrls);
+      await preloadVoice(requirements?.voiceUrls, requirements?.voiceDecodeUrls);
     },
   );
 };
@@ -139,6 +146,7 @@ const controllerAssetRequirements = (controller: GameController): StageAssetRequ
     controller.usesDeploymentSurface ? controller.battle.stage.nativeStage : undefined,
   ),
   voiceUrls: gateVoiceUrls(controller.battle.stage.id, controller.voiceVolume),
+  voiceDecodeUrls: entryVoiceDecodeUrls(controller),
   storyBackgroundUrls: stageStoryBackgroundUrls(controller.currentStageAssets),
 });
 const stage0Units = createStage0Units();
@@ -262,7 +270,10 @@ const mountController = (
               ending ? STAGE49_EPILOGUE_MUSIC_BY_SELECTOR[ending.epilogueMusicSelector] : undefined,
             ], controller.musicStyle),
           ],
-          () => preloadVoice(gateVoiceUrls("ending", controller.voiceVolume)),
+          () => preloadVoice(
+            gateVoiceUrls("ending", controller.voiceVolume),
+            gateLeadVoiceUrls("ending", controller.voiceVolume),
+          ),
         );
         if (generation !== surfaceGeneration || controller.phase !== "ending") return;
         destroySurface = mountStage49EndingUi(root, controller, audio);
@@ -385,7 +396,9 @@ if (!releaseBuild && debugScenario) {
       controller.battle.stage.id,
       async () => controllerAssetRequirements(controller),
     );
-    mountController(controller, false, resourceLoader);
+    // 從調試頁點連結進來時瀏覽器已允許出聲，照已解鎖掛上，第一頁劇情就有語音。
+    const { debugEntryAudioAllowed } = await import("./game/debug-audio-activation");
+    mountController(controller, await debugEntryAudioAllowed(), resourceLoader);
     debug.mountDebugToolbar(
       controller,
       debugScenario,

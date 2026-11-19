@@ -53,7 +53,7 @@ import { stagedRenderAssetAvailable } from "./staged-render-asset-cache";
 import { fullCombatImageAvailable } from "./full-combat-image-cache";
 import { MUSIC_BOX_TRACKS, musicBoxProgram } from "./content/music-box";
 import { stageRemixMusicUrls } from "./content/music-remix";
-import { gateVoiceUrls } from "./content/voice-catalog";
+import { gateLeadVoiceUrls, gateVoiceUrls } from "./content/voice-catalog";
 import { STAGE49_STORY_PAGES } from "./content/stage49-ending";
 import type { MusicProgram } from "./music-transport";
 import {
@@ -262,6 +262,11 @@ export interface StageAssetRequirements {
    * 只在玩家開了語音時隨資源門下載，下載失敗的頁面當作無語音頁。
    */
   voiceUrls?: readonly string[];
+  /**
+   * 資源門收起前先解碼的語音片段：進關後馬上要開的劇情頁。下載與解碼都不擋進關，
+   * 失敗的頁面照舊當作無語音頁。
+   */
+  voiceDecodeUrls?: readonly string[];
   /**
    * `REMAKE-196` 這一關劇情用到的原版插圖（`storyBackground` 與 `storyBackgrounds`）。
    * 原版插圖本身已在關卡資源包裡；資源門只在選了高清時據此帶上對應的高清循環。
@@ -1119,6 +1124,7 @@ export class GameController {
           runtime.preparation ? runtime.definition.nativeStage : undefined,
         ),
         voiceUrls: gateVoiceUrls(stageId, this.voiceVolume),
+        voiceDecodeUrls: gateLeadVoiceUrls(stageId, this.voiceVolume),
         storyBackgroundUrls: stageStoryBackgroundUrls(runtime.assets),
       };
     };

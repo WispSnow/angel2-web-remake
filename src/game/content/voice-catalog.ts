@@ -136,6 +136,15 @@ export function gateVoiceUrls(gate: StageId | "ending", volume: VoiceVolume): st
   return [...story, ...Object.values(VOICE_EPILOGUE_NARRATION).map((clip) => clip.source)];
 }
 
+/**
+ * 這一關（或結局路由）每段劇情的第一個有語音頁。資源門收起前先把它們解碼，
+ * 劇情一開場就能開頁；語音為「關」時為空。
+ */
+export function gateLeadVoiceUrls(gate: StageId | "ending", volume: VoiceVolume): string[] {
+  if (volume === 0) return [];
+  return VOICE_CLIPS.filter((clip) => clip.gate === gate && clip.lead === true).map((clip) => clip.source);
+}
+
 /** 棋盤上這些肖像說得出的全部戰鬥台詞片段；語音為「關」時為空。 */
 export function battleLineVoiceUrls(portraits: Iterable<number>, volume: VoiceVolume): string[] {
   if (volume === 0) return [];

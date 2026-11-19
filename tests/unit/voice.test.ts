@@ -7,6 +7,7 @@ import {
   VOICE_GAIN_BY_VOLUME,
   battleLineVoiceUrls,
   epilogueNarrationFor,
+  gateLeadVoiceUrls,
   gateVoiceUrls,
   voiceClipForPage,
   voiceCueForPage,
@@ -16,8 +17,15 @@ import type { GameController } from "../../src/game/controller";
 import type { VoiceVolume } from "../../src/game/preferences";
 import type { PortraitRecord } from "../../src/game/content/portrait-catalog.generated";
 import type { DialoguePage } from "../../src/game/types";
-import { VoiceDirector } from "../../src/game/voice";
-import { primeEncodedVoice, retainEncodedVoice, VoiceTransport } from "../../src/game/voice-transport";
+import { debugEntryAudioAllowed } from "../../src/game/debug-audio-activation";
+import { entryVoiceDecodeUrls, VoiceDirector } from "../../src/game/voice";
+import {
+  hasPredecodedVoice,
+  predecodeVoice,
+  primeEncodedVoice,
+  retainEncodedVoice,
+  VoiceTransport,
+} from "../../src/game/voice-transport";
 
 class FakeParam {
   readonly events: Array<{ type: string; value: number; time: number }> = [];
@@ -224,6 +232,77 @@ describe("REMAKE-188 voice director", () => {
     const promotion: DialoguePage = { ...page(0), source: { record: "promotion", wait: 1 } };
     expect(director.beginPage(promotion)).toBe(false);
     expect(voiceClipForPage(page(0))).toBe(VOICE_CLIPS.find(({ key }) => key === "0:1"));
+  });
+});
+
+describe("decoding the first pages before the gate lifts", () => {
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    FakeAudioContext.instances = [];
+    retainEncodedVoice(new Set());
+    await predecodeVoice([]);
+  });
+
+  test("the gate decodes this stage's current pages and every story's first voiced page", () => {
+    const { controller } = setup(4);
+    const urls = entryVoiceDecodeUrls(controller as unknown as GameController);
+    const upcoming = controller.upcomingStoryPages(4).flatMap((story) => voiceClipForPage(story)?.source ?? []);
+    expect(upcoming.length).toBeGreaterThan(0);
+    expect(urls).toEqual(expect.arrayContaining([...upcoming, ...gateLeadVoiceUrls("stage-00", 4)]));
+    expect(new Set(urls).size).toBe(urls.length);
+    // Leads are a strict subset of the stage's clips: one per story with a voiced page.
+    expect(gateLeadVoiceUrls("stage-00", 4).every((url) => gateVoiceUrls("stage-00", 4).includes(url))).toBe(true);
+    controller.voiceVolume = 0;
+    expect(entryVoiceDecodeUrls(controller as unknown as GameController)).toEqual([]);
+    expect(gateLeadVoiceUrls("stage-00", 0)).toEqual([]);
+  });
+
+  test("a clip decoded behind the loading screen is voiced on the very first page", async () => {
+    const { director, controller, decode, fetchVoice } = setup(4);
+    await predecodeVoice(entryVoiceDecodeUrls(controller as unknown as GameController), decode, fetchVoice);
+    const first = voiceClipForPage(page(0))?.source ?? "";
+    expect(hasPredecodedVoice(first)).toBe(true);
+    decode.mockClear();
+    // The surface mounts and the first page opens at once, with no time to decode.
+    director.unlock();
+    director.sync();
+    expect(director.beginPage(page(0))).toBe(true);
+    expect(FakeAudioContext.instances[0].sources[0].startedAt).toBe(5);
+    expect(decode).not.toHaveBeenCalledWith(new TextEncoder().encode(first).buffer);
+    expect(hasPredecodedVoice(first)).toBe(false);
+  });
+
+  test("without it the same first page opens unvoiced, as before", () => {
+    const { director } = setup(4);
+    director.unlock();
+    director.sync();
+    expect(director.beginPage(page(0))).toBe(false);
+  });
+
+  test("a later request drops clips the earlier one decoded for another stage", async () => {
+    const { decode, fetchVoice } = setup(4);
+    const [stage0] = gateLeadVoiceUrls("stage-00", 4);
+    const [stage1] = gateLeadVoiceUrls("stage-01", 4);
+    await predecodeVoice([stage0], decode, fetchVoice);
+    await predecodeVoice([stage1], decode, fetchVoice);
+    expect(hasPredecodedVoice(stage0)).toBe(false);
+    expect(hasPredecodedVoice(stage1)).toBe(true);
+  });
+
+  test("the debug entry mounts unlocked only when the browser already lets audio start", async () => {
+    class RunningContext extends FakeAudioContext { override state = "running"; }
+    vi.stubGlobal("AudioContext", RunningContext);
+    await expect(debugEntryAudioAllowed()).resolves.toBe(true);
+    expect(FakeAudioContext.instances.at(-1)?.state).toBe("closed");
+
+    // Chrome without a gesture: the context stays suspended and resume() never settles.
+    class BlockedContext extends FakeAudioContext { override resume(): Promise<void> { return new Promise(() => undefined); } }
+    vi.stubGlobal("AudioContext", BlockedContext);
+    vi.useFakeTimers();
+    const blocked = debugEntryAudioAllowed();
+    await vi.advanceTimersByTimeAsync(200);
+    await expect(blocked).resolves.toBe(false);
   });
 });
 
