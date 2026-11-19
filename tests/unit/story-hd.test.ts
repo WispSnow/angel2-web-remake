@@ -1,7 +1,16 @@
 import { describe, expect, test } from "vitest";
 import { STORY_HD_ENTRIES, STORY_HD_HEIGHT, STORY_HD_WIDTH } from "../../src/game/content/story-hd.generated";
-import { STORY_HD_TITLE, storyHdAssetUrls, storyHdEntryForSource, storyHdTitleAssetUrls } from "../../src/game/content/story-hd";
-import { STARTUP_TITLE } from "../../src/game/content/startup.generated";
+import {
+  STORY_HD_INTRO,
+  STORY_HD_TITLE,
+  storyHdAssetUrls,
+  storyHdEntryForSource,
+  storyHdIntroAssetUrls,
+  storyHdIntroWindow,
+  storyHdTitleAssetUrls,
+} from "../../src/game/content/story-hd";
+import { STARTUP_INTRO, STARTUP_TITLE } from "../../src/game/content/startup.generated";
+import { VOICE_STARTUP_NARRATION } from "../../src/game/content/voice-catalog";
 import { STAGE_RUNTIME_MANIFEST, loadStageRuntime, stageStoryBackgroundUrls } from "../../src/game/stage-runtime";
 import { storyHdUrlsForStyle } from "../../src/game/story-hd-style";
 
@@ -123,5 +132,57 @@ describe("REMAKE-197 HD title screen", () => {
       expect(variant.sky.y).toBeLessThanOrEqual(title.interior.y);
       expect(variant.sky.y + variant.sky.height).toBeGreaterThan(title.interior.y);
     }
+  });
+});
+
+describe("REMAKE-198 HD opening crawl", () => {
+  /** startup.ts: module 23's timer runs at 10 ms a tick, 12 ticks a scroll update. */
+  const UPDATE_MS = STARTUP_INTRO.ticksPerScrollUpdate * 10;
+  const intro = STORY_HD_INTRO;
+
+  test("replaces every crawl plate in order, in the plates' own rectangle, with one clip each", () => {
+    if (!intro) throw new Error("no HD intro");
+    expect(intro.scenes.map(({ original }) => original)).toEqual(STARTUP_INTRO.backgrounds.map(({ src }) => src));
+    const [first] = STARTUP_INTRO.backgrounds;
+    expect(intro.plate).toEqual({ x: first.x, y: first.y, width: 608, height: 257 });
+    const urls = storyHdIntroAssetUrls(intro);
+    expect(new Set(urls).size).toBe(urls.length);
+    for (const url of urls) expect(url).toMatch(/^\/assets\/original\/story\/hd\/intro\/\d+\.mp4$/u);
+  });
+
+  test("each clip lasts from its fade-in to the end of the next plate's, and the last one to the end of the crawl", () => {
+    if (!intro) throw new Error("no HD intro");
+    expect(intro.scenes[0].cue).toBe(0);
+    const crawlMs = STARTUP_INTRO.scrollUpdates * UPDATE_MS;
+    for (const [index, scene] of intro.scenes.entries()) {
+      if (index > 0) expect(scene.cue).toBeGreaterThan(intro.scenes[index - 1].cue);
+      const { start, end } = storyHdIntroWindow(intro, index, UPDATE_MS);
+      const until = Math.min(end, crawlMs);
+      expect(until - start).toBeGreaterThan(intro.crossfadeMs);
+      expect(scene.video.frames / scene.video.fps * 1000).toBeGreaterThanOrEqual(until - start);
+    }
+    // windows overlap exactly by the cross-fade, so the plate rectangle is never left uncovered
+    for (let index = 1; index < intro.scenes.length; index += 1) {
+      expect(storyHdIntroWindow(intro, index - 1, UPDATE_MS).end - storyHdIntroWindow(intro, index, UPDATE_MS).start).toBe(intro.crossfadeMs);
+    }
+  });
+
+  test("every picture comes in with the narration sentence that names it", () => {
+    if (!intro) throw new Error("no HD intro");
+    // startup-narration.ts: a sentence starts at its cue, or 250 ms after the previous one ends
+    let busy = 0;
+    const starts = VOICE_STARTUP_NARRATION.map((sentence) => {
+      const start = Math.max(sentence.startUpdate * UPDATE_MS, busy);
+      busy = start + sentence.durationMs + 250;
+      return start;
+    });
+    const cueMs = intro.scenes.map(({ cue }) => cue * UPDATE_MS);
+    // BK/43 水神愛西斯 (sentence 2), BK/45 女帝維絲塔 (4), BK/46 女帝與妮雅 (6), BK/47 妮雅傳授部下 (7), BK/48 陰謀 (8)
+    for (const [scene, sentence] of [[1, 1], [3, 3], [4, 5], [5, 6], [6, 7]] as const) {
+      expect(Math.abs(cueMs[scene] - starts[sentence])).toBeLessThanOrEqual(UPDATE_MS);
+    }
+    // BK/44 comes in at the pause inside sentence 3: 經過了無數次戰爭的蹂躪後，|「拉那洛」和「瓦爾克麗」兩族，終於合併。
+    expect(cueMs[2]).toBeGreaterThan(starts[2]);
+    expect(cueMs[2]).toBeLessThan(starts[2] + VOICE_STARTUP_NARRATION[2].durationMs / 2);
   });
 });

@@ -1,4 +1,4 @@
-import { STORY_HD_ENTRIES, STORY_HD_TITLE } from "./story-hd.generated";
+import { STORY_HD_ENTRIES, STORY_HD_INTRO, STORY_HD_TITLE } from "./story-hd.generated";
 
 /**
  * `REMAKE-196` 可選的高清劇情插圖：每張 `BK/<id>` 一段 AI 重繪的全畫面待機循環。
@@ -86,7 +86,47 @@ export interface StoryHdTitle {
 }
 
 export const STORY_HD_TITLE_AVAILABLE = STORY_HD_TITLE !== undefined;
-export { STORY_HD_TITLE };
+export { STORY_HD_INTRO, STORY_HD_TITLE };
+
+/** 開場捲動字幕上方的一張高清畫面（`REMAKE-198`）：一段只播一次的視訊，不循環。 */
+export interface StoryHdIntroScene {
+  /** 取代的原版畫面（`STARTUP_INTRO.backgrounds` 同一順序的 `BK/41`、`43..48`）。 */
+  readonly original: string;
+  /** 這張畫面完全出現的捲動更新：交叉淡化以它為中心。第一張為 0。 */
+  readonly cue: number;
+  readonly video: StoryHdVideo;
+}
+
+/**
+ * 高清開場（使用者 2026-11-18）：七張畫面重繪成高清、各自動起來，換畫面的時間跟著旁白
+ * （`REMAKE-189`）每句開口的時刻，不照原版的淡出淡入點。只換表現：捲動字幕、音樂與旁白照舊。
+ */
+export interface StoryHdIntro {
+  /** 原版畫面在 640×350 畫面上的矩形；視訊拉伸進這裡。 */
+  readonly plate: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  /** 相鄰兩張交叉淡化的長度（原版捲動時間的毫秒，以切換點為中心）。 */
+  readonly crossfadeMs: number;
+  readonly scenes: readonly StoryHdIntroScene[];
+}
+
+/** 高清開場要下載的檔案，依播放順序（先下載的先能播）。 */
+export function storyHdIntroAssetUrls(intro: StoryHdIntro): readonly string[] {
+  return intro.scenes.map((scene) => scene.video.source);
+}
+
+/**
+ * 第 `index` 張畫面在原版捲動時間上的區間（毫秒，`updateMs` 是一次捲動更新）：視訊從 `start` 播起，
+ * `start..start + crossfadeMs` 淡入（第一張一開始就完全出現），到下一張淡入完成的 `end` 為止。
+ */
+export function storyHdIntroWindow(intro: StoryHdIntro, index: number, updateMs: number): { start: number; end: number } {
+  const half = intro.crossfadeMs / 2;
+  const scene = intro.scenes[index];
+  const next = intro.scenes[index + 1];
+  return {
+    start: index === 0 ? 0 : scene.cue * updateMs - half,
+    end: next ? next.cue * updateMs + half : Number.POSITIVE_INFINITY,
+  };
+}
 
 /** 高清標題要下載的全部檔案（兩組都要：閒置重播會換組）。 */
 export function storyHdTitleAssetUrls(title: StoryHdTitle): readonly string[] {

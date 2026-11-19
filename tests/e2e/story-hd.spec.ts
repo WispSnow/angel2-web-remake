@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { captureVisualAudit } from "./visual-audit";
-import { skipOpeningToTitle } from "./startup-controls";
+import { activateStartup, skipOpeningToTitle } from "./startup-controls";
 
 /**
  * `REMAKE-196` optional HD story illustrations. The stage 10 prebattle story
@@ -35,6 +35,7 @@ declare global {
   interface Window {
     __storyHdSkyDraws?: { fractionalStrip: number; band: number };
     __titleHdDraws?: { base: number; band: number; bandSource: string; bandX: number[]; multiply: number; lighter: number };
+    __introHdDraws?: { base: number; videos: number[]; originals: number; rect: number[] };
   }
 }
 
@@ -286,7 +287,7 @@ test("REMAKE-197: in 高清 the title draws HD land, scrolling clouds and the tw
   const screen = page.getByTestId("startup-screen");
   // the layers download in the background while the entry box is up; nothing waits for them
   await expect(screen).toHaveAttribute("data-title-hd-ready", "true", { timeout: 30_000 });
-  expect([...new Set(requests)].sort()).toEqual([
+  expect([...new Set(requests.filter((url) => url.startsWith(`${TITLE}/`)))].sort()).toEqual([
     `${TITLE}/frame.png`, `${TITLE}/land-0.webp`, `${TITLE}/land-1.webp`, `${TITLE}/logo-0.png`, `${TITLE}/logo-1.png`,
     `${TITLE}/sky-0.webp`, `${TITLE}/sky-1.webp`, `${TITLE}/women.mp4`,
   ]);
@@ -349,5 +350,115 @@ test("REMAKE-197: in 原版 the title stays the original pixels and no HD title 
   await expect(page.getByTestId("title-menu")).toBeVisible({ timeout: 15_000 });
   await expect(screen).toHaveAttribute("data-title-style", "original");
   await expect(page.getByTestId("title-hd-canvas")).toHaveCount(0);
+  expect(requests).toEqual([]);
+});
+
+/**
+ * `REMAKE-198` HD opening crawl: in 高清 the startup downloads the seven one-shot clips in playing order; while the
+ * crawl scrolls, an HD canvas over the original one draws the original canvas (black, crawl rows) and the current
+ * picture or two (cross-fading) stretched into the plate rectangle. The pictures switch with the narration.
+ */
+const INTRO = `${HD}/intro`;
+const INTRO_CLIPS = [41, 43, 44, 45, 46, 47, 48].map((record) => `${INTRO}/${record}.mp4`);
+
+/** Counts what reaches the intro's HD canvas: the original canvas, each clip (by index), original plates, the plate rect. */
+const recordIntroDraws = (page: Page) => page.addInitScript(() => {
+  const counts = { base: 0, videos: [] as number[], originals: 0, rect: [] as number[] };
+  window.__introHdDraws = counts;
+  const draw = CanvasRenderingContext2D.prototype.drawImage;
+  CanvasRenderingContext2D.prototype.drawImage = function (this: CanvasRenderingContext2D, ...args: unknown[]) {
+    if (this.canvas instanceof HTMLCanvasElement && this.canvas.dataset.testid === "intro-hd-canvas") {
+      const source = args[0];
+      const k = this.canvas.width / 640;
+      if (source instanceof HTMLCanvasElement && source.id === "startup-canvas") counts.base += 1;
+      else if (source instanceof HTMLVideoElement) {
+        const index = Number(source.dataset.testid?.replace("intro-hd-video-", ""));
+        if (!counts.videos.includes(index)) counts.videos.push(index);
+        counts.rect = (args.slice(1, 5) as number[]).map((value) => Math.round(value / k));
+      } else if (source instanceof HTMLImageElement) counts.originals += 1;
+    }
+    return (draw as (...a: unknown[]) => void).apply(this, args);
+  } as typeof draw;
+});
+
+test("REMAKE-198: in 高清 the crawl plays the HD clips at the native scroll speed and switches to BK/43 with the second sentence", async ({ page }) => {
+  test.setTimeout(150_000);
+  const requests = storyHdRequests(page);
+  await useHd(page);
+  await recordIntroDraws(page);
+  await page.goto("/");
+  const screen = page.getByTestId("startup-screen");
+  // the clips download in playing order while the entry box is up
+  await expect(screen).toHaveAttribute("data-intro-hd-scenes", "7", { timeout: 60_000 });
+  expect([...new Set(requests.filter((url) => url.startsWith(`${INTRO}/`)))]).toEqual(INTRO_CLIPS);
+  await activateStartup(page);
+  await expect(screen).toHaveAttribute("data-startup-phase", "intro", { timeout: 15_000 });
+  await expect(screen).toHaveAttribute("data-intro-style", "hd");
+  const canvas = page.getByTestId("intro-hd-canvas");
+  await expect(canvas).toBeVisible();
+  const [canvasBox, screenBox] = await Promise.all([canvas.boundingBox(), screen.boundingBox()]);
+  expect(canvasBox && screenBox && Math.abs(canvasBox.width - screenBox.width) < 1 && Math.abs(canvasBox.y - screenBox.y) < 1).toBe(true);
+  await expect(canvas).toHaveAttribute("data-scene", "0");
+  await expect(canvas).toHaveAttribute("data-scene-source", "video");
+  // the first clip runs in step with the crawl: one scroll update is 120 ms
+  const sync = (index: number, start: number) => page.evaluate(([i, s]) => {
+    const update = Number(document.querySelector<HTMLElement>("[data-testid=startup-screen]")!.dataset.introUpdate);
+    const video = document.querySelector<HTMLVideoElement>(`[data-testid=intro-hd-video-${i}]`)!;
+    return { drift: Math.abs(video.currentTime - (update * 0.12 - s)), playing: !video.paused, update };
+  }, [index, start] as const);
+  await page.waitForTimeout(3000);
+  const early = await sync(0, 0);
+  expect(early.playing).toBe(true);
+  expect(early.drift).toBeLessThan(0.4);
+  const draws = await page.evaluate(() => ({ ...window.__introHdDraws! }));
+  expect(draws.base).toBeGreaterThan(20);
+  expect(draws.videos).toEqual([0]);
+  expect(draws.originals).toBe(0);
+  // stretched into the native plate rectangle, (24,0) 608x257
+  expect(draws.rect).toEqual([24, 0, 608, 257]);
+  await captureVisualAudit(screen, { path: "artifacts/playwright/intro-hd.png" });
+  // sentence 2 (水神「愛西斯」) starts at update 71: BK/43 fades in over the half second either side
+  await expect(screen).toHaveAttribute("data-intro-update", /^(7[6-9]|[89]\d)$/u, { timeout: 15_000 });
+  await expect(canvas).toHaveAttribute("data-scene", "1");
+  const second = await sync(1, 71 * 0.12 - 0.5);
+  expect(second.playing).toBe(true);
+  expect(second.drift).toBeLessThan(0.4);
+  expect(await page.evaluate(() => window.__introHdDraws!.videos)).toEqual([0, 1]);
+  // the first clip has left the screen: it waits at frame 0 for the idle replay
+  await expect.poll(() => page.evaluate(() => {
+    const video = document.querySelector<HTMLVideoElement>("[data-testid=intro-hd-video-0]")!;
+    return video.paused && video.currentTime === 0;
+  })).toBe(true);
+});
+
+test("REMAKE-198: the HD crawl reaches all seven pictures in order and a key press leaves it for the title", async ({ page }) => {
+  test.setTimeout(120_000);
+  await useHd(page);
+  await recordIntroDraws(page);
+  await page.goto("/?test=1");
+  const screen = page.getByTestId("startup-screen");
+  await expect(screen).toHaveAttribute("data-intro-hd-scenes", "7", { timeout: 60_000 });
+  await activateStartup(page);
+  await expect(screen).toHaveAttribute("data-startup-phase", "intro", { timeout: 15_000 });
+  await expect(screen).toHaveAttribute("data-intro-style", "hd");
+  // test mode squeezes the 71 s crawl into 8 s; every clip still gets drawn, in playing order
+  await expect.poll(() => page.evaluate(() => window.__introHdDraws!.videos.length), { timeout: 15_000 }).toBeGreaterThanOrEqual(5);
+  const order = await page.evaluate(() => [...window.__introHdDraws!.videos]);
+  expect(order).toEqual([...order].sort((a, b) => a - b));
+  // the next run (idle replay) is decided afresh; a key press now skips to the title and stops every clip
+  await page.keyboard.press("x");
+  await expect(screen).toHaveAttribute("data-startup-phase", /title/u);
+  await expect(page.getByTestId("intro-hd-canvas")).toBeHidden();
+  expect(await page.evaluate(() => [...document.querySelectorAll<HTMLVideoElement>("[data-testid^=intro-hd-video-]")].every((video) => video.paused))).toBe(true);
+});
+
+test("REMAKE-198: in 原版 the crawl keeps the original plates and no HD clip is requested", async ({ page }) => {
+  const requests = storyHdRequests(page);
+  await page.goto("/?test=1");
+  await activateStartup(page);
+  const screen = page.getByTestId("startup-screen");
+  await expect(screen).toHaveAttribute("data-startup-phase", "intro", { timeout: 15_000 });
+  await expect(screen).toHaveAttribute("data-intro-style", "original");
+  await expect(page.getByTestId("intro-hd-canvas")).toHaveCount(0);
   expect(requests).toEqual([]);
 });

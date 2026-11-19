@@ -248,8 +248,8 @@ for (const file of portraitHdManifest.records.flatMap((entry) =>
 }
 // `REMAKE-196`: HD story illustrations follow the same rule. The manifest exists only once
 // the asset pack carries at least one HD illustration. A still (BK/13) has no loop, a
-// shared sky strip is listed by every record using it, and `REMAKE-197` adds the title's
-// layers.
+// shared sky strip is listed by every record using it, `REMAKE-197` adds the title's
+// layers and `REMAKE-198` the opening crawl's clips.
 const storyHdManifestPath = path.join(releaseDirectory, "assets/original/story/hd/hd-manifest.json");
 if (await pathExists(storyHdManifestPath)) {
   const storyHdManifest = JSON.parse(await readFile(storyHdManifestPath, "utf8"));
@@ -257,6 +257,7 @@ if (await pathExists(storyHdManifestPath)) {
   const storyHdFiles = [
     ...storyHdManifest.records.flatMap((entry) => [entry.poster, entry.video, entry.sky]),
     ...(title ? [title.frame, title.women, ...title.variants.flatMap((variant) => [variant.logo, variant.land, variant.sky])] : []),
+    ...(storyHdManifest.intro?.scenes.map((scene) => scene.video) ?? []),
   ].filter(Boolean);
   for (const file of new Map(storyHdFiles.map((entry) => [entry.output, entry])).values()) {
     const released = await readFile(path.join(releaseDirectory, "assets/original", file.output));

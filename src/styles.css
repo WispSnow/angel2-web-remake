@@ -237,7 +237,10 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 /* REMAKE-197: the HD title canvas sits over the original canvas and under the menu
  * frames and menus. Its backing follows the displayed size, so it maps about one to
  * one onto screen pixels and draws the original pixels nearest-neighbour itself; the
- * stacked loop of the two women decodes underneath it, fully transparent. */
+ * stacked loop of the two women decodes underneath it, fully transparent.
+ * REMAKE-198: the HD intro canvas works the same way over the crawl, its seven
+ * one-shot clips decoding underneath. */
+.startup-intro > canvas.startup-hd-canvas,
 .startup-title > canvas.startup-hd-canvas {
   position: absolute;
   inset: 0;
@@ -246,6 +249,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   image-rendering: auto !important;
   pointer-events: none;
 }
+.startup-intro > video.startup-hd-video,
 .startup-title > video.startup-hd-video {
   position: absolute;
   inset: 0;

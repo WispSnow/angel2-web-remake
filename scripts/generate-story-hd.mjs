@@ -25,6 +25,13 @@
 // like the illustrations', and the variants must be the ones the startup screen
 // alternates.
 //
+// Version 4 adds the opening crawl (REMAKE-198, user request 2026-11-18) under
+// `intro`: one one-shot clip (not a loop) per plate BK/41, 43..48 in the order
+// module 23 shows them, each with the scroll update it is fully on screen (the
+// pictures follow the REMAKE-189 narration, not the native plate switches) and
+// one cross-fade length. The originals are pinned by hash, and every clip must
+// last from the start of its fade-in to the end of the next plate's.
+//
 // `--import <workbench export>` first copies the files from the git-ignored
 // workbench (tmp/cutscene-hd/export, made by its tools/export.py) into the asset
 // pack and rewrites the manifest. The workbench never ships.
@@ -42,7 +49,12 @@ const manifestPath = path.join(hdRoot, "hd-manifest.json");
 const contentRoot = path.join(root, "src/game/content");
 const generatedModule = path.join(contentRoot, "story-hd.generated.ts");
 const FORMAT = "ANGEL2 HD story illustrations";
-const VERSION = 3;
+const VERSION = 4;
+/** REMAKE-198 crawl clips: 2.316x the 608x257 plate (2.366x vertically; H3 sizes step by 32), shown stretched into it. */
+const INTRO_WIDTH = 1408;
+const INTRO_HEIGHT = 608;
+/** startup.ts NATIVE_TICK_MS: the remake runs module 23's timer at 10 ms a tick. */
+const NATIVE_TICK_MS = 10;
 const TITLE_SCALE = 3;
 const TITLE_ROOT = "/assets/original/startup/title/";
 /** 2.2x the 640x350 logical screen (2.194x vertically); `object-fit: cover` trims under one logical pixel. */
@@ -164,6 +176,13 @@ async function checkFile(file, kind) {
       fail(`${file.output} is ${tracks[0].width}x${tracks[0].height}, the manifest says ${file.width}x${file.height}`);
     }
     if (file.alpha !== "stacked" || !(file.frames > 24 && file.fps === 24)) fail(`${file.output} must be a stacked 24 fps loop`);
+  } else if (kind === "intro-video") {
+    const tracks = mp4Tracks(buffer);
+    if (tracks.length !== 1 || tracks[0].handler !== "vide") fail(`${file.output} must hold exactly one video track and no audio`);
+    if (tracks[0].width !== INTRO_WIDTH || tracks[0].height !== INTRO_HEIGHT || file.width !== INTRO_WIDTH || file.height !== INTRO_HEIGHT) {
+      fail(`${file.output} is ${tracks[0].width}x${tracks[0].height}, expected ${INTRO_WIDTH}x${INTRO_HEIGHT}`);
+    }
+    if (!(Number.isInteger(file.frames) && file.frames > 24 && file.fps === 24)) fail(`${file.output} frame count or rate out of range`);
   } else if (kind === "png") {
     const size = pngSize(buffer);
     if (size.width !== file.width || size.height !== file.height) fail(`${file.output} is ${size.width}x${size.height}`);
@@ -220,9 +239,57 @@ async function validateTitle(title, expectedFiles) {
   }
 }
 
+/** STARTUP_INTRO as the startup generator wrote it (plates, scroll length, update period). */
+async function startupIntro() {
+  const startup = await readFile(path.join(contentRoot, "startup.generated.ts"), "utf8");
+  const match = startup.match(/export const STARTUP_INTRO = (\{.*\}) as const;/u);
+  if (!match) fail("startup.generated.ts has no STARTUP_INTRO");
+  return JSON.parse(match[1]);
+}
+
+/**
+ * The HD crawl (REMAKE-198): the plates in module 23's order with their pinned originals, cues starting at 0 and
+ * rising inside the crawl with room for a full cross-fade between them, and clips long enough for their window.
+ * Returns the plate rectangle the clips are stretched into.
+ */
+async function validateIntro(intro, expectedFiles) {
+  const native = await startupIntro();
+  const updateMs = native.ticksPerScrollUpdate * NATIVE_TICK_MS;
+  const crawlMs = native.scrollUpdates * updateMs;
+  if (!Array.isArray(intro.scenes) || intro.scenes.length !== native.backgrounds.length) fail("the intro needs one scene per crawl plate");
+  if (!Number.isInteger(intro.crossfadeMs) || intro.crossfadeMs < 0 || intro.crossfadeMs > 3000) fail("intro cross-fade out of range");
+  let plate;
+  for (const [index, scene] of intro.scenes.entries()) {
+    const background = native.backgrounds[index];
+    if (scene.original !== background.src) fail(`intro scene ${index} must replace ${background.src}`);
+    const file = path.join(assetRoot, scene.original.replace(/^\/assets\/original\//u, ""));
+    if (!existsSync(file)) fail(`${scene.original} does not exist`);
+    const buffer = await readFile(file);
+    if (scene.originalSha256 !== sha256(buffer)) fail(`intro scene ${index}: ${scene.original} changed; review the HD intro before shipping it`);
+    const size = pngSize(buffer);
+    const rect = { x: background.x, y: background.y, width: size.width, height: size.height };
+    if (plate && JSON.stringify(plate) !== JSON.stringify(rect)) fail("the crawl plates no longer share one rectangle");
+    plate = rect;
+    const next = intro.scenes[index + 1];
+    if (index === 0 ? scene.cue !== 0 : !(Number.isInteger(scene.cue) && scene.cue > intro.scenes[index - 1].cue)) {
+      fail(`intro scene ${index}: cues start at 0 and rise`);
+    }
+    const end = next ? next.cue * updateMs + intro.crossfadeMs / 2 : crawlMs;
+    const start = index === 0 ? 0 : scene.cue * updateMs - intro.crossfadeMs / 2;
+    if (next && (next.cue - scene.cue) * updateMs <= intro.crossfadeMs) fail(`intro scene ${index} is shorter than the cross-fade`);
+    if (end > crawlMs + intro.crossfadeMs) fail(`intro scene ${index} runs past the crawl`);
+    await checkFile(scene.video, "intro-video");
+    if (scene.video.frames < Math.ceil((end - start) / 1000 * scene.video.fps)) {
+      fail(`${scene.video.output} has ${scene.video.frames} frames, its window needs ${Math.ceil((end - start) / 1000 * scene.video.fps)}`);
+    }
+    expectedFiles.add(path.relative("story/hd", scene.video.output));
+  }
+  return plate;
+}
+
 async function importWorkbench(workbench) {
   const exported = JSON.parse(await readFile(path.join(workbench, "manifest.json"), "utf8"));
-  if (exported.format !== "angel2-story-hd-export" || exported.version !== 3) fail("unexpected workbench export format");
+  if (exported.format !== "angel2-story-hd-export" || exported.version !== 4) fail("unexpected workbench export format");
   await rm(hdRoot, { recursive: true, force: true });
   const copied = new Set();
   // the export folder mirrors story/hd/; a strip two records share is copied once
@@ -270,6 +337,21 @@ async function importWorkbench(workbench) {
       });
     }
   }
+  let intro;
+  if (exported.intro) {
+    intro = { crossfadeMs: exported.intro.crossfadeMs, scenes: [] };
+    for (const scene of exported.intro.scenes) {
+      const original = `/assets/original/${scene.original}`;
+      const file = path.join(assetRoot, scene.original);
+      if (!existsSync(file)) fail(`${original} does not exist`);
+      intro.scenes.push({
+        original,
+        originalSha256: sha256(await readFile(file)),
+        cue: scene.cue,
+        video: await ship(scene.video, { frames: scene.video.frames, fps: scene.video.fps }),
+      });
+    }
+  }
   const manifest = {
     format: FORMAT,
     version: VERSION,
@@ -286,10 +368,18 @@ async function importWorkbench(workbench) {
         ...title,
       },
     } : {}),
+    ...(intro ? {
+      intro: {
+        note: "REMAKE-198 opening crawl: one one-shot clip per plate, each fully on screen from `cue` (scroll updates), cross-fades centred on the cues",
+        ...intro,
+      },
+    } : {}),
   };
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   return manifest;
 }
+
+let introPlate;
 
 async function validate(manifest) {
   if (manifest.format !== FORMAT || manifest.version !== VERSION || manifest.width !== WIDTH || manifest.height !== HEIGHT) {
@@ -328,6 +418,7 @@ async function validate(manifest) {
     if (entry.isFile()) shipped.push(path.relative(hdRoot, path.join(entry.parentPath, entry.name)));
   }
   if (manifest.title) await validateTitle(manifest.title, expectedFiles);
+  if (manifest.intro) introPlate = await validateIntro(manifest.intro, expectedFiles);
   const stray = shipped.filter((file) => !expectedFiles.has(file));
   if (stray.length > 0) fail(`stray files under story/hd/: ${stray.join(", ")}`);
 }
@@ -366,10 +457,30 @@ function titleModule(title) {
     "",
   ];
 }
+function introModule(intro) {
+  if (!intro) return ["export const STORY_HD_INTRO: StoryHdIntro | undefined = undefined;", ""];
+  const plate = introPlate ?? fail("the intro was not validated");
+  return [
+    "export const STORY_HD_INTRO: StoryHdIntro | undefined = {",
+    `  plate: { x: ${plate.x}, y: ${plate.y}, width: ${plate.width}, height: ${plate.height} },`,
+    `  crossfadeMs: ${intro.crossfadeMs},`,
+    "  scenes: [",
+    ...intro.scenes.map((scene) => [
+      "    {",
+      `      original: ${JSON.stringify(scene.original)},`,
+      `      cue: ${scene.cue},`,
+      `      video: { source: ${url(scene.video.output)}, width: ${scene.video.width}, height: ${scene.video.height}, frames: ${scene.video.frames}, fps: ${scene.video.fps} },`,
+      "    },",
+    ].join("\n")),
+    "  ],",
+    "};",
+    "",
+  ];
+}
 const records = [...manifest.records].sort((a, b) => a.background - b.background);
 await writeFile(generatedModule, [
   "// Generated by scripts/generate-story-hd.mjs from story/hd/hd-manifest.json; do not edit by hand.",
-  "import type { StoryHdEntry, StoryHdTitle } from \"./story-hd\";",
+  "import type { StoryHdEntry, StoryHdIntro, StoryHdTitle } from \"./story-hd\";",
   "",
   `export const STORY_HD_WIDTH = ${WIDTH};`,
   `export const STORY_HD_HEIGHT = ${HEIGHT};`,
@@ -387,6 +498,7 @@ await writeFile(generatedModule, [
   "];",
   "",
   ...titleModule(manifest.title),
+  ...introModule(manifest.intro),
 ].join("\n"));
 const shippedBytes = new Map();
 for (const entry of records) for (const file of [entry.poster, entry.video, entry.sky]) if (file) shippedBytes.set(file.output, file.bytes);
@@ -394,5 +506,6 @@ if (manifest.title) {
   const t = manifest.title;
   for (const file of [t.frame, t.women, ...t.variants.flatMap((v) => [v.logo, v.land, v.sky])]) shippedBytes.set(file.output, file.bytes);
 }
+if (manifest.intro) for (const scene of manifest.intro.scenes) shippedBytes.set(scene.video.output, scene.video.bytes);
 const bytes = [...shippedBytes.values()].reduce((sum, size) => sum + size, 0);
-console.log(`story HD catalog: ${records.length} records${manifest.title ? " + title" : ""}, ${(bytes / 1024 / 1024).toFixed(1)} MiB -> ${path.relative(root, generatedModule)}`);
+console.log(`story HD catalog: ${records.length} records${manifest.title ? " + title" : ""}${manifest.intro ? " + intro" : ""}, ${(bytes / 1024 / 1024).toFixed(1)} MiB -> ${path.relative(root, generatedModule)}`);
