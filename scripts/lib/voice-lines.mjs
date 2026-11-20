@@ -28,8 +28,19 @@ export const LINE_MODULES = Object.freeze({
 });
 
 /** DS:84BB lines that stay text-only, with the reason. */
-export const UNVOICED_LINES = Object.freeze({
-  experienceGain: "「得經驗值 N 點」是數字讀數，規格「完全不配音的文字」",
+export const UNVOICED_LINES = Object.freeze({});
+
+/**
+ * DS:84BB lines whose typed text carries a number the native writes in before
+ * the window opens. One clip per voice reads only the fixed words, keyed by the
+ * record's own text (numeric field unwritten); the runtime maps every filled-in
+ * page back to it (`voiceLineTextForPage`).
+ *
+ * - 「得經驗值 N 點」 (REMAKE-202, user 2026-11-19): too many amounts to voice
+ *   each one, so it is read 「獲得經驗值」.
+ */
+export const LINE_SPOKEN_OVERRIDES = Object.freeze({
+  experienceGain: "獲得經驗值",
 });
 
 /**
@@ -121,7 +132,8 @@ export async function loadLineSources(root) {
       unvoiced.push({ surface: `contextual:${id}`, text: line.text, reason: UNVOICED_LINES[id] });
       continue;
     }
-    sources.push({ surface: `contextual:${id}`, text: line.text, speakers: "battle" });
+    const spoken = LINE_SPOKEN_OVERRIDES[id];
+    sources.push({ surface: `contextual:${id}`, text: line.text, speakers: "battle", ...(spoken ? { spoken } : {}) });
   }
   for (const group of ai.NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS) {
     sources.push({ surface: `ai-technique:${group.selector}`, text: group.text, speakers: "battle" });
@@ -176,6 +188,7 @@ export function buildLineScript({ sources, unvoiced }) {
       const existing = clips.get(key);
       if (existing) {
         if (existing.displayed !== source.text) throw new Error(`text hash collision on ${key}`);
+        if (existing.spoken !== lineSpokenText(source.spoken ?? source.text)) throw new Error(`${key} is read two ways`);
         if (!existing.surfaces.includes(source.surface)) existing.surfaces.push(source.surface);
         continue;
       }
@@ -191,7 +204,7 @@ export function buildLineScript({ sources, unvoiced }) {
         displayed: source.text,
         displayTextHash: sha16(source.text),
         textHash,
-        spoken: lineSpokenText(source.text),
+        spoken: lineSpokenText(source.spoken ?? source.text),
         tempo: voiceTempoForRole(voice.role),
         platform: voice.platform,
         voiceId: voice.voiceId,

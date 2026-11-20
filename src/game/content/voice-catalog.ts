@@ -1,5 +1,6 @@
 import type { DialoguePage, StageId } from "../types";
 import type { VoiceVolume } from "../preferences";
+import { NATIVE_CONTEXTUAL_BATTLE_LINES } from "./ai-technique-dialogue.generated";
 import {
   VOICE_CLIPS,
   VOICE_EPILOGUE_NARRATION,
@@ -114,6 +115,28 @@ export function voiceLineFor(portrait: number | undefined, text: string | undefi
   return { key: `${voiceId}:${textHash}`, source: voiceLineSource(voiceId, textHash), durationMs, startGlyph: 0, kind: "line" };
 }
 
+const EXPERIENCE_LINE = NATIVE_CONTEXTUAL_BATTLE_LINES.experienceGain;
+const [EXPERIENCE_LINE_HEAD = "", EXPERIENCE_LINE_TAIL = ""] =
+  EXPERIENCE_LINE.text.split(EXPERIENCE_LINE.numericField.digits);
+/** `0000:EF56` 寫入的五格欄位：前導零換成空白，全空時補回一個 `0`。 */
+const EXPERIENCE_FIELD = /^ *\d+$/u;
+
+/**
+ * 戰鬥台詞片段按哪段文字取。「得經驗值 N 點」的數字每次不同，片段只讀固定字句
+ * 「獲得經驗值」（`REMAKE-202`），所以填好數字的頁面一律對回記錄原文（數字欄位未寫入）；
+ * 其餘頁面就是打出的文字。
+ */
+export function voiceLineTextForPage(page: DialoguePage): string | undefined {
+  const typed = voiceTypedText(page);
+  if (typed === undefined || page.source.record !== EXPERIENCE_LINE.record) return typed;
+  const field = typed.slice(EXPERIENCE_LINE_HEAD.length, typed.length - EXPERIENCE_LINE_TAIL.length);
+  const filledIn = typed.length === EXPERIENCE_LINE.text.length
+    && typed.startsWith(EXPERIENCE_LINE_HEAD)
+    && typed.endsWith(EXPERIENCE_LINE_TAIL)
+    && EXPERIENCE_FIELD.test(field);
+  return filledIn ? EXPERIENCE_LINE.text : typed;
+}
+
 /** 頁面要播的片段：劇情頁按 SAY 頁，其餘（字串記錄）按說話者聲線與文字。 */
 export function voiceCueForPage(page: DialoguePage | undefined): VoiceCue | undefined {
   if (!page) return undefined;
@@ -122,7 +145,7 @@ export function voiceCueForPage(page: DialoguePage | undefined): VoiceCue | unde
     return clip ? { key: clip.key, source: clip.source, durationMs: clip.durationMs, startGlyph: clip.startGlyph, kind: "story" } : undefined;
   }
   const state = page.activeSlot ? page[page.activeSlot] : undefined;
-  return voiceLineFor(state?.portrait, voiceTypedText(page));
+  return voiceLineFor(state?.portrait, voiceLineTextForPage(page));
 }
 
 /**

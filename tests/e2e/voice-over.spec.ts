@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+import { NATIVE_CONTEXTUAL_BATTLE_LINES } from "../../src/game/content/ai-technique-dialogue.generated";
+import { VOICE_PORTRAIT_VOICES, voiceLineSource, voiceTextHash } from "../../src/game/content/voice-catalog";
 import { captureVisualAudit } from "./visual-audit";
 
 /**
@@ -289,6 +291,30 @@ test("REMAKE-189: 妮雅's quit confirmation is voiced instead of beeping", asyn
   await page.getByTestId("quit-confirm-menu").getByRole("menuitem", { name: /取/u }).click();
   await expect(page.getByTestId("quit-confirm")).toBeHidden();
   await expect(app(page)).toHaveAttribute("data-voice-playing", "none");
+});
+
+test("REMAKE-202: a kill's 得經驗值 window says 獲得經驗值 in the killer's voice instead of beeping", async ({ page }) => {
+  await useVoice(page, { voiceVolume: 4 });
+  // The commander 妮雅 (D/46) stands next to a 1-life enemy; whatever the award, one clip reads it.
+  const voiceId = VOICE_PORTRAIT_VOICES[46];
+  const textHash = voiceTextHash(NATIVE_CONTEXTUAL_BATTLE_LINES.experienceGain.text);
+  const clip = voiceLineSource(voiceId, textHash);
+  const fetched: string[] = [];
+  page.on("requestfinished", (request) => fetched.push(new URL(request.url()).pathname));
+  await page.goto("/?test=1&debugScenario=stage-00-near-victory&difficulty=0");
+  await waitForPhase(page, "player");
+  // Battle lines play only once their bytes are in memory, so wait for the board's download.
+  await expect.poll(() => fetched.includes(clip), { timeout: 30_000 }).toBe(true);
+  const beeps = await speechRequests(page);
+  await page.getByTestId("battle-canvas").click({ position: { x: 220, y: 177 } });
+  await page.getByTestId("unit-command-attack").click();
+  await expect(dialogue(page)).toHaveAttribute("data-source-record", "experience-gain", { timeout: 40_000 });
+  await expect(dialogue(page)).toContainText(/得經驗值 *\d+ 點/u);
+  await expect(app(page)).toHaveAttribute("data-voice-page", `${voiceId}:${textHash}`);
+  await expect(app(page)).toHaveAttribute("data-voice-playing", new RegExp(`/voice/line/${voiceId}/${textHash}\\.ogg$`, "u"));
+  await typingDone(page);
+  expect(await speechRequests(page)).toBe(beeps);
+  await expect(dialogue(page)).not.toHaveAttribute("data-source-record", "experience-gain", { timeout: 10_000 });
 });
 
 test("REMAKE-191: the entry panel's 翻頁方式 row starts on 自動 with voice and writes the panel's 自動翻頁", async ({ page }) => {

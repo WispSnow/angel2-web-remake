@@ -18,6 +18,7 @@ import {
   NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS,
   NATIVE_CONTEXTUAL_BATTLE_LINES,
   contextualBattleDialogueFor,
+  experienceGainDialogueFor,
 } from "../../src/game/content/ai-technique-dialogue";
 import { GROUP_COMMAND_DIALOGUE, groupCommandDialogueFor } from "../../src/game/content/group-command-dialogue";
 import { OUTCOME_FEEDBACK_PORTRAIT, OUTCOME_FEEDBACK_TEXT } from "../../src/game/content/outcome-feedback";
@@ -37,6 +38,8 @@ import {
   voiceClipForPage,
   voiceCueForPage,
   voiceLineFor,
+  voiceLineTextForPage,
+  voiceTextHash,
   voiceTypedText,
 } from "../../src/game/content/voice-catalog";
 import type { DialoguePage } from "../../src/game/types";
@@ -67,6 +70,7 @@ interface VoiceManifestClip {
 interface VoiceManifestLine {
   key: string;
   textHash: string;
+  spoken: string;
   roles: string[];
   surfaces: string[];
   platform: string;
@@ -310,18 +314,45 @@ describe("REMAKE-189 battle lines and narration", () => {
     }
   });
 
-  test("voices every DS:84BB line and technique notice for any battle speaker, but not the EXP readout", () => {
+  test("voices every DS:84BB line and technique notice for any battle speaker", () => {
     for (const portrait of SAMPLE_PORTRAITS) {
       for (const line of Object.keys(NATIVE_CONTEXTUAL_BATTLE_LINES) as (keyof typeof NATIVE_CONTEXTUAL_BATTLE_LINES)[]) {
         const cue = voiceCueForPage(contextualBattleDialogueFor(speaker(portrait, 2), line));
-        if (line === "experienceGain") expect(cue, `${portrait}:${line}`).toBeUndefined();
-        else expect(cue, `${portrait}:${line}`).toMatchObject({ kind: "line" });
+        expect(cue, `${portrait}:${line}`).toMatchObject({ kind: "line" });
       }
       for (const group of NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS) {
         expect(voiceLineFor(portrait, group.text), `${portrait}:${group.text}`).toBeDefined();
       }
     }
-    expect(manifest.unvoicedLines.map(({ surface }) => surface)).toEqual(["contextual:experienceGain"]);
+    expect(manifest.unvoicedLines).toEqual([]);
+  });
+
+  test("reads every EXP award as 「獲得經驗值」 in the earner's voice, whatever the number (REMAKE-202)", () => {
+    const template = NATIVE_CONTEXTUAL_BATTLE_LINES.experienceGain.text;
+    const clips = manifest.lines.filter(({ surfaces }) => surfaces.includes("contextual:experienceGain"));
+    expect(new Set(clips.map(({ voiceId }) => voiceId))).toEqual(new Set(Object.values(VOICE_PORTRAIT_VOICES)));
+    for (const clip of clips) {
+      expect(clip.textHash, clip.key).toBe(voiceTextHash(template));
+      expect(clip.spoken, clip.key).toBe("获得经验值");
+    }
+    for (const portrait of SAMPLE_PORTRAITS) {
+      const expected = voiceLineFor(portrait, template);
+      expect(expected, `D/${portrait}`).toBeDefined();
+      for (const side of [1, 2] as const) {
+        for (const amount of [0, 7, 52, 300, 12_345, 70_000]) {
+          const page = experienceGainDialogueFor(speaker(portrait, side), amount);
+          expect(voiceCueForPage(page), `D/${portrait}:${amount}`).toEqual(expected);
+        }
+      }
+    }
+    // Only the native field maps back: an edited readout (e.g. a Mod) has no clip.
+    const edited = experienceGainDialogueFor(speaker(46), 52);
+    const state = edited.upper;
+    if (!state?.text) throw new Error("EXP page lost its window");
+    for (const text of ["得經驗值 52 點", "得經驗值  -52 點", "得到經驗值52 點", `${state.text}!`]) {
+      expect(voiceCueForPage({ ...edited, upper: { ...state, text } }), text).toBeUndefined();
+    }
+    expect(voiceLineTextForPage({ ...edited, source: { ...edited.source, record: "battle-context" } })).toBe(state.text);
   });
 
   test("voices the group commands and the promotion dialogue in whoever speaks them", () => {
