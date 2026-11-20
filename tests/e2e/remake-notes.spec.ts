@@ -206,6 +206,14 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
     .toContainText("Qwen-Image-Edit");
   await expect(page.getByTestId("remake-disclaimer-ai-portraits"))
     .toContainText("RIFE");
+  await expect(page.getByTestId("remake-disclaimer-ai-portraits"))
+    .toContainText("美術風格");
+  // REMAKE-196/197/198/200/201: the HD story pictures name the models that drew, extended and animated them.
+  const storyArt = page.getByTestId("remake-disclaimer-ai-story-art");
+  for (const model of ["Qwen-Image-Edit", "FLUX.1 Fill", "MiniMax", "RIFE"]) {
+    await expect(storyArt).toContainText(model);
+  }
+  await expect(storyArt).toContainText("The end");
   await expect(page.getByTestId("remake-note-REMAKE-100")).toHaveCount(0);
   await captureVisualAudit(page.locator(".rn-dialog"), {
     path: "artifacts/playwright/remake-disclaimer-desktop.png",
