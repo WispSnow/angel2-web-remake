@@ -129,7 +129,7 @@ describe("deployment auto-fill session (自動配置)", () => {
   it("fills a late 1–15 deployment with the top-ranked candidates around a manual pick", () => {
     const roster = createStage29DeploymentRoster({
       difficulty: 2,
-      roster: debugRosterForProfile("representative-growth", "stage-29"),
+      roster: debugRosterForProfile("default-growth", "stage-29"),
     });
     const { deployment } = STAGE29_DEFINITION;
     const optional = new Set<number>(deployment.optionalSlots);

@@ -500,7 +500,7 @@ test("S49-G: the epilogue types its native bitmap text and the first press only 
   // 24 native ticks (0000:069E-0725), and the warrior-statue segment alone
   // holds the screen for 46 of them.
   await page.goto(
-    "/?debugScenario=stage-49-warrior-statue&difficulty=0&roster=representative-growth&growth=100",
+    "/?debugScenario=stage-49-warrior-statue&difficulty=0&roster=default-growth&growth=100",
   );
   const screen = page.locator("#stage49-screen");
   const epilogue = page.getByTestId("stage49-epilogue");
@@ -617,7 +617,7 @@ test("S49-H: the epilogue keeps its native trailing pause after the last glyph",
   // Chained `setTimeout` delays drift far enough over 46 redraws to swallow that
   // pause, so the schedule has to be anchored to the segment's own start.
   await page.goto(
-    "/?debugScenario=stage-49-warrior-statue&difficulty=0&roster=representative-growth&growth=100",
+    "/?debugScenario=stage-49-warrior-statue&difficulty=0&roster=default-growth&growth=100",
   );
   const epilogue = page.getByTestId("stage49-epilogue");
   await expect(epilogue).toHaveAttribute("data-segment", "warriorStatue");

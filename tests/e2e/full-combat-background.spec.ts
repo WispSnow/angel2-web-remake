@@ -26,7 +26,7 @@ const state = (page: Page) => page.evaluate(
  */
 test("stage-1 full-screen battles use the defender's terrain backdrop, not the stage record", async ({ page }) => {
   await page.goto(
-    "/?debugScenario=stage-01-near-victory&difficulty=0&roster=representative-growth&growth=100",
+    "/?debugScenario=stage-01-near-victory&difficulty=0&roster=default-growth&growth=100",
   );
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await expect.poll(async () => (await state(page)).phase).toBe("player");

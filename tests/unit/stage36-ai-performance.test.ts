@@ -9,7 +9,7 @@ const campaign: CampaignState = {
   stageId: "stage-36",
   ruleset: "stableRemake",
   difficulty: 2,
-  roster: debugRosterForProfile("representative-growth", "stage-36"),
+  roster: debugRosterForProfile("default-growth", "stage-36"),
   rngState: 0x36_36_36_36,
   rngCalls: 0,
 };

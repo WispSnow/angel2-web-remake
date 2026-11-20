@@ -12,7 +12,6 @@ import {
 } from "./content/campaign-entry-experience";
 import { completeCampaignRoster } from "./content/stage0";
 import { readSaveSlot, SAVE_SLOT_COUNT } from "./save";
-import { DeterministicRng } from "./simulation/rng";
 import { STAGE_RUNTIME_MANIFEST } from "./stage-runtime";
 import type {
   CampaignState,
@@ -127,6 +126,12 @@ export interface DebugCampaignMemberSpec {
   /** 戰役入隊職業：有強制劇情職業的用該職業，其餘沿用原版士兵起點。 */
   campaignEntryClassId: ClassId;
   /**
+   * 「預設職業成長」的目標頂層職業（沒有轉職候選的職業）；「隨機職業成長」改按種子抽選。原版
+   * 轉職圖是一棵樹，從入隊職業到它只有一條路，所以成長預算沿這條路逐段轉職；入隊職業本身已是
+   * 頂層（多莉、琴斯、水戰士等）時就填它。
+   */
+  growthTargetClassId: ClassId;
+  /**
    * 角色早於 `joinStageId` 就能上場的關卡。此時她還沒拿到強制劇情職業，名冊保持未轉職
    * 士兵，由關卡自己的命名士兵經驗下限接手，所以夾具不在那些關寫入成長。
    */
@@ -141,68 +146,255 @@ export interface DebugCampaignMemberSpec {
  * `eligibleSlots` 首次出現的關卡，固定編隊關取該關的固定我方單位表；強制劇情職業取該關
  * 的 `initialClassId`／`forcedClassId`／`campaignEntryNativeClassRecord` 覆寫。
  *
+ * 「預設職業成長」的目標頂層職業讓整份名冊盡量把 20 個頂層職業各覆蓋一次：多莉、琴斯、愛莉歐拉已固定為咒術師、
+ * 魔祭師、巨斧戰士，其餘 17 名士兵起點的角色與蘇蘭達（騎兵只能走騎士線）分掉另外 18 個
+ * （含巨斧戰士，愛莉歐拉第 27 關才歸隊），葛蒂拉斯（魔術士線）第 20 關後離隊，所以和潔西卡
+ * 重複邪法師。妮雅飛龍騎士、希蜜巫師是用戶指定（2026-11-19）。水戰士、半龍戰士與女帝不能轉職。
+ *
  * 不登記 40..58 這類 `xxxxNN` 通用槽與第 20 關守護者（槽 32）：它們是關卡自帶的一次性
  * NPC，職業與經驗由關卡模板直接給定，戰役名冊不保存它們的成長。
  */
 const DEBUG_CAMPAIGN_MEMBER_SPECS = [
   // 第 0 關瓦爾克麗宮的兩名可操作角色。
-  { slot: 0, name: "妮雅", joinStageId: "stage-00", campaignEntryClassId: "soldier" },
-  { slot: 1, name: "希蜜", joinStageId: "stage-00", campaignEntryClassId: "soldier" },
+  {
+    slot: 0,
+    name: "妮雅",
+    joinStageId: "stage-00",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "flying-dragon-knight",
+  },
+  {
+    slot: 1,
+    name: "希蜜",
+    joinStageId: "stage-00",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "wizard",
+  },
   // 第 1 關騎士城堡前的名單候選。
-  { slot: 2, name: "蒙欣曼", joinStageId: "stage-01", campaignEntryClassId: "soldier" },
-  { slot: 4, name: "拉朵那", joinStageId: "stage-01", campaignEntryClassId: "soldier" },
+  {
+    slot: 2,
+    name: "蒙欣曼",
+    joinStageId: "stage-01",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "magic-archer",
+  },
+  {
+    slot: 4,
+    name: "拉朵那",
+    joinStageId: "stage-01",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "magic-master",
+  },
   // 葛蒂拉斯第 1 關以未轉職士兵進名單，第 2 關固定編隊才把她寫成魔術士；第 22 關叛變離隊。
   {
     slot: 24,
     name: "葛蒂拉斯",
     joinStageId: "stage-02",
     campaignEntryClassId: "magician",
+    growthTargetClassId: "evil-mage",
     firstBoardStageId: "stage-01",
     lastStageId: "stage-20",
   },
   // 第 3 關救援友軍的固定我方編隊。
-  { slot: 3, name: "黛西", joinStageId: "stage-03", campaignEntryClassId: "soldier" },
-  { slot: 20, name: "蕾奇蒂特", joinStageId: "stage-03", campaignEntryClassId: "soldier" },
-  { slot: 21, name: "愛歐里雅", joinStageId: "stage-03", campaignEntryClassId: "soldier" },
+  {
+    slot: 3,
+    name: "黛西",
+    joinStageId: "stage-03",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "magic-armor-warrior",
+  },
+  {
+    slot: 20,
+    name: "蕾奇蒂特",
+    joinStageId: "stage-03",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "demon-dragon-knight",
+  },
+  {
+    slot: 21,
+    name: "愛歐里雅",
+    joinStageId: "stage-03",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "prayer-guide",
+  },
   // 第 6 關過異世界之門後新增的名單候選。
-  { slot: 5, name: "汀塔琪", joinStageId: "stage-06", campaignEntryClassId: "soldier" },
-  { slot: 6, name: "萊茵", joinStageId: "stage-06", campaignEntryClassId: "soldier" },
-  { slot: 12, name: "亞莉沙", joinStageId: "stage-06", campaignEntryClassId: "soldier" },
-  { slot: 13, name: "克莉絲", joinStageId: "stage-06", campaignEntryClassId: "soldier" },
-  { slot: 14, name: "舒菲亞", joinStageId: "stage-06", campaignEntryClassId: "soldier" },
+  {
+    slot: 5,
+    name: "汀塔琪",
+    joinStageId: "stage-06",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "swift-dragon-knight",
+  },
+  {
+    slot: 6,
+    name: "萊茵",
+    joinStageId: "stage-06",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "magic-sword-warrior",
+  },
+  {
+    slot: 12,
+    name: "亞莉沙",
+    joinStageId: "stage-06",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "crossbow",
+  },
+  {
+    slot: 13,
+    name: "克莉絲",
+    joinStageId: "stage-06",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "magic-guide",
+  },
+  {
+    slot: 14,
+    name: "舒菲亞",
+    joinStageId: "stage-06",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "jungle-warrior",
+  },
   // 第 8 關「營地遭到偷襲 ２」的固定編隊：蘇蘭達被強制為騎兵，兩名游騎兵沿用士兵。
-  { slot: 8, name: "蘇蘭達", joinStageId: "stage-08", campaignEntryClassId: "cavalry" },
-  { slot: 17, name: "阿曼妮", joinStageId: "stage-08", campaignEntryClassId: "soldier" },
-  { slot: 18, name: "雷伊拉", joinStageId: "stage-08", campaignEntryClassId: "soldier" },
+  {
+    slot: 8,
+    name: "蘇蘭達",
+    joinStageId: "stage-08",
+    campaignEntryClassId: "cavalry",
+    growthTargetClassId: "beast-knight",
+  },
+  {
+    slot: 17,
+    name: "阿曼妮",
+    joinStageId: "stage-08",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "great-dragon-knight",
+  },
+  {
+    slot: 18,
+    name: "雷伊拉",
+    joinStageId: "stage-08",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "evil-sword-warrior",
+  },
   // 第 9 關找尋傳說中的飛船把多莉固定為咒術師。
-  { slot: 9, name: "多莉", joinStageId: "stage-09", campaignEntryClassId: "curse-master" },
+  {
+    slot: 9,
+    name: "多莉",
+    joinStageId: "stage-09",
+    campaignEntryClassId: "curse-master",
+    growthTargetClassId: "curse-master",
+  },
   // 第 11 關拯救蘇蘭達（序數 10）的固定游騎兵編隊。
-  { slot: 16, name: "茱莉亞", joinStageId: "stage-11", campaignEntryClassId: "soldier" },
-  { slot: 19, name: "塔絲加", joinStageId: "stage-11", campaignEntryClassId: "soldier" },
+  {
+    slot: 16,
+    name: "茱莉亞",
+    joinStageId: "stage-11",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "bone-knight",
+  },
+  {
+    slot: 19,
+    name: "塔絲加",
+    joinStageId: "stage-11",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "great-axe-warrior",
+  },
   // 第 10 關飛船上遭遇敵人（序數 11）才出現在名單候選中。
-  { slot: 15, name: "潔西卡", joinStageId: "stage-10", campaignEntryClassId: "soldier" },
+  {
+    slot: 15,
+    name: "潔西卡",
+    joinStageId: "stage-10",
+    campaignEntryClassId: "soldier",
+    growthTargetClassId: "evil-mage",
+  },
   // 第 13 關龍塔外的兩名水戰士新人。
-  { slot: 10, name: "瑪琳", joinStageId: "stage-13", campaignEntryClassId: "water-warrior" },
-  { slot: 11, name: "摩莉娜", joinStageId: "stage-13", campaignEntryClassId: "water-warrior" },
+  {
+    slot: 10,
+    name: "瑪琳",
+    joinStageId: "stage-13",
+    campaignEntryClassId: "water-warrior",
+    growthTargetClassId: "water-warrior",
+  },
+  {
+    slot: 11,
+    name: "摩莉娜",
+    joinStageId: "stage-13",
+    campaignEntryClassId: "water-warrior",
+    growthTargetClassId: "water-warrior",
+  },
   // 第 22 關焦土森林村莊中加入的七姊妹，名單覆寫為半龍戰士。
-  { slot: 25, name: "芳", joinStageId: "stage-22", campaignEntryClassId: "half-dragon-warrior" },
-  { slot: 26, name: "蘭", joinStageId: "stage-22", campaignEntryClassId: "half-dragon-warrior" },
-  { slot: 27, name: "莎", joinStageId: "stage-22", campaignEntryClassId: "half-dragon-warrior" },
-  { slot: 28, name: "倩", joinStageId: "stage-22", campaignEntryClassId: "half-dragon-warrior" },
-  { slot: 29, name: "麗", joinStageId: "stage-22", campaignEntryClassId: "half-dragon-warrior" },
-  { slot: 30, name: "愛", joinStageId: "stage-22", campaignEntryClassId: "half-dragon-warrior" },
-  { slot: 31, name: "嵐", joinStageId: "stage-22", campaignEntryClassId: "half-dragon-warrior" },
+  {
+    slot: 25,
+    name: "芳",
+    joinStageId: "stage-22",
+    campaignEntryClassId: "half-dragon-warrior",
+    growthTargetClassId: "half-dragon-warrior",
+  },
+  {
+    slot: 26,
+    name: "蘭",
+    joinStageId: "stage-22",
+    campaignEntryClassId: "half-dragon-warrior",
+    growthTargetClassId: "half-dragon-warrior",
+  },
+  {
+    slot: 27,
+    name: "莎",
+    joinStageId: "stage-22",
+    campaignEntryClassId: "half-dragon-warrior",
+    growthTargetClassId: "half-dragon-warrior",
+  },
+  {
+    slot: 28,
+    name: "倩",
+    joinStageId: "stage-22",
+    campaignEntryClassId: "half-dragon-warrior",
+    growthTargetClassId: "half-dragon-warrior",
+  },
+  {
+    slot: 29,
+    name: "麗",
+    joinStageId: "stage-22",
+    campaignEntryClassId: "half-dragon-warrior",
+    growthTargetClassId: "half-dragon-warrior",
+  },
+  {
+    slot: 30,
+    name: "愛",
+    joinStageId: "stage-22",
+    campaignEntryClassId: "half-dragon-warrior",
+    growthTargetClassId: "half-dragon-warrior",
+  },
+  {
+    slot: 31,
+    name: "嵐",
+    joinStageId: "stage-22",
+    campaignEntryClassId: "half-dragon-warrior",
+    growthTargetClassId: "half-dragon-warrior",
+  },
   // 第 23 關死亡之谷中的琴斯，戰役入隊職業記錄為魔祭師。
-  { slot: 7, name: "琴斯", joinStageId: "stage-23", campaignEntryClassId: "magic-priest" },
+  {
+    slot: 7,
+    name: "琴斯",
+    joinStageId: "stage-23",
+    campaignEntryClassId: "magic-priest",
+    growthTargetClassId: "magic-priest",
+  },
   // 第 27 關趕回瓦爾克麗城的固定守軍愛莉歐拉，之後靠名冊職業顯示。
   {
     slot: 22,
     name: "愛莉歐拉",
     joinStageId: "stage-27",
     campaignEntryClassId: "great-axe-warrior",
+    growthTargetClassId: "great-axe-warrior",
   },
   // 第 30 關治癒維斯塔女帝後歸隊的女帝本人。
-  { slot: 23, name: "維絲塔", joinStageId: "stage-30", campaignEntryClassId: "empress" },
+  {
+    slot: 23,
+    name: "維絲塔",
+    joinStageId: "stage-30",
+    campaignEntryClassId: "empress",
+    growthTargetClassId: "empress",
+  },
 ] as const satisfies readonly DebugCampaignMemberSpec[];
 
 export const DEBUG_CAMPAIGN_MEMBERS: readonly DebugCampaignMemberSpec[] =
@@ -295,61 +487,13 @@ const REPRESENTATIVE_STAGE8 = [
   { slot: 18, classPath: ["soldier", "warrior"], experience: 500 },
 ] as const satisfies readonly DebugRosterEntrySpec[];
 
-const PROMOTION_COVERAGE_STAGE4 = [
-  {
-    slot: 0,
-    classPath: ["soldier", "cavalry", "land-knight", "swift-dragon-knight"],
-    experience: 360,
-  },
-  {
-    slot: 1,
-    classPath: ["soldier", "sister", "priest", "magic-priest"],
-    experience: 330,
-  },
-  { slot: 2, classPath: ["soldier", "archer", "crossbow"], experience: 680 },
-  {
-    slot: 3,
-    classPath: ["soldier", "warrior", "steel-armor-warrior", "magic-armor-warrior"],
-    experience: 420,
-  },
-  {
-    slot: 4,
-    classPath: ["soldier", "sister", "monk", "prayer-guide"],
-    experience: 390,
-  },
-  {
-    slot: 20,
-    classPath: ["soldier", "cavalry", "pegasus-warrior", "flying-dragon-knight"],
-    experience: 450,
-  },
-  {
-    slot: 21,
-    classPath: ["soldier", "warrior", "divine-sword-warrior", "evil-sword-warrior"],
-    experience: 510,
-  },
-  { slot: 24, classPath: ["magician", "wizard"], experience: 660 },
-] as const satisfies readonly DebugRosterEntrySpec[];
-
-const PROMOTION_COVERAGE_STAGE6 = [
-  ...PROMOTION_COVERAGE_STAGE4,
-  { slot: 5, classPath: ["soldier", "cavalry", "land-knight"], experience: 720 },
-  { slot: 6, classPath: ["soldier", "warrior", "divine-sword-warrior"], experience: 680 },
-  { slot: 12, classPath: ["soldier", "archer", "magic-archer"], experience: 650 },
-  { slot: 13, classPath: ["soldier", "sister", "monk"], experience: 620 },
-  { slot: 14, classPath: ["soldier", "warrior", "steel-armor-warrior"], experience: 640 },
-] as const satisfies readonly DebugRosterEntrySpec[];
-
-const PROMOTION_COVERAGE_STAGE8 = [
-  ...PROMOTION_COVERAGE_STAGE6,
-  { slot: 17, classPath: ["soldier", "cavalry", "land-knight"], experience: 620 },
-  { slot: 18, classPath: ["soldier", "warrior", "steel-armor-warrior"], experience: 590 },
-] as const satisfies readonly DebugRosterEntrySpec[];
-
 type DebugGrowthStageId = Exclude<StageId, "stage-00">;
 
 // This is intentionally total rather than Partial: extending StageId for a playable stage must fail
-// type-checking until both direct-entry growth profiles receive an explicit profession fixture.
-const REPRESENTATIVE_PROFILE_STAGES = {
+// type-checking until the direct-entry growth profiles receive an explicit profession fixture. Both
+// growth profiles share this table: it marks which stages accept per-stage growth and is the
+// hand-written roster a direct link uses when it carries no `growth` parameter.
+const GROWTH_PROFILE_STAGES = {
   "stage-01": REPRESENTATIVE_STAGE1,
   "stage-02": REPRESENTATIVE_STAGE2,
   "stage-03": REPRESENTATIVE_STAGE3,
@@ -390,47 +534,6 @@ const REPRESENTATIVE_PROFILE_STAGES = {
   "stage-38": REPRESENTATIVE_STAGE8,
 } as const satisfies Record<DebugGrowthStageId, readonly DebugRosterEntrySpec[]>;
 
-const PROMOTION_COVERAGE_PROFILE_STAGES = {
-  "stage-01": REPRESENTATIVE_STAGE1,
-  "stage-02": REPRESENTATIVE_STAGE2,
-  "stage-03": REPRESENTATIVE_STAGE3,
-  "stage-04": PROMOTION_COVERAGE_STAGE4,
-  "stage-05": PROMOTION_COVERAGE_STAGE4,
-  "stage-42-portal": PROMOTION_COVERAGE_STAGE4,
-  "stage-06": PROMOTION_COVERAGE_STAGE6,
-  "stage-07": PROMOTION_COVERAGE_STAGE6,
-  "stage-08": PROMOTION_COVERAGE_STAGE8,
-  "stage-09": PROMOTION_COVERAGE_STAGE8,
-  "stage-11": PROMOTION_COVERAGE_STAGE8,
-  "stage-10": PROMOTION_COVERAGE_STAGE8,
-  "stage-12": PROMOTION_COVERAGE_STAGE8,
-  "stage-13": PROMOTION_COVERAGE_STAGE8,
-  "stage-14": PROMOTION_COVERAGE_STAGE8,
-  "stage-15": PROMOTION_COVERAGE_STAGE8,
-  "stage-16": PROMOTION_COVERAGE_STAGE8,
-  "stage-17": PROMOTION_COVERAGE_STAGE8,
-  "stage-18": PROMOTION_COVERAGE_STAGE8,
-  "stage-19": PROMOTION_COVERAGE_STAGE8,
-  "stage-20": PROMOTION_COVERAGE_STAGE8,
-  "stage-21": PROMOTION_COVERAGE_STAGE8,
-  "stage-22": PROMOTION_COVERAGE_STAGE8,
-  "stage-23": PROMOTION_COVERAGE_STAGE8,
-  "stage-24": PROMOTION_COVERAGE_STAGE8,
-  "stage-26": PROMOTION_COVERAGE_STAGE8,
-  "stage-27": PROMOTION_COVERAGE_STAGE8,
-  "stage-28": PROMOTION_COVERAGE_STAGE8,
-  "stage-29": PROMOTION_COVERAGE_STAGE8,
-  "stage-30": PROMOTION_COVERAGE_STAGE8,
-  "stage-31": PROMOTION_COVERAGE_STAGE8,
-  "stage-32": PROMOTION_COVERAGE_STAGE8,
-  "stage-33": PROMOTION_COVERAGE_STAGE8,
-  "stage-34": PROMOTION_COVERAGE_STAGE8,
-  "stage-35": PROMOTION_COVERAGE_STAGE8,
-  "stage-36": PROMOTION_COVERAGE_STAGE8,
-  "stage-37": PROMOTION_COVERAGE_STAGE8,
-  "stage-38": PROMOTION_COVERAGE_STAGE8,
-} as const satisfies Record<DebugGrowthStageId, readonly DebugRosterEntrySpec[]>;
-
 const DEBUG_ROSTER_PROFILE_SPECS = [
   {
     id: "template-baseline",
@@ -439,16 +542,18 @@ const DEBUG_ROSTER_PROFILE_SPECS = [
     stages: {},
   },
   {
-    id: "representative-growth",
-    label: "逐關代表性成長",
-    description: "按關卡入口提供確定性的合法轉職混編；這是調試夾具，不是唯一標準答案。",
-    stages: REPRESENTATIVE_PROFILE_STAGES,
+    id: "default-growth",
+    label: "預設職業成長",
+    description: "每名角色有固定的目標頂層職業，留到最後的全員合起來把 20 個頂層職業各覆蓋一次"
+      + "（巨斧戰士後期兩人）；按每關成長沿唯一轉職路線逐段轉職，每次進入結果相同。",
+    stages: GROWTH_PROFILE_STAGES,
   },
   {
-    id: "promotion-coverage",
-    label: "深層轉職分支覆蓋",
-    description: "前幾關沿用代表成長，第 4 關覆蓋多次轉職後的不同職業分支。",
-    stages: PROMOTION_COVERAGE_PROFILE_STAGES,
+    id: "random-growth",
+    label: "隨機職業成長",
+    description: "每次進入場景都為每名角色在入隊職業能到的頂層職業裡隨機抽一個，再按每關成長逐段轉職；"
+      + "網址記下隨機種子，重新整理會重現同一陣容。",
+    stages: GROWTH_PROFILE_STAGES,
   },
 ] as const satisfies readonly {
   id: string;
@@ -468,7 +573,8 @@ export type DebugRosterSourceId =
   | `save-${number}-${DebugRosterSaveMode}`;
 
 export type DebugRosterSource =
-  | { kind: "profile"; id: DebugRosterProfileId }
+  /** `seed` 只有隨機職業成長在套用每關成長時才用到，見 `withDebugGrowthSeed`。 */
+  | { kind: "profile"; id: DebugRosterProfileId; seed?: number }
   | { kind: "save-slot"; id: DebugRosterSourceId; slot: number; mode: DebugRosterSaveMode };
 
 export interface DebugRosterSourceOption {
@@ -478,17 +584,17 @@ export interface DebugRosterSourceOption {
 }
 
 export const DEFAULT_DEBUG_ROSTER_SOURCE_ID: DebugRosterProfileId = "template-baseline";
-export const DEFAULT_DEBUG_HUB_ROSTER_SOURCE_ID: DebugRosterProfileId = "representative-growth";
+export const DEFAULT_DEBUG_HUB_ROSTER_SOURCE_ID: DebugRosterProfileId = "default-growth";
+/** 每名角色的目標頂層職業按種子隨機抽選的成長檔案。 */
+export const RANDOM_DEBUG_ROSTER_PROFILE_ID: DebugRosterProfileId = "random-growth";
 export const DEFAULT_DEBUG_PER_STAGE_GROWTH = 100;
 export const DEBUG_PER_STAGE_GROWTH_MAX = 9999;
+/** 調試戰役的戰鬥 PRNG 初值；名冊成長不讀它，隨機職業成長另用網址裡的種子。 */
 const DEFAULT_DEBUG_RNG_STATE = 0x0a11ce02;
-const DEBUG_GROWTH_PROFILE_SALTS: Record<DebugRosterProfileId, number> = {
-  "template-baseline": 0x7465_6d70,
-  "representative-growth": 0x7265_7072,
-  "promotion-coverage": 0x636f_7665,
-};
+const DEBUG_GROWTH_SEED_MAX = 0xffff_ffff;
 const SAVE_SOURCE_PATTERN = /^save-(\d+)-(entry|current)$/u;
 const PER_STAGE_GROWTH_PATTERN = /^(?:0|[1-9]\d{0,3})$/u;
+const GROWTH_SEED_PATTERN = /^(?:0|[1-9]\d{0,9})$/u;
 
 function isDebugRosterProfileId(value: string): value is DebugRosterProfileId {
   return DEBUG_ROSTER_PROFILE_SPECS.some(({ id }) => id === value);
@@ -516,6 +622,38 @@ export function parseDebugPerStageGrowth(
   if (!PER_STAGE_GROWTH_PATTERN.test(value)) return undefined;
   const growth = Number(value);
   return growth <= DEBUG_PER_STAGE_GROWTH_MAX ? growth : undefined;
+}
+
+export function parseDebugGrowthSeed(
+  value: string | null | undefined,
+): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (!GROWTH_SEED_PATTERN.test(value)) return undefined;
+  const seed = Number(value);
+  return seed <= DEBUG_GROWTH_SEED_MAX ? seed : undefined;
+}
+
+/** 新的隨機種子。這是宿主調試便利，只決定夾具名冊，戰鬥 PRNG 仍是固定初值。 */
+export function newDebugGrowthSeed(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
+}
+
+/**
+ * 隨機職業成長只在套用每關成長時讀種子：網址帶了就沿用，沒帶就抽一個新的，呼叫端再把它寫回
+ * 網址，重新整理時才能重現同一陣容。其他來源與未套用成長時原樣返回。
+ */
+export function withDebugGrowthSeed(
+  source: DebugRosterSource,
+  perStageGrowth: number | undefined,
+  seed: number | undefined,
+  draw: () => number = newDebugGrowthSeed,
+): DebugRosterSource {
+  if (
+    source.kind !== "profile"
+    || source.id !== RANDOM_DEBUG_ROSTER_PROFILE_ID
+    || perStageGrowth === undefined
+  ) return source;
+  return { ...source, seed: seed ?? draw() };
 }
 
 function profileSpec(profileId: DebugRosterProfileId) {
@@ -556,24 +694,51 @@ export function debugGrowthBudgetForStage(
   return Math.max(0, stageOrdinal(stageId) - stageOrdinal(joinStageId)) * perStageGrowth;
 }
 
-function debugGrowthRng(
-  profileId: DebugRosterProfileId,
-  slot: number,
-): DeterministicRng {
-  const seed = (
-    DEFAULT_DEBUG_RNG_STATE
-    ^ DEBUG_GROWTH_PROFILE_SALTS[profileId]
-    ^ Math.imul(slot + 1, 0x9e37_79b1)
-  ) >>> 0;
-  return new DeterministicRng(seed || DEFAULT_DEBUG_RNG_STATE);
+/**
+ * 從入隊職業到目標頂層職業的轉職路線（含兩端）。原版轉職圖每個職業至多一個上一職，所以
+ * 路線唯一；目標不是頂層或走不到時直接報錯，避免新增角色時填錯而靜默停在半路。
+ */
+export function debugGrowthPath(entryClassId: ClassId, targetClassId: ClassId): readonly ClassId[] {
+  if (promotionTargetsFor(targetClassId).length > 0) {
+    throw new Error(`${className(targetClassId)}還能轉職，不是頂層職業`);
+  }
+  const search = (classId: ClassId): ClassId[] | undefined => {
+    if (classId === targetClassId) return [classId];
+    for (const { id } of promotionTargetsFor(classId)) {
+      const rest = search(id);
+      if (rest) return [classId, ...rest];
+    }
+    return undefined;
+  };
+  const path = search(entryClassId);
+  if (!path) throw new Error(`${className(entryClassId)}無法轉職到${className(targetClassId)}`);
+  return path;
 }
 
-function randomPromotionTarget(classId: ClassId, rng: DeterministicRng): ClassId {
+/** 從某職業出發能轉到的全部頂層職業，按原版轉職候選順序深度優先排列。 */
+function reachableTopClasses(classId: ClassId): ClassId[] {
   const targets = promotionTargetsFor(classId);
-  if (targets.length === 0) throw new Error(`${className(classId)}沒有合法轉職候選`);
-  const target = targets[rng.between(0, targets.length - 1)];
-  if (!target) throw new Error(`${className(classId)}的隨機轉職候選不存在`);
-  return target.id;
+  if (targets.length === 0) return [classId];
+  return targets.flatMap(({ id }) => reachableTopClasses(id));
+}
+
+/**
+ * 以種子和角色槽各自雜湊出一個索引（murmur3 的 32 位收尾混合），所以同一種子下每名角色的
+ * 抽選彼此獨立，新增或刪除別的成員也不會改動她的結果。每個可達頂層職業機率相同。
+ */
+function seededIndex(seed: number, slot: number, length: number): number {
+  let hash = (seed ^ Math.imul(slot + 1, 0x9e37_79b9)) >>> 0;
+  hash = Math.imul(hash ^ (hash >>> 16), 0x85eb_ca6b);
+  hash = Math.imul(hash ^ (hash >>> 13), 0xc2b2_ae35);
+  return ((hash ^ (hash >>> 16)) >>> 0) % length;
+}
+
+/** 隨機職業成長下該角色的目標頂層職業。 */
+export function debugRandomGrowthTarget(member: DebugCampaignMemberSpec, seed: number): ClassId {
+  const tops = reachableTopClasses(member.campaignEntryClassId);
+  const target = tops[seededIndex(seed, member.slot, tops.length)];
+  if (!target) throw new Error(`${member.name}沒有可抽選的頂層職業`);
+  return target;
 }
 
 export interface DebugGrowthProgression {
@@ -583,32 +748,30 @@ export interface DebugGrowthProgression {
 }
 
 function debugGrowthProgression(
-  profileId: DebugRosterProfileId,
-  slot: number,
-  campaignEntryClassId: ClassId,
+  member: DebugCampaignMemberSpec,
+  targetClassId: ClassId,
   growthBudget: number,
 ): DebugGrowthProgression {
-  const rng = debugGrowthRng(profileId, slot);
+  const path = debugGrowthPath(member.campaignEntryClassId, targetClassId);
   // 入队当关预算为 0：角色刚登场，还没打出任何成长，因此保持战役入队职业。士兵在
   // 之后的关卡照旧立刻转职一次，让档案覆盖到已转职的常见形态。
-  let classId = campaignEntryClassId === "soldier" && growthBudget > 0
-    ? randomPromotionTarget(campaignEntryClassId, rng)
-    : campaignEntryClassId;
+  const first = path[0] === "soldier" && growthBudget > 0 && path.length > 1 ? 1 : 0;
+  let index = first;
   let experience = growthBudget;
-  const promotions: ClassId[] = [classId];
-
-  while (promotionTargetsFor(classId).length > 0) {
+  while (index < path.length - 1) {
+    const classId = path[index];
+    if (!classId) break;
     const threshold = promotionExperienceThresholdFor(classId);
     if (experience < threshold) break;
     experience -= threshold;
-    classId = randomPromotionTarget(classId, rng);
-    promotions.push(classId);
+    index += 1;
   }
-  return { classId, experience, promotions };
+  const classId = path[index];
+  if (!classId) throw new Error(`${member.name}的成長路線缺少第 ${index} 段`);
+  return { classId, experience, promotions: path.slice(first, index + 1) };
 }
 
 export function debugGrowthProgressionForSlot(
-  profileId: DebugRosterProfileId,
   stageId: StageId,
   slot: number,
   perStageGrowth: number,
@@ -619,9 +782,8 @@ export function debugGrowthProgressionForSlot(
     throw new Error(`${member.name}在 ${stageId} 還沒有入隊`);
   }
   return debugGrowthProgression(
-    profileId,
-    slot,
-    member.campaignEntryClassId,
+    member,
+    member.growthTargetClassId,
     debugMemberGrowthBudget(member, stageId, perStageGrowth),
   );
 }
@@ -668,6 +830,7 @@ export function debugRosterForProfile(
   profileId: DebugRosterProfileId,
   stageId: StageId,
   perStageGrowth?: number,
+  seed?: number,
 ): SaveRosterEntry[] {
   const roster = completeCampaignRoster(
     debugStageProfileBaselines(stageId).map((entry) => ({
@@ -696,14 +859,18 @@ export function debugRosterForProfile(
   if (entries.length === 0) {
     throw new Error(`成長檔案 ${profileId} 在 ${stageId} 沒有可覆蓋的友軍`);
   }
+  const random = profileId === RANDOM_DEBUG_ROSTER_PROFILE_ID;
+  if (random && seed === undefined) throw new Error("隨機職業成長需要隨機種子");
   // 每關成長覆蓋整份戰役名冊，不只覆蓋本檔案手寫登記的槽：後期加入的角色同樣要按
   // 「（當前關卡 − 入隊關卡）× 每關成長值」推算，尚未入隊的槽保持關卡模板基線。
   for (const member of DEBUG_CAMPAIGN_MEMBERS) {
     if (!debugCampaignMemberJoined(member, stageId)) continue;
+    const target = random && seed !== undefined
+      ? debugRandomGrowthTarget(member, seed)
+      : member.growthTargetClassId;
     const { classId, experience } = debugGrowthProgression(
-      profileId,
-      member.slot,
-      member.campaignEntryClassId,
+      member,
+      target,
       debugMemberGrowthBudget(member, stageId, perStageGrowth),
     );
     roster[member.slot] = {
@@ -751,7 +918,7 @@ export function createDebugCampaignState(
       stageId,
       ruleset: "stableRemake",
       difficulty,
-      roster: debugRosterForProfile(source.id, stageId, perStageGrowth),
+      roster: debugRosterForProfile(source.id, stageId, perStageGrowth, source.seed),
       recordCounters: Array<number>(75).fill(0),
       rngState: DEFAULT_DEBUG_RNG_STATE,
       rngCalls: 0,

@@ -34,8 +34,10 @@ export {
   type DebugScenarioId,
 } from "./debug-scenario-catalog";
 export {
+  parseDebugGrowthSeed,
   parseDebugPerStageGrowth,
   parseDebugRosterSourceId,
+  withDebugGrowthSeed,
   type DebugRosterSource,
 } from "./debug-roster-profiles";
 
@@ -4946,7 +4948,8 @@ export function mountDebugToolbar(
     scenarioLabel.textContent = `${
       debugStageLabel(currentStageId())
     } · ${scenario?.title ?? scenarioId}`;
-    rosterLabel.textContent = `成長：${rosterOption.label}`;
+    const seed = rosterSource.kind === "profile" ? rosterSource.seed : undefined;
+    rosterLabel.textContent = `成長：${rosterOption.label}${seed === undefined ? "" : ` · 種子 ${seed}`}`;
     experienceLabel.textContent = perStageGrowth === undefined || growthBudget === undefined
       ? "每關成長：沿用成長檔案"
       : `每關成長：${perStageGrowth} · 本關最高成長預算：${growthBudget}（自入隊關起算）`;
@@ -4978,7 +4981,13 @@ export function mountDebugToolbar(
     forceDefeat: () => controller.forceDefeatForTest(),
     openScenario: (id) => {
       if (isDebugScenarioId(id)) {
-        location.assign(debugScenarioUrl(id, difficulty, rosterSource.id, perStageGrowth));
+        location.assign(debugScenarioUrl(
+          id,
+          difficulty,
+          rosterSource.id,
+          perStageGrowth,
+          rosterSource.kind === "profile" ? rosterSource.seed : undefined,
+        ));
       }
     },
   };

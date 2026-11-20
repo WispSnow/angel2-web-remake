@@ -267,7 +267,7 @@ test("reading a record after a retreat redeploy draws every ally figure it bring
   // Regression: 全面撤退 remounts the battle surface for the new formation, and 讀取記錄
   // then swaps the recorded board in on that same surface. The five allies the record
   // brings back were never preloaded and drew as Phaser's missing-texture placeholder.
-  await page.goto("/?debugScenario=stage-05-player&difficulty=0&roster=promotion-coverage&test=1");
+  await page.goto("/?debugScenario=stage-05-player&difficulty=0&roster=default-growth&test=1");
   await waitForPhase(page, "player");
   const recorded = (await state(page)).units.filter(({ side }) => side === 1);
   expect(recorded).toHaveLength(6);

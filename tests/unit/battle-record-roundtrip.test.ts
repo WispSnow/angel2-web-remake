@@ -75,7 +75,7 @@ describe("battle records written from every player-turn fixture", () => {
     storage.clear();
     const controller = await createDebugScenarioController(id, {
       difficulty,
-      rosterSource: { kind: "profile", id: "representative-growth" },
+      rosterSource: { kind: "profile", id: "default-growth" },
       storage,
     });
     // Stage 3's fourth corps enters ready to promote, and the player has to choose
@@ -121,7 +121,7 @@ describe("battle records after an allied water warrior splits", () => {
     storage.clear();
     const controller = await createDebugScenarioController(id, {
       difficulty: 1,
-      rosterSource: { kind: "profile", id: "representative-growth" },
+      rosterSource: { kind: "profile", id: "default-growth" },
       storage,
     });
     const battle = controller.battle;
@@ -186,7 +186,7 @@ describe("a record the load path would reject", () => {
     vi.stubGlobal("location", { search: "?debugScenario=stage-00-player" });
     const controller = await createDebugScenarioController("stage-00-player", {
       difficulty: 0,
-      rosterSource: { kind: "profile", id: "representative-growth" },
+      rosterSource: { kind: "profile", id: "default-growth" },
       storage,
     }).finally(() => vi.stubGlobal("location", { search: "" }));
     controller.openRecordMenu("save");

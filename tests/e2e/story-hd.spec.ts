@@ -467,7 +467,7 @@ test("REMAKE-198: in 原版 the crawl keeps the original plates and no HD clip i
 // the text over the two 320x350 halves, and in 高清 one one-shot clip per spread plays between the halves and the text.
 const EPILOGUE = `${HD}/epilogue`;
 const openWarriorStatue = async (page: Page) => {
-  await page.goto("/?debugScenario=stage-49-warrior-statue&difficulty=0&roster=representative-growth&growth=100");
+  await page.goto("/?debugScenario=stage-49-warrior-statue&difficulty=0&roster=default-growth&growth=100");
   const screen = page.locator("#stage49-screen");
   await expect(page.getByTestId("stage49-epilogue")).toHaveAttribute("data-segment", "warriorStatue");
   await expect(screen).toHaveAttribute("data-segment-ready", "true");

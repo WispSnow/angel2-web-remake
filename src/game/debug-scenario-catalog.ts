@@ -2145,11 +2145,13 @@ export function debugScenarioUrl(
   difficulty: Difficulty,
   rosterSourceId?: DebugRosterSourceId,
   perStageGrowth?: number,
+  growthSeed?: number,
 ): string {
   const parameters = new URLSearchParams({ debugScenario: id, difficulty: String(difficulty) });
   if (rosterSourceId) parameters.set("roster", rosterSourceId);
   if (perStageGrowth !== undefined) {
     parameters.set("growth", String(perStageGrowth));
   }
+  if (growthSeed !== undefined) parameters.set("seed", String(growthSeed));
   return `/?${parameters.toString()}`;
 }

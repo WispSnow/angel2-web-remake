@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { className, classStatsFor } from "../../src/game/content/classes";
-import { debugRosterForProfile } from "../../src/game/debug-roster-profiles";
+import { DEBUG_CAMPAIGN_MEMBERS, debugRosterForProfile } from "../../src/game/debug-roster-profiles";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import type { CompletedSaveData } from "../../src/game/types";
@@ -364,8 +364,11 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   const promotionLabLink = page.getByTestId("debug-promotion-lab-link");
   await expect(promotionLabLink).toHaveAttribute("href", "/promotion-lab.html");
   await expect(promotionLabLink).toContainText("12 組可轉職來源職業只差 1 經驗");
-  await expect(page.getByTestId("debug-roster-source")).toHaveValue("representative-growth");
-  await expect(page.locator("[data-debug-roster-description]")).toContainText("合法轉職混編");
+  await expect(page.getByTestId("debug-roster-source")).toHaveValue("default-growth");
+  await expect(page.getByTestId("debug-roster-source").locator("option:checked")).toHaveText("預設職業成長");
+  await expect(page.getByTestId("debug-roster-source")).toHaveAttribute("title", /20 個頂層職業各覆蓋一次/u);
+  await expect(page.getByTestId("debug-roster-source").locator("option[value='random-growth']"))
+    .toHaveText("隨機職業成長");
   await expect(page.getByTestId("debug-per-stage-growth")).toHaveValue("100");
   await expect(page.getByTestId("debug-growth-reset")).toHaveText("恢復預設（每關 100）");
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
@@ -376,7 +379,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   const deployment = page.getByTestId("debug-scenario-stage-01-deployment");
   await expect(deployment).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-01-deployment&difficulty=3&roster=representative-growth&growth=100",
+    "/?debugScenario=stage-01-deployment&difficulty=3&roster=default-growth&growth=100",
   );
   await page.getByTestId("debug-per-stage-growth").fill("120");
   await page.getByTestId("debug-growth-apply").click();
@@ -385,47 +388,47 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   );
   await expect(deployment).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-01-deployment&difficulty=3&roster=representative-growth&growth=120",
+    "/?debugScenario=stage-01-deployment&difficulty=3&roster=default-growth&growth=120",
   );
   await expect(page.getByTestId("debug-scenario-stage-05-player")).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-05-player&difficulty=3&roster=representative-growth&growth=120",
+    "/?debugScenario=stage-05-player&difficulty=3&roster=default-growth&growth=120",
   );
   await expect(page.getByTestId("debug-scenario-stage-06-player")).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-06-player&difficulty=3&roster=representative-growth&growth=120",
+    "/?debugScenario=stage-06-player&difficulty=3&roster=default-growth&growth=120",
   );
   await expect(page.getByTestId("debug-scenario-stage-07-player")).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-07-player&difficulty=3&roster=representative-growth&growth=120",
+    "/?debugScenario=stage-07-player&difficulty=3&roster=default-growth&growth=120",
   );
   await expect(page.getByTestId("debug-scenario-stage-08-player")).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-08-player&difficulty=3&roster=representative-growth&growth=120",
+    "/?debugScenario=stage-08-player&difficulty=3&roster=default-growth&growth=120",
   );
   await expect(page.getByTestId("debug-scenario-stage-09-player")).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-09-player&difficulty=3&roster=representative-growth&growth=120",
+    "/?debugScenario=stage-09-player&difficulty=3&roster=default-growth&growth=120",
   );
   await expect(page.getByTestId("debug-scenario-stage-11-player")).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-11-player&difficulty=3&roster=representative-growth&growth=120",
+    "/?debugScenario=stage-11-player&difficulty=3&roster=default-growth&growth=120",
   );
   await expect(page.getByTestId("debug-scenario-stage-10-player")).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-10-player&difficulty=3&roster=representative-growth&growth=120",
+    "/?debugScenario=stage-10-player&difficulty=3&roster=default-growth&growth=120",
   );
   await expect(page.getByTestId("debug-scenario-stage-21-prebattle")).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-21-prebattle&difficulty=3&roster=representative-growth&growth=120",
+    "/?debugScenario=stage-21-prebattle&difficulty=3&roster=default-growth&growth=120",
   );
   await expect(page.getByTestId("debug-scenario-stage-22-player")).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-22-player&difficulty=3&roster=representative-growth&growth=120",
+    "/?debugScenario=stage-22-player&difficulty=3&roster=default-growth&growth=120",
   );
   await expect(page.getByTestId("debug-scenario-stage-00-player")).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-00-player&difficulty=3&roster=representative-growth",
+    "/?debugScenario=stage-00-player&difficulty=3&roster=default-growth",
   );
   await page.getByTestId("debug-growth-reset").click();
   await expect(page.getByTestId("debug-per-stage-growth")).toHaveValue("100");
@@ -434,7 +437,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   );
   await expect(deployment).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-01-deployment&difficulty=3&roster=representative-growth&growth=100",
+    "/?debugScenario=stage-01-deployment&difficulty=3&roster=default-growth&growth=100",
   );
   await captureVisualAudit(page, { path: `${ARTIFACT_DIR}/debug-hub.png`, fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -448,7 +451,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.getByTestId("deployment-screen")).toBeVisible();
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 5／8");
   await expect(page.getByTestId("debug-toolbar")).toBeVisible();
-  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
+  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：預設職業成長");
   await expect(page.getByTestId("debug-toolbar")).toContainText(
     "每關成長：100 · 本關最高成長預算：100",
   );
@@ -568,7 +571,7 @@ test("debug hub stage-49 fixtures directly expose every epilogue result", async 
 
 test("one per-stage growth budget advances the stage-five profession", async ({ page }) => {
   await page.goto(
-    "/?debugScenario=stage-05-player&difficulty=2&roster=representative-growth&growth=120",
+    "/?debugScenario=stage-05-player&difficulty=2&roster=default-growth&growth=120",
   );
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await expect(page.getByTestId("debug-toolbar")).toContainText(
@@ -579,7 +582,8 @@ test("one per-stage growth budget advances the stage-five profession", async ({ 
   });
   expect(state.units).toContainEqual(expect.objectContaining({
     id: "1:0",
-    classId: "land-knight",
+    // 妮雅的目標是飛龍騎士：騎兵 460 門檻之後走飛馬戰士，剩 140。
+    classId: "pegasus-warrior",
     experience: 140,
   }));
 });
@@ -588,14 +592,14 @@ test("stage-eleven debug profiles start Sulanda from her stage-eight cavalry bas
   // 未套用每關成長時保留固定基線；套用時從騎兵入隊職業起算兩關預算，尚未到 460 的轉職門檻。
   for (const { query, expected } of [
     { query: "roster=template-baseline", expected: { classId: "cavalry", experience: 299 } },
-    { query: "roster=representative-growth", expected: { classId: "cavalry", experience: 299 } },
+    { query: "roster=default-growth", expected: { classId: "cavalry", experience: 299 } },
     {
-      query: "roster=representative-growth&growth=120",
-      expected: debugRosterForProfile("representative-growth", "stage-11", 120)[8]!,
+      query: "roster=default-growth&growth=120",
+      expected: debugRosterForProfile("default-growth", "stage-11", 120)[8]!,
     },
     {
-      query: "roster=promotion-coverage&growth=120",
-      expected: debugRosterForProfile("promotion-coverage", "stage-11", 120)[8]!,
+      query: "roster=random-growth&growth=120&seed=42",
+      expected: debugRosterForProfile("random-growth", "stage-11", 120, 42)[8]!,
     },
   ] as const) {
     await page.goto(`/?debugScenario=stage-11-player&difficulty=2&${query}`);
@@ -619,15 +623,15 @@ test("stage-twenty-seven debug entry uses the configured campaign professions", 
   const playerScenario = page.getByTestId("debug-scenario-stage-27-player");
   await expect(playerScenario).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-27-player&difficulty=2&roster=representative-growth&growth=100",
+    "/?debugScenario=stage-27-player&difficulty=2&roster=default-growth&growth=100",
   );
   await playerScenario.click();
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
-  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
+  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：預設職業成長");
   await expect(page.getByTestId("debug-toolbar")).toContainText(
     "每關成長：100 · 本關最高成長預算：2600",
   );
-  await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", /巨龍騎士妮雅/u);
+  await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", /飛龍騎士妮雅/u);
   const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
     units: Array<{ id: string; classId: string }>;
   });
@@ -637,13 +641,13 @@ test("stage-twenty-seven debug entry uses the configured campaign professions", 
   }
   expect(classes.get("1:7")).toBe("magic-priest");
   // 蘇蘭達第 8 關以騎兵入隊，每關成長讓她走完騎兵→陸戰騎士→龍騎士的合法轉職鏈。
-  expect(classes.get("1:8")).toBe(debugRosterForProfile("representative-growth", "stage-27", 100)[8]?.classId);
+  expect(classes.get("1:8")).toBe(debugRosterForProfile("default-growth", "stage-27", 100)[8]?.classId);
   expect(classes.get("1:8")).not.toBe("soldier");
   expect(classes.get("1:10")).toBe("water-warrior");
   expect(classes.get("1:11")).toBe("water-warrior");
   expect(classes.get("1:57")).toBe("engineer");
   await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/debug-stage27-representative-growth.png`,
+    path: `${ARTIFACT_DIR}/debug-stage27-default-growth.png`,
   });
 });
 
@@ -653,15 +657,15 @@ test("stage-twenty-eight debug entry uses the configured campaign professions", 
   const playerScenario = page.getByTestId("debug-scenario-stage-28-player");
   await expect(playerScenario).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-28-player&difficulty=2&roster=representative-growth&growth=100",
+    "/?debugScenario=stage-28-player&difficulty=2&roster=default-growth&growth=100",
   );
   await playerScenario.click();
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
-  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
+  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：預設職業成長");
   await expect(page.getByTestId("debug-toolbar")).toContainText(
     "每關成長：100 · 本關最高成長預算：2700",
   );
-  await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", /巨龍騎士妮雅/u);
+  await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", /飛龍騎士妮雅/u);
   const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
     units: Array<{ id: string; side: number; classId: string }>;
   });
@@ -671,12 +675,12 @@ test("stage-twenty-eight debug entry uses the configured campaign professions", 
     expect(classes.get(id), id).not.toBe("soldier");
   }
   expect(classes.get("1:7")).toBe("magic-priest");
-  expect(classes.get("1:8")).toBe(debugRosterForProfile("representative-growth", "stage-28", 100)[8]?.classId);
+  expect(classes.get("1:8")).toBe(debugRosterForProfile("default-growth", "stage-28", 100)[8]?.classId);
   expect(classes.get("1:8")).not.toBe("soldier");
   expect(classes.get("1:10")).toBe("water-warrior");
   expect(classes.get("1:11")).toBe("water-warrior");
   await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/debug-stage28-representative-growth.png`,
+    path: `${ARTIFACT_DIR}/debug-stage28-default-growth.png`,
   });
 });
 
@@ -686,11 +690,11 @@ test("stage-twenty-nine debug deployment preserves the inherited great-axe defen
   const deploymentScenario = page.getByTestId("debug-scenario-stage-29-deployment");
   await expect(deploymentScenario).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-29-deployment&difficulty=2&roster=representative-growth&growth=100",
+    "/?debugScenario=stage-29-deployment&difficulty=2&roster=default-growth&growth=100",
   );
   await deploymentScenario.click();
   await expect(page.getByTestId("deployment-screen")).toBeVisible();
-  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
+  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：預設職業成長");
   await expect(page.getByTestId("debug-toolbar")).toContainText(
     "每關成長：100 · 本關最高成長預算：2800",
   );
@@ -702,10 +706,10 @@ test("stage-twenty-nine debug deployment preserves the inherited great-axe defen
   });
 
   await page.goto(
-    "/?debugScenario=stage-29-player&difficulty=2&roster=representative-growth&growth=100",
+    "/?debugScenario=stage-29-player&difficulty=2&roster=default-growth&growth=100",
   );
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
-  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
+  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：預設職業成長");
   const battle = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
     phase: string;
     units: Array<{ id: string; side: number; classId: string; name: string }>;
@@ -736,14 +740,14 @@ test("stage-twenty-nine debug deployment preserves the inherited great-axe defen
 });
 
 test("stage-thirty debug entry preserves both growth profiles and the magic-sword defender", async ({ page }) => {
-  for (const profile of ["representative-growth", "promotion-coverage"] as const) {
-    const nia = debugRosterForProfile(profile, "stage-30", 100)[0]!;
+  for (const profile of ["default-growth", "random-growth"] as const) {
+    const nia = debugRosterForProfile(profile, "stage-30", 100, 42)[0]!;
     await page.goto(
-      `/?debugScenario=stage-30-player&difficulty=2&roster=${profile}&growth=100`,
+      `/?debugScenario=stage-30-player&difficulty=2&roster=${profile}&growth=100&seed=42`,
     );
     await expect(page.getByTestId("battle-canvas")).toBeVisible();
     await expect(page.getByTestId("debug-toolbar")).toContainText(
-      profile === "representative-growth" ? "成長：逐關代表性成長" : "成長：深層轉職分支覆蓋",
+      profile === "default-growth" ? "成長：預設職業成長" : "成長：隨機職業成長 · 種子 42",
     );
     await expect(page.getByTestId("debug-toolbar")).toContainText(
       "每關成長：100 · 本關最高成長預算：2900",
@@ -771,14 +775,14 @@ test("stage-thirty debug entry preserves both growth profiles and the magic-swor
 });
 
 test("stage-thirty-one debug entry preserves both growth profiles in the full crossing force", async ({ page }) => {
-  for (const profile of ["representative-growth", "promotion-coverage"] as const) {
-    const nia = debugRosterForProfile(profile, "stage-31", 100)[0]!;
+  for (const profile of ["default-growth", "random-growth"] as const) {
+    const nia = debugRosterForProfile(profile, "stage-31", 100, 42)[0]!;
     await page.goto(
-      `/?debugScenario=stage-31-player&difficulty=2&roster=${profile}&growth=100`,
+      `/?debugScenario=stage-31-player&difficulty=2&roster=${profile}&growth=100&seed=42`,
     );
     await expect(page.getByTestId("battle-canvas")).toBeVisible();
     await expect(page.getByTestId("debug-toolbar")).toContainText(
-      profile === "representative-growth" ? "成長：逐關代表性成長" : "成長：深層轉職分支覆蓋",
+      profile === "default-growth" ? "成長：預設職業成長" : "成長：隨機職業成長 · 種子 42",
     );
     await expect(page.getByTestId("debug-toolbar")).toContainText(
       "每關成長：100 · 本關最高成長預算：3000",
@@ -807,28 +811,58 @@ test("stage-thirty-one debug entry preserves both growth profiles in the full cr
   }
 });
 
-test("stage-four debug profiles cover inherited multi-promotion rosters", async ({ page }) => {
+test("stage-four default growth reaches every member's top class at the maximum budget", async ({ page }) => {
   await page.goto(
-    "/?debugScenario=stage-04-player&difficulty=2&roster=promotion-coverage&test=1",
+    "/?debugScenario=stage-04-player&difficulty=2&roster=default-growth&growth=9999&test=1",
   );
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
-  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：深層轉職分支覆蓋");
+  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：預設職業成長");
   const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
     units: Array<{ id: string; classId: string }>;
   });
-  expect(state.units.filter(({ id }) => id.startsWith("1:"))).toEqual(expect.arrayContaining([
-    expect.objectContaining({ id: "1:0", classId: "swift-dragon-knight" }),
-    expect.objectContaining({ id: "1:1", classId: "magic-priest" }),
-    expect.objectContaining({ id: "1:2", classId: "crossbow" }),
-    expect.objectContaining({ id: "1:3", classId: "magic-armor-warrior" }),
-    expect.objectContaining({ id: "1:4", classId: "prayer-guide" }),
-    expect.objectContaining({ id: "1:20", classId: "flying-dragon-knight" }),
-    expect.objectContaining({ id: "1:21", classId: "evil-sword-warrior" }),
-    expect.objectContaining({ id: "1:24", classId: "wizard" }),
-  ]));
+  const slots = [0, 1, 2, 3, 4, 20, 21, 24];
+  expect(state.units.filter(({ id }) => id.startsWith("1:"))).toEqual(expect.arrayContaining(
+    slots.map((slot) => expect.objectContaining({
+      id: `1:${slot}`,
+      classId: DEBUG_CAMPAIGN_MEMBERS.find((member) => member.slot === slot)?.growthTargetClassId,
+    })),
+  ));
   await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/debug-stage4-promotion-coverage.png`,
+    path: `${ARTIFACT_DIR}/debug-stage4-default-growth-top-classes.png`,
   });
+});
+
+test("debug hub random growth draws a seed per entry and keeps it on reload", async ({ page }) => {
+  await page.goto("/debug.html");
+  await page.getByTestId("debug-roster-source").selectOption("random-growth");
+  await expect(page.getByTestId("debug-roster-source")).toHaveAttribute("title", /隨機抽一個/u);
+  const scenario = page.getByTestId("debug-scenario-stage-05-player");
+  // 連結本身不帶種子：每次點進去都在場景頁抽新的，再寫回網址。
+  await expect(scenario).toHaveAttribute(
+    "href",
+    "/?debugScenario=stage-05-player&difficulty=0&roster=random-growth&growth=100",
+  );
+  await scenario.click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await expect(page).toHaveURL(/[?&]seed=\d+/u);
+  const seed = Number(new URL(page.url()).searchParams.get("seed"));
+  await expect(page.getByTestId("debug-toolbar")).toContainText(`成長：隨機職業成長 · 種子 ${seed}`);
+  const expected = debugRosterForProfile("random-growth", "stage-05", 100, seed);
+  const allies = async () => (await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
+    units: Array<{ id: string; side: number; classId: string; experience: number }>;
+  })).units.filter(({ side, id }) => side === 1 && Number(id.slice(2)) < 32);
+  const entered = await allies();
+  expect(entered.length).toBeGreaterThan(0);
+  for (const unit of entered) {
+    expect(unit, unit.id).toMatchObject({
+      classId: expected[Number(unit.id.slice(2))]?.classId,
+      experience: expected[Number(unit.id.slice(2))]?.experience,
+    });
+  }
+  await page.reload();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  expect(Number(new URL(page.url()).searchParams.get("seed"))).toBe(seed);
+  expect(await allies()).toEqual(entered);
 });
 
 test("debug hub imports a formal save roster read-only", async ({ page }) => {

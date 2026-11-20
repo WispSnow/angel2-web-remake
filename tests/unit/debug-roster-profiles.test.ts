@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   classStatsFor,
   promotionExperienceThresholdFor,
+  promotionReachableClassIds,
   promotionTargetsFor,
 } from "../../src/game/content/classes";
 import { ALLY_MAP_UNIT_ASSETS } from "../../src/game/content/map-unit-assets";
@@ -13,14 +14,19 @@ import {
   createDebugCampaignState,
   DEBUG_CAMPAIGN_MEMBERS,
   debugGrowthBudgetForStage,
+  debugGrowthPath,
   debugGrowthProgressionForSlot,
+  debugRandomGrowthTarget,
   debugRosterForProfile,
   debugRosterProfileSupportsGrowthOverride,
   debugRosterSourceOptions,
   DEFAULT_DEBUG_PER_STAGE_GROWTH,
+  DEBUG_PER_STAGE_GROWTH_MAX,
   FIRST_STAGE_SCOPED_ALLY_SLOT,
+  parseDebugGrowthSeed,
   parseDebugPerStageGrowth,
   parseDebugRosterSourceId,
+  withDebugGrowthSeed,
   type DebugGrowthProgression,
 } from "../../src/game/debug-roster-profiles";
 import {
@@ -30,9 +36,12 @@ import {
 } from "../../src/game/debug-scenario-catalog";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION, saveSlotKey } from "../../src/game/save";
 import { STAGE_RUNTIME_MANIFEST } from "../../src/game/stage-runtime";
+import type { ClassId } from "../../src/game/content/classes";
 import type { BattleSaveData, CompletedSaveData, StageId } from "../../src/game/types";
 
 const stageIds = Object.keys(STAGE_RUNTIME_MANIFEST) as StageId[];
+/** 隨機職業成長套用每關成長時必須帶種子；預設職業成長會忽略它。 */
+const TEST_SEED = 0x5eed;
 const workspace = path.resolve(import.meta.dirname, "../..");
 
 const memberFor = (slot: number) => {
@@ -102,8 +111,8 @@ describe("debug roster profiles", () => {
     for (const stageId of stageIds) {
       for (const profileId of [
         "template-baseline",
-        "representative-growth",
-        "promotion-coverage",
+        "default-growth",
+        "random-growth",
       ] as const) {
         const roster = debugRosterForProfile(profileId, stageId);
         expect(roster).toHaveLength(75);
@@ -119,7 +128,7 @@ describe("debug roster profiles", () => {
 
   it("registers both growth profiles for every implemented stage after stage zero", () => {
     for (const stageId of stageIds.filter((candidate) => candidate !== "stage-00")) {
-      for (const profileId of ["representative-growth", "promotion-coverage"] as const) {
+      for (const profileId of ["default-growth", "random-growth"] as const) {
         expect(
           debugRosterProfileSupportsGrowthOverride(profileId, stageId),
           `${stageId}/${profileId}`,
@@ -128,33 +137,124 @@ describe("debug roster profiles", () => {
     }
   });
 
-  it("provides realistic stage-four growth and distinct map figures for its deep branches", async () => {
-    const representative = debugRosterForProfile("representative-growth", "stage-04");
-    expect(representative[0]).toMatchObject({ classId: "land-knight", experience: 640 });
-    expect(representative[1]).toMatchObject({ classId: "priest", experience: 780 });
-    expect(representative[24]).toMatchObject({ classId: "evil-mage", experience: 540 });
-
-    const coverage = debugRosterForProfile("promotion-coverage", "stage-04");
-    expect(coverage.filter(({ slot }) => [0, 1, 2, 3, 4, 20, 21, 24].includes(slot)))
-      .toMatchObject([
-        { classId: "swift-dragon-knight" },
-        { classId: "magic-priest" },
-        { classId: "crossbow" },
-        { classId: "magic-armor-warrior" },
-        { classId: "prayer-guide" },
-        { classId: "flying-dragon-knight" },
-        { classId: "evil-sword-warrior" },
-        { classId: "wizard" },
-      ]);
-    for (const entry of coverage.filter(({ slot }) =>
-      [0, 1, 2, 3, 4, 20, 21, 24].includes(slot))) {
-      const source = ALLY_MAP_UNIT_ASSETS[entry.classId as keyof typeof ALLY_MAP_UNIT_ASSETS];
-      expect(source).toMatch(/^\/assets\/original\//u);
-      expect((await readFile(path.join(workspace, "public", source))).length).toBeGreaterThan(0);
+  it("keeps the hand-written stage-four roster for direct links without per-stage growth", () => {
+    const fixed = debugRosterForProfile("default-growth", "stage-04");
+    expect(fixed[0]).toMatchObject({ classId: "land-knight", experience: 640 });
+    expect(fixed[1]).toMatchObject({ classId: "priest", experience: 780 });
+    expect(fixed[24]).toMatchObject({ classId: "evil-mage", experience: 540 });
+    // 隨機只作用在每關成長上；不帶 growth 的直鏈兩份檔案共用同一份手寫名冊。
+    for (const stageId of stageIds) {
+      expect(debugRosterForProfile("random-growth", stageId), stageId)
+        .toEqual(debugRosterForProfile("default-growth", stageId));
     }
   });
 
-  it("spends one fixed per-stage budget through deterministic random promotion paths", () => {
+  it("assigns growth targets that cover every top class about once", async () => {
+    const topClasses = promotionReachableClassIds(["soldier"])
+      .filter((classId) => promotionTargetsFor(classId).length === 0);
+    expect(topClasses).toHaveLength(20);
+    for (const classId of topClasses) {
+      const source = ALLY_MAP_UNIT_ASSETS[classId as keyof typeof ALLY_MAP_UNIT_ASSETS];
+      expect(source, classId).toMatch(/^\/assets\/original\//u);
+      expect((await readFile(path.join(workspace, "public", source))).length, classId)
+        .toBeGreaterThan(0);
+    }
+    // 用戶指定（2026-11-19）。
+    expect(memberFor(0).growthTargetClassId).toBe("flying-dragon-knight");
+    expect(memberFor(1).growthTargetClassId).toBe("wizard");
+    for (const member of DEBUG_CAMPAIGN_MEMBERS) {
+      const path = debugGrowthPath(member.campaignEntryClassId, member.growthTargetClassId);
+      expect(path[0], member.name).toBe(member.campaignEntryClassId);
+      expect(promotionTargetsFor(member.growthTargetClassId), member.name).toEqual([]);
+    }
+    expect(() => debugGrowthPath("soldier", "cavalry")).toThrow("不是頂層職業");
+    expect(() => debugGrowthPath("cavalry", "wizard")).toThrow("無法轉職");
+
+    // 留到最後的成員：每個頂層職業至少一人、至多兩人，而且只有一個職業有兩人（巨斧戰士：
+    // 塔絲加與第 27 關歸隊的愛莉歐拉）。葛蒂拉斯第 20 關離隊，不算在內。
+    const finalCounts = new Map<string, number>();
+    for (const member of DEBUG_CAMPAIGN_MEMBERS) {
+      if (member.lastStageId !== undefined) continue;
+      finalCounts.set(member.growthTargetClassId, (finalCounts.get(member.growthTargetClassId) ?? 0) + 1);
+    }
+    for (const classId of topClasses) expect(finalCounts.get(classId) ?? 0, classId).toBeGreaterThanOrEqual(1);
+    const doubled = topClasses.filter((classId) => (finalCounts.get(classId) ?? 0) > 1);
+    expect(doubled).toEqual(["great-axe-warrior"]);
+
+    // 預設每關成長下，最後一關每個成員都已走到自己的目標；葛蒂拉斯離隊前也已走到。
+    const stage38 = debugRosterForProfile(
+      "default-growth",
+      "stage-38",
+      DEFAULT_DEBUG_PER_STAGE_GROWTH,
+    );
+    for (const member of DEBUG_CAMPAIGN_MEMBERS.filter(({ lastStageId }) => lastStageId === undefined)) {
+      expect(stage38[member.slot]?.classId, member.name).toBe(member.growthTargetClassId);
+    }
+    for (const classId of topClasses) {
+      expect(stage38.some((entry) => entry.classId === classId), classId).toBe(true);
+    }
+    expect(debugRosterForProfile("default-growth", "stage-20", DEFAULT_DEBUG_PER_STAGE_GROWTH)[24]?.classId)
+      .toBe(memberFor(24).growthTargetClassId);
+  });
+
+  it("draws each random-growth target from the URL seed, independently per member", () => {
+    const random = { kind: "profile", id: "random-growth" } as const;
+    expect(withDebugGrowthSeed(random, 100, undefined, () => 42)).toEqual({ ...random, seed: 42 });
+    expect(withDebugGrowthSeed(random, 100, 7, () => 42)).toEqual({ ...random, seed: 7 });
+    // 未套用每關成長時名冊是手寫夾具，不需要也不寫入種子；其他檔案同樣不帶種子。
+    expect(withDebugGrowthSeed(random, undefined, undefined, () => 42)).toBe(random);
+    const fixed = { kind: "profile", id: "default-growth" } as const;
+    expect(withDebugGrowthSeed(fixed, 100, undefined, () => 42)).toBe(fixed);
+    expect(() => debugRosterForProfile("random-growth", "stage-38", 100)).toThrow("需要隨機種子");
+    expect(createDebugCampaignState("stage-38", 0, { ...random, seed: 42 }, storageWith({}), 100).roster)
+      .toEqual(debugRosterForProfile("random-growth", "stage-38", 100, 42));
+
+    const seeds = Array.from({ length: 40 }, (_, index) => index * 7919 + 1);
+    const soldierTops = new Set<ClassId>();
+    const assignments = new Set<string>();
+    for (const seed of seeds) {
+      // 預算拉到上限，最後一關每名成員都已走到抽中的目標。
+      const roster = debugRosterForProfile("random-growth", "stage-38", DEBUG_PER_STAGE_GROWTH_MAX, seed);
+      expect(debugRosterForProfile("random-growth", "stage-38", DEBUG_PER_STAGE_GROWTH_MAX, seed)).toEqual(roster);
+      const targets = DEBUG_CAMPAIGN_MEMBERS.map((member) => {
+        const target = debugRandomGrowthTarget(member, seed);
+        // 走不到或不是頂層時 debugGrowthPath 會直接報錯。
+        expect(debugGrowthPath(member.campaignEntryClassId, target).at(-1)).toBe(target);
+        if (member.lastStageId === undefined) {
+          expect(roster[member.slot]?.classId, `${seed}/${member.name}`).toBe(target);
+        }
+        if (member.campaignEntryClassId === "soldier") soldierTops.add(target);
+        return target;
+      });
+      assignments.add(targets.join());
+    }
+    expect(soldierTops.size).toBe(20);
+    expect(assignments.size).toBe(seeds.length);
+    // 劇情固定的頂層職業沒得抽；蘇蘭達只在騎士線裡抽。
+    expect(debugRandomGrowthTarget(memberFor(9), 1)).toBe("curse-master");
+    expect(debugRandomGrowthTarget(memberFor(23), 1)).toBe("empress");
+    for (const seed of seeds) {
+      expect(debugGrowthPath("cavalry", debugRandomGrowthTarget(memberFor(8), seed))[0]).toBe("cavalry");
+    }
+
+    // 預算公式與預設檔案相同，只換了目標：花掉的總額仍是入隊後的關數 × 每關成長。
+    const stage5 = debugRosterForProfile("random-growth", "stage-05", 120, TEST_SEED);
+    for (const slot of [0, 1, 2, 3, 4, 20, 21, 24]) {
+      const member = memberFor(slot);
+      const path = debugGrowthPath(member.campaignEntryClassId, debugRandomGrowthTarget(member, TEST_SEED));
+      const entry = stage5[slot];
+      if (!entry) throw new Error(`missing debug roster slot ${slot}`);
+      const reached = path.indexOf(entry.classId);
+      expect(reached, `slot ${slot}`).toBeGreaterThanOrEqual(0);
+      const firstPaid = path[0] === "soldier" ? 1 : 0;
+      const spent = path.slice(firstPaid, reached)
+        .reduce((total, classId) => total + promotionExperienceThresholdFor(classId), entry.experience);
+      expect(spent, `slot ${slot}`).toBe(expectedBudget(slot, "stage-05", 120));
+      expect(entry.life).toBe(classStatsFor(entry).maxLife);
+    }
+  });
+
+  it("spends one fixed per-stage budget along each member's target promotion path", () => {
     const perStageGrowth = 120;
     const stage5Budget = 600;
     expect(debugGrowthBudgetForStage("stage-00", perStageGrowth)).toBe(0);
@@ -175,7 +275,6 @@ describe("debug roster profiles", () => {
     const soldierTargets = promotionTargetsFor("soldier").map(({ id }) => id);
     const stage1Progressions = [0, 1, 2, 4].map((slot) =>
       debugGrowthProgressionForSlot(
-        "representative-growth",
         "stage-01",
         slot,
         perStageGrowth,
@@ -193,13 +292,12 @@ describe("debug roster profiles", () => {
     }
 
     const roster = debugRosterForProfile(
-      "representative-growth",
+      "default-growth",
       "stage-05",
       perStageGrowth,
     );
     for (const slot of [0, 1, 2, 3, 4, 20, 21]) {
       const progression = debugGrowthProgressionForSlot(
-        "representative-growth",
         "stage-05",
         slot,
         perStageGrowth,
@@ -208,7 +306,6 @@ describe("debug roster profiles", () => {
       // 入隊當關預算為 0：角色第一次出場時停在戰役入隊職業，不預先轉職。
       expect(
         debugGrowthProgressionForSlot(
-          "representative-growth",
           member.joinStageId,
           slot,
           perStageGrowth,
@@ -218,7 +315,6 @@ describe("debug roster profiles", () => {
       // 入隊之後，首次轉職在每一關都是同一個確定結果。
       expect(progression.promotions[0]).toBe(
         debugGrowthProgressionForSlot(
-          "representative-growth",
           "stage-38",
           slot,
           perStageGrowth,
@@ -244,7 +340,7 @@ describe("debug roster profiles", () => {
     expect(roster[5]).toMatchObject({ classId: "soldier", experience: 0 });
 
     const stage6Roster = debugRosterForProfile(
-      "representative-growth",
+      "default-growth",
       "stage-06",
       DEFAULT_DEBUG_PER_STAGE_GROWTH,
     );
@@ -255,7 +351,7 @@ describe("debug roster profiles", () => {
       else expect(stage6Roster[slot]?.classId, `slot ${slot}`).not.toBe("soldier");
     }
     const stage7Roster = debugRosterForProfile(
-      "representative-growth",
+      "default-growth",
       "stage-07",
       DEFAULT_DEBUG_PER_STAGE_GROWTH,
     );
@@ -263,7 +359,7 @@ describe("debug roster profiles", () => {
       expect(stage7Roster[slot]?.classId).not.toBe("soldier");
     }
     const stage8Roster = debugRosterForProfile(
-      "representative-growth",
+      "default-growth",
       "stage-08",
       DEFAULT_DEBUG_PER_STAGE_GROWTH,
     );
@@ -272,13 +368,13 @@ describe("debug roster profiles", () => {
       expect(stage8Roster[slot]).toMatchObject({ classId: "soldier", experience: 0 });
     }
     const stage9Roster = debugRosterForProfile(
-      "representative-growth",
+      "default-growth",
       "stage-09",
       DEFAULT_DEBUG_PER_STAGE_GROWTH,
     );
     for (const slot of [17, 18]) expect(stage9Roster[slot]?.classId).not.toBe("soldier");
     expect(debugRosterProfileSupportsGrowthOverride(
-      "representative-growth",
+      "default-growth",
       "stage-05",
     )).toBe(true);
     expect(debugRosterProfileSupportsGrowthOverride(
@@ -292,8 +388,8 @@ describe("debug roster profiles", () => {
   it("carries Sulanda's mandatory stage-eight cavalry baseline into later direct-entry profiles", () => {
     const profiles = [
       ["template-baseline", undefined],
-      ["representative-growth", undefined],
-      ["promotion-coverage", undefined],
+      ["default-growth", undefined],
+      ["random-growth", undefined],
     ] as const;
 
     for (const stageId of ["stage-11", "stage-10", "stage-12", "stage-13", "stage-14", "stage-15", "stage-16", "stage-17", "stage-18", "stage-19", "stage-20", "stage-21"] as const) {
@@ -312,8 +408,8 @@ describe("debug roster profiles", () => {
   it("carries mandatory Dori and water-warrior classes into later direct-entry profiles", () => {
     const profiles = [
       ["template-baseline", undefined],
-      ["representative-growth", undefined],
-      ["promotion-coverage", undefined],
+      ["default-growth", undefined],
+      ["random-growth", undefined],
     ] as const;
 
     for (const stageId of ["stage-11", "stage-10", "stage-12", "stage-13", "stage-14", "stage-15", "stage-16", "stage-17", "stage-18", "stage-19", "stage-20", "stage-21"] as const) {
@@ -360,9 +456,9 @@ describe("debug roster profiles", () => {
       })),
     ] as const;
 
-    for (const profileId of ["representative-growth", "promotion-coverage"] as const) {
+    for (const profileId of ["default-growth", "random-growth"] as const) {
       for (const stageId of ["stage-22", "stage-23", "stage-28", "stage-31", "stage-38"] as const) {
-        const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
+        const roster = debugRosterForProfile(profileId, stageId, perStageGrowth, TEST_SEED);
         for (const { slot, classId } of terminalRecruits) {
           const member = memberFor(slot);
           const joined = STAGE_RUNTIME_MANIFEST[stageId].ordinal
@@ -384,21 +480,21 @@ describe("debug roster profiles", () => {
     // 蘇蘭達的騎兵入隊職業仍能繼續轉職，預算同樣自第 8 關起算。
     for (const stageId of ["stage-10", "stage-22", "stage-38"] as const) {
       const progression = debugGrowthProgressionForSlot(
-        "representative-growth",
         stageId,
         8,
         perStageGrowth,
       );
       expect(spentBudget(progression)).toBe(expectedBudget(8, stageId, perStageGrowth));
       expect(progression.promotions[0]).toBe("cavalry");
-      expect(debugRosterForProfile("representative-growth", stageId, perStageGrowth)[8])
+      expect(debugRosterForProfile("default-growth", stageId, perStageGrowth)[8])
         .toMatchObject({ classId: progression.classId, experience: progression.experience });
     }
   });
 
   it("grows every joined campaign member and leaves later recruits on the stage template", () => {
     const perStageGrowth = DEFAULT_DEBUG_PER_STAGE_GROWTH;
-    for (const profileId of ["representative-growth", "promotion-coverage"] as const) {
+    // 隨機職業成長的目標另有種子測試；這裡逐關對照預設目標的路線。
+    for (const profileId of ["default-growth"] as const) {
       for (const stageId of stageIds.filter((candidate) => candidate !== "stage-00")) {
         const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
         const untouched = debugRosterForProfile(profileId, stageId);
@@ -414,7 +510,6 @@ describe("debug roster profiles", () => {
             continue;
           }
           const progression = debugGrowthProgressionForSlot(
-            profileId,
             stageId,
             member.slot,
             perStageGrowth,
@@ -433,13 +528,13 @@ describe("debug roster profiles", () => {
 
     // 回歸：後期加入的角色以前完全沒有成長，只保留固定的 0／299 基線經驗。
     const lateJoiners = [7, 8, 9, 10, 11, 15, 16, 19, 22, 23, 25, 26, 27, 28, 29, 30, 31];
-    const stage38 = debugRosterForProfile("representative-growth", "stage-38", perStageGrowth);
-    const stage38Baseline = debugRosterForProfile("representative-growth", "stage-38");
+    const stage38 = debugRosterForProfile("default-growth", "stage-38", perStageGrowth);
+    const stage38Baseline = debugRosterForProfile("default-growth", "stage-38");
     for (const slot of lateJoiners) {
       const entry = stage38[slot];
       if (!entry) throw new Error(`missing debug roster slot ${slot}`);
       expect(spentBudget(
-        debugGrowthProgressionForSlot("representative-growth", "stage-38", slot, perStageGrowth),
+        debugGrowthProgressionForSlot("stage-38", slot, perStageGrowth),
       ), `stage-38/${slot}`).toBe(expectedBudget(slot, "stage-38", perStageGrowth));
       expect(entry.experience, `stage-38/${slot}`).toBeGreaterThan(0);
       expect(entry.classId, `stage-38/${slot}`).not.toBe("soldier");
@@ -449,9 +544,9 @@ describe("debug roster profiles", () => {
 
   it("freezes Gedilas at her stage-twenty departure instead of growing the traitor", () => {
     const perStageGrowth = DEFAULT_DEBUG_PER_STAGE_GROWTH;
-    const departure = debugRosterForProfile("representative-growth", "stage-20", perStageGrowth);
+    const departure = debugRosterForProfile("default-growth", "stage-20", perStageGrowth);
     for (const stageId of ["stage-21", "stage-22", "stage-38"] as const) {
-      expect(debugRosterForProfile("representative-growth", stageId, perStageGrowth)[24], stageId)
+      expect(debugRosterForProfile("default-growth", stageId, perStageGrowth)[24], stageId)
         .toEqual(departure[24]);
     }
     expect(expectedBudget(24, "stage-38", perStageGrowth))
@@ -482,7 +577,7 @@ describe("debug roster profiles", () => {
   });
 
   it("inherits the stage-twenty debug professions into the stage-twenty-one interlude", () => {
-    for (const profileId of ["representative-growth", "promotion-coverage"] as const) {
+    for (const profileId of ["default-growth", "random-growth"] as const) {
       const stage20 = debugRosterForProfile(profileId, "stage-20");
       const stage21 = debugRosterForProfile(profileId, "stage-21");
       expect(stage21).toEqual(stage20);
@@ -502,8 +597,8 @@ describe("debug roster profiles", () => {
   it("carries Kins and the seven half-dragon sisters into late direct-entry profiles", async () => {
     const profiles = [
       ["template-baseline", undefined],
-      ["representative-growth", undefined],
-      ["promotion-coverage", undefined],
+      ["default-growth", undefined],
+      ["random-growth", undefined],
     ] as const;
 
     for (const stageId of ["stage-23", "stage-24", "stage-26", "stage-27", "stage-28", "stage-29"] as const) {
@@ -529,8 +624,8 @@ describe("debug roster profiles", () => {
   it("carries stage 27's mandatory great-axe defender into stage 28 and 29 profiles", () => {
     const profiles = [
       ["template-baseline", undefined],
-      ["representative-growth", undefined],
-      ["promotion-coverage", undefined],
+      ["default-growth", undefined],
+      ["random-growth", undefined],
     ] as const;
 
     for (const stageId of ["stage-28", "stage-29"] as const) {
@@ -550,8 +645,8 @@ describe("debug roster profiles", () => {
   it("carries Vesta's mandatory stage 30 recruitment into every stage 31–33 profile", () => {
     const profiles = [
       ["template-baseline", undefined],
-      ["representative-growth", undefined],
-      ["promotion-coverage", undefined],
+      ["default-growth", undefined],
+      ["random-growth", undefined],
     ] as const;
 
     for (const stageId of ["stage-31", "stage-32", "stage-33"] as const) {
@@ -662,13 +757,13 @@ describe("debug roster profiles", () => {
   });
 
   it("serializes roster sources in reproducible debug URLs and rejects invalid sources", () => {
-    expect(debugScenarioUrl("stage-04-player", 2, "promotion-coverage", 120))
+    expect(debugScenarioUrl("stage-04-player", 2, "random-growth", 120, 42))
       .toBe(
-        "/?debugScenario=stage-04-player&difficulty=2&roster=promotion-coverage&growth=120",
+        "/?debugScenario=stage-04-player&difficulty=2&roster=random-growth&growth=120&seed=42",
       );
-    expect(debugScenarioUrl("stage-49-record-total-101", 0, "representative-growth", 100))
+    expect(debugScenarioUrl("stage-49-record-total-101", 0, "default-growth", 100))
       .toBe(
-        "/?debugScenario=stage-49-record-total-101&difficulty=0&roster=representative-growth&growth=100",
+        "/?debugScenario=stage-49-record-total-101&difficulty=0&roster=default-growth&growth=100",
       );
     expect(debugRosterStageId("stage-49")).toBe("stage-37");
     expect(debugStageLabel("stage-49")).toBe("主線結局 · 四段尾聲");
@@ -684,5 +779,15 @@ describe("debug roster profiles", () => {
     });
     expect(parseDebugRosterSourceId("save-0-current")).toBeUndefined();
     expect(parseDebugRosterSourceId("arbitrary-class")).toBeUndefined();
+    // 舊檔案名不再接受，免得舊連結默默換成另一種成長。
+    expect(parseDebugRosterSourceId("representative-growth")).toBeUndefined();
+    expect(parseDebugRosterSourceId("promotion-coverage")).toBeUndefined();
+    expect(parseDebugGrowthSeed("0")).toBe(0);
+    expect(parseDebugGrowthSeed("4294967295")).toBe(0xffff_ffff);
+    expect(parseDebugGrowthSeed(null)).toBeUndefined();
+    expect(parseDebugGrowthSeed("4294967296")).toBeUndefined();
+    expect(parseDebugGrowthSeed("012")).toBeUndefined();
+    expect(parseDebugGrowthSeed("-1")).toBeUndefined();
+    expect(parseDebugGrowthSeed("1.5")).toBeUndefined();
   });
 });

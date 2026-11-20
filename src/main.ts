@@ -394,8 +394,8 @@ if (!releaseBuild && debugScenario) {
       || difficultyValue === 2 || difficultyValue === 3
       ? difficultyValue
       : 0;
-    const rosterSource = debug.parseDebugRosterSourceId(parameters.get("roster"));
-    if (!rosterSource) {
+    const parsedRosterSource = debug.parseDebugRosterSourceId(parameters.get("roster"));
+    if (!parsedRosterSource) {
       renderDebugLoadError("未知成長檔案", parameters.get("roster") ?? "");
       return;
     }
@@ -403,6 +403,17 @@ if (!releaseBuild && debugScenario) {
     if (parameters.has("growth") && perStageGrowth === undefined) {
       renderDebugLoadError("無效每關成長值", parameters.get("growth") ?? "");
       return;
+    }
+    const growthSeed = debug.parseDebugGrowthSeed(parameters.get("seed"));
+    if (parameters.has("seed") && growthSeed === undefined) {
+      renderDebugLoadError("無效隨機種子", parameters.get("seed") ?? "");
+      return;
+    }
+    // 隨機職業成長每次進入都抽新種子，並寫回網址，重新整理才會重現同一陣容。
+    const rosterSource = debug.withDebugGrowthSeed(parsedRosterSource, perStageGrowth, growthSeed);
+    if (rosterSource.kind === "profile" && rosterSource.seed !== undefined && growthSeed === undefined) {
+      parameters.set("seed", String(rosterSource.seed));
+      history.replaceState(history.state, "", `${location.pathname}?${parameters.toString()}${location.hash}`);
     }
     const controller = await debug.createDebugScenarioController(debugScenario, {
       difficulty,

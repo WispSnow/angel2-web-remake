@@ -43,7 +43,7 @@ afterAll(() => {
 const controllerFor = (id: "stage-00-player" | "stage-28-player") =>
   createDebugScenarioController(id, {
     difficulty: 0,
-    rosterSource: { kind: "profile", id: "representative-growth" },
+    rosterSource: { kind: "profile", id: "default-growth" },
     storage,
   });
 

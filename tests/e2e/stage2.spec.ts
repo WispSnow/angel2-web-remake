@@ -390,7 +390,7 @@ test("retreat draws the automatic allies a record read from the title had alread
   // board, and 全面撤退 then swaps the stage-entry board in on that same surface. With
   // every automatic ally fallen and no manual ally still a soldier, nothing had
   // preloaded `ally-soldier`, so all six came back as missing-texture boxes.
-  await page.goto("/?debugScenario=stage-02-player&difficulty=0&roster=promotion-coverage&test=1");
+  await page.goto("/?debugScenario=stage-02-player&difficulty=0&roster=default-growth&test=1");
   await waitForPhase(page, "player");
   const automaticIds = await npcAllyBadgeIds(page);
   expect(automaticIds).toHaveLength(6);

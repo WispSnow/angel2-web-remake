@@ -56,7 +56,7 @@ afterEach(() => {
 
 const openScenario = (id: DebugScenarioId) => createDebugScenarioController(id, {
   difficulty: 0,
-  rosterSource: { kind: "profile", id: "representative-growth" },
+  rosterSource: { kind: "profile", id: "default-growth" },
   storage,
 });
 

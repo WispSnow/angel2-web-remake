@@ -63,11 +63,12 @@ root.innerHTML = `
       </select>
       <label for="debug-roster-source">成長檔案</label>
       <select id="debug-roster-source" data-testid="debug-roster-source">
-        ${rosterOptions.map((option) => `<option value="${option.id}"${
+        ${rosterOptions.map((option) => `<option value="${option.id}" title="${
+          escapeAttribute(option.description)
+        }"${
           option.id === DEFAULT_DEBUG_HUB_ROSTER_SOURCE_ID ? " selected" : ""
         }>${option.label}</option>`).join("")}
       </select>
-      <span data-debug-roster-description></span>
       <form class="debug-growth-form" data-debug-growth-form>
         <label for="debug-per-stage-growth">每關成長</label>
         <input id="debug-per-stage-growth" data-testid="debug-per-stage-growth" type="number"
@@ -120,7 +121,7 @@ root.innerHTML = `
     </main>
     <footer class="debug-hub-footer">
       <p><b>擴充約定：</b>新增關卡時向場景註冊表加入關前、部署/準備、玩家回合、勝利準備和完成路由條目。</p>
-      <p>代表性成長與分支覆蓋是確定性調試夾具，不是唯一標準陣容；正式記錄來源只讀取 roster 與 PRNG。普通 <code>/</code> 仍不載入或暴露這些介面。</p>
+      <p>預設與隨機職業成長都是調試夾具，不是唯一標準陣容；隨機的那份由網址裡的種子重現。正式記錄來源只讀取 roster 與 PRNG。普通 <code>/</code> 仍不載入或暴露這些介面。</p>
     </footer>
   </div>`;
 
@@ -131,8 +132,7 @@ bindDebugPresentationSettings(presentationSettings, localStorage);
 const difficultySelect = root.querySelector<HTMLSelectElement>("#debug-difficulty");
 if (!difficultySelect) throw new Error("debug difficulty selector not found");
 const rosterSelect = root.querySelector<HTMLSelectElement>("#debug-roster-source");
-const rosterDescription = root.querySelector<HTMLElement>("[data-debug-roster-description]");
-if (!rosterSelect || !rosterDescription) throw new Error("debug roster selector not found");
+if (!rosterSelect) throw new Error("debug roster selector not found");
 const growthForm = root.querySelector<HTMLFormElement>("[data-debug-growth-form]");
 const growthInput = root.querySelector<HTMLInputElement>("#debug-per-stage-growth");
 const growthApply = root.querySelector<HTMLButtonElement>("[data-testid='debug-growth-apply']");
@@ -152,7 +152,8 @@ const updateLinks = () => {
   const supportsAnyStage = rosterSource?.kind === "profile"
     && stageGroups.some(({ stageId }) =>
       debugRosterProfileSupportsGrowthOverride(rosterSource.id, debugRosterStageId(stageId)));
-  rosterDescription.textContent = rosterOption?.description ?? "未知成長檔案";
+  // 說明放在懸浮提示裡：選單本身保持簡短的名稱，滑過才看到這份檔案怎麼長。
+  rosterSelect.title = rosterOption?.description ?? "未知成長檔案";
   growthInput.disabled = !supportsAnyStage;
   growthApply.disabled = !supportsAnyStage;
   growthReset.disabled = !supportsAnyStage;

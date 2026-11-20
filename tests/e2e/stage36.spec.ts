@@ -206,7 +206,7 @@ test("S36-J: full-force automatic actions stay within the shared expert-AI respo
   };
 
   await page.goto(
-    "/?debugScenario=stage-36-player&difficulty=0&roster=representative-growth&test=1",
+    "/?debugScenario=stage-36-player&difficulty=0&roster=default-growth&test=1",
   );
   await waitForPhase(page, "player");
   await startPerformanceProbe();

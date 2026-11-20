@@ -50,7 +50,7 @@ test("S21-A–D: four scouts enter, cross the forest, discover the dolls, and ro
   const seenPhases: string[] = [];
   await page.exposeFunction("recordStage21Phase", (phase: string) => seenPhases.push(phase));
   await page.goto(
-    "/?debugScenario=stage-21-prebattle&difficulty=0&roster=representative-growth&growth=100&test=1",
+    "/?debugScenario=stage-21-prebattle&difficulty=0&roster=default-growth&growth=100&test=1",
   );
   await page.evaluate(() => {
     let previous = "";
