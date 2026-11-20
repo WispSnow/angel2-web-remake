@@ -432,6 +432,81 @@ test("角色圖鑑覆蓋全部具名角色，有肖像的都畫得出來", async
   }
 });
 
+const DISPLAY_KEY = "angel2.preferences.display.v1";
+
+const hdPortraitRequests = (page: Page): string[] => {
+  const seen: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/assets/original/portraits/hd/")) seen.push(new URL(request.url()).pathname);
+  });
+  return seen;
+};
+
+test("角色圖鑑：美術風格可對照原版與高清肖像，不改遊戲偏好", async ({ page }) => {
+  const requests = hdPortraitRequests(page);
+  await page.goto("/");
+  await openCompendium(page, "characters");
+  const detail = page.getByTestId("compendium-detail");
+  const portrait = page.getByTestId("compendium-portrait");
+
+  // 遊戲預設原版：圖鑑也從原版開始，而且不為了圖鑑先去要高清檔案。
+  await expect(detail.getByRole("heading", { name: "妮雅" })).toBeVisible();
+  await expect(portrait).toHaveAttribute("data-portrait-style", "original");
+  await expect(page.getByTestId("compendium-portrait-style-original")).toHaveAttribute("aria-pressed", "true");
+  expect(requests).toEqual([]);
+
+  await page.getByTestId("compendium-portrait-style-hd").click();
+  await expect(portrait).toHaveAttribute("data-portrait-style", "hd");
+  await expect(page.getByTestId("compendium-portrait-style-hd")).toHaveAttribute("aria-pressed", "true");
+  // 右欄重繪後焦點交給新的同一顆按鈕，不掉到 body：否則之後的按鍵會漏到戰場、Esc 也關不掉。
+  await expect(page.getByTestId("compendium-portrait-style-hd")).toBeFocused();
+  await expect.poll(() => portrait.locator("img").evaluate((image: HTMLImageElement) => image.naturalWidth))
+    .toBe(448);
+  // 和全景狀態框一樣播待機循環：視訊在播、畫布有畫，而且是平滑縮小。
+  await expect(portrait).toHaveAttribute("data-portrait-hd-video", "playing");
+  await expect(portrait.locator("canvas")).toHaveAttribute("data-drawn", "true");
+  expect(await portrait.locator("canvas").evaluate((canvas) => getComputedStyle(canvas).imageRendering))
+    .toBe("auto");
+  // 只要了妮雅（D/46）這一張臉。
+  expect(new Set(requests.map((path) => path.split("/").at(-2)))).toEqual(new Set(["0046"]));
+  await captureVisualAudit(page.locator(".rn-dialog"), {
+    path: "artifacts/playwright/compendium-character-hd-portrait.png",
+  });
+
+  // 換角色時選擇照舊；沒有專屬肖像的角色沒有切換。
+  await page.getByTestId("compendium-character-sulanda").click();
+  await expect(detail.getByRole("heading", { name: "蘇蘭達" })).toBeVisible();
+  await expect(portrait).toHaveAttribute("data-portrait-style", "hd");
+  await page.getByTestId("compendium-character-ailioula").click();
+  await expect(detail).toContainText("無專屬肖像");
+  await expect(page.getByTestId("compendium-portrait-style-hd")).toHaveCount(0);
+
+  // 圖鑑的切換不寫回遊戲的「美術風格」；重新打開圖鑑又從遊戲的設定開始。
+  const stored = await page.evaluate((key) => localStorage.getItem(key), DISPLAY_KEY);
+  expect(stored === null || !stored.includes('"hd"')).toBe(true);
+  await page.keyboard.press("Escape");
+  await openCompendium(page, "characters");
+  await page.getByTestId("compendium-character-sulanda").click();
+  await expect(portrait).toHaveAttribute("data-portrait-style", "original");
+  await expect(portrait.locator("video, canvas")).toHaveCount(0);
+});
+
+test("角色圖鑑：遊戲選了高清時，肖像預設就是高清", async ({ page }) => {
+  await page.addInitScript(([key, value]) => localStorage.setItem(key, value), [
+    DISPLAY_KEY,
+    JSON.stringify({ imageScaling: "sharp", interfaceZoom: 100, portraitStyle: "hd" }),
+  ] as const);
+  await page.goto("/");
+  await openCompendium(page, "characters");
+  const portrait = page.getByTestId("compendium-portrait");
+  await expect(portrait).toHaveAttribute("data-portrait-style", "hd");
+  await page.getByTestId("compendium-portrait-style-original").click();
+  await expect(portrait).toHaveAttribute("data-portrait-style", "original");
+  await expect(portrait.locator("img")).toHaveCSS("image-rendering", "pixelated");
+  // 遊戲的偏好仍是高清。
+  expect(await page.evaluate((key) => localStorage.getItem(key), DISPLAY_KEY)).toContain('"portraitStyle":"hd"');
+});
+
 test("兩個分頁各自記住選取，來回切換不會重設", async ({ page }) => {
   await page.goto("/");
   await openCompendium(page, "classes");

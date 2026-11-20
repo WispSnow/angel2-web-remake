@@ -1,8 +1,12 @@
 # 开发路线
 
-更新日期：2026-08-14
+更新日期：2026-11-20
 
 本路线按“首次建立并验收一种能力”推进，不按关卡数量估算百分比。任何被冻结阶段都必须先完成纸面合同并获得明确授权。
+
+截至 2026-11-20，原版可达的全部战斗、过场与结局都已以逐关有界例外实现，并从 2026-09-01 起以
+版本号对外发布（当前 1.1.0）。其后的工作转为原版贴合修复与可选表现层，见
+[战役完成后的阶段](#战役完成后的阶段)；里程碑表只登记战役逐关切片，不为每个 `REMAKE` 另立里程碑。
 
 ## 路线总览
 
@@ -93,9 +97,9 @@
 | M72 | stage 49 主线结局纸面合同 | `accepted` | SAY 70、二十二张战绩卡、四段尾声（三段条件分支、一段固定）、`SAVE_NUM`／`KILL_ALL`、v73/v72、REMAKE-086 与隐藏 stage 38 边界闭合；用户确认主线结局测试通过 |
 | M73 | stage 49 主线结局有界实现 | `accepted` | 故事、战绩、条件尾声、原版音画、75 槽战绩、累计存档次数、八个尾声直达调试夹具、v73/v72 与 stage 38 可见边界通过；用户确认 `STAGE-49 主線結局` 测试通过 |
 | M74 | 隐藏 stage 38 纸面合同 | `accepted` | B/0077、18 格部署、44 名静态敌军、SAY/0164/0165、stage-39 终端标识、模块 46 八次不可跳过转场、UN/55 与 UN/54 闭合；用户授权实现 |
-| M75 | 隐藏 stage 38 有界实现 | `verified` | 正式战斗、stage 49→stage 38 路由、生成内容、调试入口、模块 46 自动片尾与 `UN/55` 已通过定向自动／视觉门禁；等待用户普通入口试玩 |
+| M75 | 隐藏 stage 38 有界实现 | `verified` | 正式战斗、stage 49→stage 38 路由、生成内容、调试入口、模块 46 自动片尾与 `UN/55` 已通过定向自动／视觉门禁并随公开版本发布；用户普通入口试玩尚无记录 |
 | M04+ | 职业与技术能力切片 | `verified` | 33 项分层玩家技术、`1N` 直连技術「傳送」（`BAT-068`／`REMAKE-062`）、常规职业、终阶特性、水戰士分裂与三类组合实验表面完成自动门禁 |
-| Campaign | 全战役扩展 | `frozen` | 在通用边界稳定后逐关固化内容与验收 |
+| Campaign | 全战役扩展 | `frozen` | 原版可达关卡已由 M02–M75 逐关以有界例外全部覆盖；`09-design-acceptance.md` 的全战役冻结标记未解除，原版之外的新内容（自制关卡、支线、Mod）仍须先建合同并获授权 |
 
 ## M00：第 0 关人工接受
 
@@ -325,7 +329,12 @@ M27/M28 记录见 [`milestones/M27-stage-15-specification.md`](milestones/M27-st
 与 [`milestones/M28-stage-15-implementation.md`](milestones/M28-stage-15-implementation.md)。内部
 第 15 关按 B/0031、SAY `34/98/133/134` 与 `REMAKE-048` 接入固定妮雅、二十一候选九格、
 最多十人、蘭率领的十名守军、无增援、第 6 回合起原版行为清零、v37/v36 与 stage 16
-冻结路由；自动、Chromium、视觉、构建、证据和文档门禁已通过，等待用户试玩。
+冻结路由；自动、Chromium、视觉、构建、证据和文档门禁已通过，并获用户试玩接受。
+
+M29–M37 记录见各自的里程碑文件。内部第 16–19 关（B/0033–B/0039，莎／倩／麗／愛各率守军、
+无增援）按 `REMAKE-051` 逐关闭合并实现，M30／M33／M35／M37 均获用户确认测试通过。M31 在同一
+决定下把第 1–15 关胜利条件改按 `DS:1273` 表取值（第 1／2／3 关首领为娜米／萊莉／梅蒂），自动
+门禁已通过，仍待用户复验。
 
 M38/M39 记录见 [`milestones/M38-stage-20-specification.md`](milestones/M38-stage-20-specification.md)
 与 [`milestones/M39-stage-20-implementation.md`](milestones/M39-stage-20-implementation.md)。内部
@@ -468,8 +477,31 @@ M74/M75 记录见 [`milestones/M74-stage-38-specification.md`](milestones/M74-st
 
 第 0–24 关、内部第 26–37 关与既有非连续战斗均获用户接受。stage 49 已完成 M72 纸面
 合同和 M73 有界实现并获用户确认；隐藏 stage 38 已完成 M74 纸面合同和 M75 有界实现，
-自动／视觉门禁已验证，等待用户普通入口试玩。其后没有新的战役关卡因本切片自动解冻。
+自动／视觉门禁已验证并随公开版本发布，用户普通入口试玩尚无记录。原版战役至此没有剩余
+关卡；此后没有新的战役内容因本切片自动解冻。
+
+## 战役完成后的阶段
+
+2026-08-14 之后的工作不再按关卡切片，而是按决定编号逐项推进；逐项状态以
+[`STATUS.md`](STATUS.md) 状态表为准，玩家可见的变更以
+[`release-history.md`](../docs/release-history.md) 为准。下表只归纳阶段，状态取该阶段各项中
+最靠后的一个，不把 `verified` 写成用户已接受。
+
+| 阶段 | 时间 | 当前状态 | 核心结果 |
+| --- | --- | --- | --- |
+| 公开发布与部署 | 2026-09-01 起 | `implemented` | `pnpm release:version` 统一版本号，0.2.0–0.16.0 后升 1.0.0、1.1.0；每版同时更新 Cloudflare Pages 网页版与 Windows NSIS 安装包。安装包仍未签名、未做真实 Windows 验收，见 [`release-and-deployment.md`](../docs/release-and-deployment.md) |
+| 资源分包与加载 | 2026-08-20 起 | `verified` | 两阶段资源加载（2026-08-21 首次部署）、逐关资源门、跨刷新缓存与解码门；原版素材于 2026-08-25 起移到私有素材仓库，见 [`assets-split-migration.md`](../docs/assets-split-migration.md) 与 [`resource-loading-phase2.md`](audits/resource-loading-phase2.md) |
+| 原版贴合与问题修复 | 2026-08-15 – 2026-11-08 | `implemented` | `REMAKE-088`–`180`、`182`–`184`：AI 与经验规则、存档写入校验、增援与守卫、全景战斗按原版重放（`REMAKE-165`–`169` 已获接受）、关卡名与地形名、原版Debug模式与音樂盒（`REMAKE-174`）、技术证据冲突（`REMAKE-176`–`180`）。部分条目已获接受，其余等待复验 |
+| 交响改编音乐 | 1.0.0 | `implemented` | `REMAKE-181`、`185`–`187`：「交響」音乐风格为全部 36 首原曲各配一首改编，开场方框与「音樂開關」面板切换，默认原版 |
+| 剧情语音 | 1.1.0 | `implemented` | `REMAKE-188`–`191`、`199`、`202`：关前剧情、战场对白、战斗台词与开场／尾声旁白的可选语音与自动翻页，默认关闭，见 [`voice-over.md`](../design/remake-gdd/systems/voice-over.md) |
+| 高清肖像 | 1.1.0 | `implemented` | `REMAKE-192`–`195`：「美術風格　原版／高清」下的动态肖像、全景状态框待机循环与被操控红眼版；2026-11-20 起「角色圖鑑」可对照两种肖像，见 [`portrait-hd-remake-proposal.md`](audits/portrait-hd-remake-proposal.md) |
+| 高清剧情画面 | 1.1.0 | `in-progress` | `REMAKE-196`–`198`、`200`、`201`：剧情插图、标题、捲動开场、结局尾声与「The end」的高清动态版已随 1.1.0 发布，状态表仍按逐项评审记为 `in-progress`，见 [`story-hd-remake-proposal.md`](audits/story-hd-remake-proposal.md) |
+
+目前没有已授权、进行中的实施里程碑。游戏内「RoadMap」覆盖层上未标「已實裝」的方向（高解析
+战斗演出、重编音效、剧情回顾、支线与挑战、Mod 与关卡编辑器、翻译与无障碍扩展）都是未承诺的
+候选，其中会改变玩法或存档的仍须先按下节建立合同。
 
 ## 全战役入口
 
-全战役通用化仍受 [`design/remake-gdd/09-design-acceptance.md`](../design/remake-gdd/09-design-acceptance.md) 约束。只有核心系统合同、稳定语义 ID、存档/Mod 边界和代表性垂直切片足以支撑实施时，才进入逐关批量固化。
+全战役通用化仍受 [`design/remake-gdd/09-design-acceptance.md`](../design/remake-gdd/09-design-acceptance.md) 约束。原版关卡已逐关实现，不再需要“逐关批量固化”；该门槛现在约束的是原版之外的新内容：
+自制关卡、支线、挑战规则与 Mod 加载都要先有核心系统合同、稳定语义 ID 与存档/Mod 边界，再取得用户授权。

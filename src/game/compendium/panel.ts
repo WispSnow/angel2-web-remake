@@ -10,13 +10,17 @@ import {
 } from "./class-view";
 import { mountClassPreview, type ClassPreviewController } from "./class-preview";
 import {
+  characterEntry,
   COMPENDIUM_DEFAULT_CHARACTER_ID,
   isCharacterId,
 } from "./character-compendium";
 import { renderCharacterDetail, renderCharacterIndex } from "./character-view";
+import { mountCharacterPortrait, type CharacterPortraitController } from "./character-portrait";
 import { createOverlayPanel, type OverlayTab } from "../overlay/panel";
 import { isClassId, type ClassId } from "../content/classes";
 import type { CharacterId } from "../content/character-catalog.generated";
+import { isPortraitStyle, type PortraitStyle } from "../preferences";
+import { portraitStyle } from "../portrait-style";
 
 /**
  * 「圖鑑」覆蓋層：兩個資料表分頁，職業一個、角色一個。
@@ -29,13 +33,16 @@ export type CompendiumTab = "classes" | "characters";
 
 export const COMPENDIUM_TABS: readonly OverlayTab<CompendiumTab>[] = [
   { id: "classes", label: "職業圖鑑", title: "收錄全 39 種職業的棋子造型、全景動畫、屬性數值、成長曲線與專屬特性" },
-  { id: "characters", label: "角色圖鑑", title: "收錄全 51 名具名角色的生平簡介、登場陣營與出場關卡" },
+  { id: "characters", label: "角色圖鑑", title: "收錄全 51 名具名角色的肖像（原版／高清）、生平簡介、登場陣營與出場關卡" },
 ];
 
 let selectedClassId: ClassId = COMPENDIUM_DEFAULT_CLASS_ID;
 let selectedCharacterId: CharacterId = COMPENDIUM_DEFAULT_CHARACTER_ID;
 let classPreviewSelection: ClassPreviewSelection = DEFAULT_CLASS_PREVIEW_SELECTION;
 let classPreviewController: ClassPreviewController | undefined;
+/** 角色頁的「原版／高清」對照；每次開圖鑑都從遊戲目前的「美術風格」開始，不寫回偏好。 */
+let characterPortraitView: PortraitStyle = "original";
+let characterPortraitController: CharacterPortraitController | undefined;
 
 const isPreviewSide = (value: string | undefined): value is ClassPreviewSide =>
   value === "ally" || value === "enemy";
@@ -48,13 +55,23 @@ function stopClassPreview(): void {
   classPreviewController = undefined;
 }
 
+function stopCharacterPortrait(): void {
+  characterPortraitController?.destroy();
+  characterPortraitController = undefined;
+}
+
+function stopPreviews(): void {
+  stopClassPreview();
+  stopCharacterPortrait();
+}
+
 function normalizedClassPreview(): ClassPreviewSelection {
   classPreviewSelection = normalizeClassPreviewSelection(selectedClassId, classPreviewSelection);
   return classPreviewSelection;
 }
 
 function mountSelectedClassPreview(body: HTMLElement): void {
-  stopClassPreview();
+  stopPreviews();
   const detail = body.querySelector<HTMLElement>(".rn-class-detail");
   if (!detail) return;
   classPreviewController = mountClassPreview(
@@ -62,6 +79,13 @@ function mountSelectedClassPreview(body: HTMLElement): void {
     selectedClassId,
     normalizedClassPreview(),
   );
+}
+
+function mountSelectedCharacterPortrait(body: HTMLElement): void {
+  stopPreviews();
+  const detail = body.querySelector<HTMLElement>(".rn-class-detail");
+  if (!detail) return;
+  characterPortraitController = mountCharacterPortrait(detail, characterEntry(selectedCharacterId));
 }
 
 function renderTab(tab: CompendiumTab): string {
@@ -73,7 +97,7 @@ function renderTab(tab: CompendiumTab): string {
     ]
     : [
       renderCharacterIndex(selectedCharacterId),
-      renderCharacterDetail(selectedCharacterId),
+      renderCharacterDetail(selectedCharacterId, characterPortraitView),
       "角色索引",
     ];
   return `
@@ -89,7 +113,7 @@ function renderTab(tab: CompendiumTab): string {
 
 /** 只換左右兩欄的內容，不重繪整個分頁：重繪會把捲軸拉回頂端。 */
 function select(body: HTMLElement, index: string, detail: string): void {
-  stopClassPreview();
+  stopPreviews();
   const indexElement = body.querySelector<HTMLElement>(".rn-class-index");
   const detailElement = body.querySelector<HTMLElement>(".rn-class-detail");
   if (!indexElement || !detailElement) return;
@@ -101,12 +125,21 @@ function select(body: HTMLElement, index: string, detail: string): void {
 }
 
 function rerenderSelectedClass(body: HTMLElement, resetScroll: boolean): void {
-  stopClassPreview();
+  stopPreviews();
   const detail = body.querySelector<HTMLElement>(".rn-class-detail");
   if (!detail) return;
   detail.innerHTML = renderClassDetail(selectedClassId, normalizedClassPreview());
   if (resetScroll) detail.scrollTop = 0;
   mountSelectedClassPreview(body);
+}
+
+/** 只換右欄，捲軸位置照舊：切換肖像風格不該把玩家讀到一半的出場表捲回頂端。 */
+function rerenderSelectedCharacter(body: HTMLElement): void {
+  stopPreviews();
+  const detail = body.querySelector<HTMLElement>(".rn-class-detail");
+  if (!detail) return;
+  detail.innerHTML = renderCharacterDetail(selectedCharacterId, characterPortraitView);
+  mountSelectedCharacterPortrait(body);
 }
 
 const panel = createOverlayPanel<CompendiumTab>({
@@ -117,11 +150,11 @@ const panel = createOverlayPanel<CompendiumTab>({
   tabs: COMPENDIUM_TABS,
   render: renderTab,
   onBodyRendered: (body, tab) => {
-    stopClassPreview();
     if (tab === "classes") mountSelectedClassPreview(body);
+    else mountSelectedCharacterPortrait(body);
   },
-  onClose: stopClassPreview,
-  onDestroy: stopClassPreview,
+  onClose: stopPreviews,
+  onDestroy: stopPreviews,
   onBodyClick: (target, body) => {
     const classId = target.closest<HTMLElement>("[data-class]")?.dataset.class;
     if (isClassId(classId) && classId !== selectedClassId) {
@@ -152,10 +185,24 @@ const panel = createOverlayPanel<CompendiumTab>({
       rerenderSelectedClass(body, false);
       return;
     }
+    const portraitView = target.closest<HTMLElement>("[data-character-portrait-style]")
+      ?.dataset.characterPortraitStyle;
+    if (isPortraitStyle(portraitView)) {
+      if (portraitView !== characterPortraitView) {
+        characterPortraitView = portraitView;
+        rerenderSelectedCharacter(body);
+      }
+      return;
+    }
     const characterId = target.closest<HTMLElement>("[data-character]")?.dataset.character;
     if (isCharacterId(characterId) && characterId !== selectedCharacterId) {
       selectedCharacterId = characterId;
-      select(body, renderCharacterIndex(characterId), renderCharacterDetail(characterId));
+      select(
+        body,
+        renderCharacterIndex(characterId),
+        renderCharacterDetail(characterId, characterPortraitView),
+      );
+      mountSelectedCharacterPortrait(body);
     }
   },
 });
@@ -163,6 +210,7 @@ const panel = createOverlayPanel<CompendiumTab>({
 export function openCompendium(tab: CompendiumTab, returnFocusTo?: HTMLElement): void {
   // 「站立」是入口默认页；同一轮浏览中切职业仍保留玩家选的动作，方便横向比较。
   classPreviewSelection = { ...classPreviewSelection, animation: "stand" };
+  characterPortraitView = portraitStyle();
   panel.open(tab, returnFocusTo);
 }
 export const closeCompendium = panel.close;

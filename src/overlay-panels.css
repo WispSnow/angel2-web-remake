@@ -356,6 +356,23 @@
   font: 700 10px/1.4 system-ui, sans-serif !important;
   letter-spacing: .16em;
 }
+.rn-roadmap-status {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 1px 6px;
+  border: 1px solid #4f7a4a;
+  border-radius: 2px;
+  background: #1b2a1c;
+  color: #a9d79a;
+  letter-spacing: .08em;
+  vertical-align: 1px;
+}
+.rn-roadmap-status[data-status="partial"] {
+  border-color: #7a6a3a;
+  background: #2a2417;
+  color: #e3c77d;
+}
+.rn-roadmap-item[data-status="shipped"] { border-color: #34472f; }
 .rn-roadmap-item h3 { margin: 0 0 7px; color: #f6e8c6; font-size: 16px; }
 .rn-roadmap-item > p:last-child {
   margin: 0;
@@ -790,6 +807,27 @@
 /* 肖像原本就是 112×112 的點陣圖，不像地圖棋子那樣需要放大兩倍。 */
 .rn-figure-portrait, .rn-figure-empty { width: 114px; height: 114px; }
 .rn-figure-portrait > img { width: 112px; height: 112px; transform: none; }
+/* `REMAKE-192` 高清肖像：封面與畫布疊在同一格，448² 一律平滑縮到 112。全域的
+   `canvas { … !important }` 會把畫布壓回最近鄰，這裡同樣要 `!important`；視訊只是解碼來源，
+   縮成 2 px 透明留在版面裡（`display:none` 的視訊不保證會播放）。 */
+.rn-figure-hd { position: relative; }
+.rn-figure-hd > img,
+.rn-figure-hd > canvas {
+  width: 112px;
+  height: 112px;
+  grid-area: 1 / 1;
+  image-rendering: auto !important;
+}
+.rn-figure-hd > video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 2px;
+  opacity: 0;
+  pointer-events: none;
+}
+.rn-figure-hd[data-portrait-hd-video="failed"] > canvas { display: none; }
 .rn-figure-empty {
   padding: 0 8px;
   color: #6f6152;

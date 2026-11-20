@@ -57,6 +57,27 @@ interface PanelHandles {
   readonly unsubscribeLanguage: () => void;
 }
 
+/**
+ * 被點的按鈕若在內容區裡，記下它全部的 `data-*` 屬性當作身分。點擊處理常把整欄 `innerHTML`
+ * 重寫，原本那顆按鈕就離開了文件，焦點隨之掉到 `body`——之後的按鍵不再經過對話框的
+ * `keydown` 攔截，Esc 關不掉面板，方向鍵還會漏到綁在 `window` 的戰場。
+ */
+function focusedControlSelector(body: HTMLElement): string | undefined {
+  const focused = document.activeElement;
+  if (!(focused instanceof HTMLElement) || !body.contains(focused)) return undefined;
+  const attributes = [...focused.attributes].filter((attribute) => attribute.name.startsWith("data-"));
+  if (attributes.length === 0) return undefined;
+  return focused.tagName.toLowerCase()
+    + attributes.map((attribute) => `[${attribute.name}="${CSS.escape(attribute.value)}"]`).join("");
+}
+
+/** 焦點掉出覆蓋層時，交給重繪後同一個身分的控制項；找不到或不能聚焦就交給對話框本身。 */
+function restoreFocusAfterRerender(root: HTMLElement, dialog: HTMLElement, selector: string | undefined): void {
+  if (!root.classList.contains("is-open") || root.contains(document.activeElement)) return;
+  if (selector) root.querySelector<HTMLElement>(selector)?.focus({ preventScroll: true });
+  if (!root.contains(document.activeElement)) dialog.focus({ preventScroll: true });
+}
+
 export function createOverlayPanel<Id extends string>(
   config: OverlayPanelConfig<Id>,
 ): OverlayPanel<Id> {
@@ -186,8 +207,10 @@ export function createOverlayPanel<Id extends string>(
         renderBody();
         return;
       }
+      const focusKey = focusedControlSelector(body);
       config.onBodyClick?.(target, body);
       localizeDocumentationElement(root, documentationLanguage());
+      restoreFocusAfterRerender(root, dialog, focusKey);
     }, { signal });
 
     // 覆蓋層在 `document.body` 上，按鍵會一路冒泡到綁在 `window` 的戰場、開場與結局

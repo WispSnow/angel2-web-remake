@@ -1,6 +1,6 @@
 import { createOverlayPanel, type OverlayTab } from "../overlay/panel";
 import { escapeHtml } from "../overlay/markup";
-import { ROADMAP_CONTENT, type RoadmapItem, type RoadmapTab } from "./content";
+import { ROADMAP_CONTENT, ROADMAP_STATUS_LABELS, type RoadmapItem, type RoadmapTab } from "./content";
 
 /**
  * 「RoadMap」覆蓋層：展示候選願景與社群入口，不把願景條目誤作已承諾排程。
@@ -16,9 +16,14 @@ export const ROADMAP_TABS: readonly OverlayTab<RoadmapTab>[] = [
 ];
 
 function renderItem(item: RoadmapItem): string {
+  const status = item.status
+    ? `<span class="rn-roadmap-status" data-status="${item.status}"
+        data-testid="roadmap-status-${escapeHtml(item.id)}">${escapeHtml(ROADMAP_STATUS_LABELS[item.status])}</span>`
+    : "";
   return `
-    <article class="rn-roadmap-item" data-testid="roadmap-item-${escapeHtml(item.id)}">
-      <p class="rn-roadmap-label">${escapeHtml(item.label)}</p>
+    <article class="rn-roadmap-item" data-testid="roadmap-item-${escapeHtml(item.id)}"
+      ${item.status ? `data-status="${item.status}"` : ""}>
+      <p class="rn-roadmap-label">${escapeHtml(item.label)}${status}</p>
       <h3>${escapeHtml(item.title)}</h3>
       <p>${escapeHtml(item.description)}</p>
     </article>`;
@@ -30,7 +35,7 @@ function renderTab(tab: RoadmapTab): string {
       <main class="rn-roadmap-main">
         <div class="rn-roadmap-notice" data-testid="roadmap-notice">
           <strong>本頁展示開放性未來規劃願景，並非已承諾的開發時程。</strong>
-          <span>所有規劃將結合社群反饋、原版考據與技術可行性持續迭代；任何玩法調整均有獨立規則與存檔邊界。</span>
+          <span>標示「已實裝」「部分實裝」的方向已可在遊戲中開啟；其餘規劃將結合社群反饋、原版考據與技術可行性持續迭代，任何玩法調整均有獨立規則與存檔邊界。</span>
         </div>
         <div class="rn-roadmap-grid">
           ${ROADMAP_CONTENT[tab].map(renderItem).join("")}

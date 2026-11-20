@@ -5,7 +5,8 @@ import {
   type CharacterStageRole,
 } from "../content/character-catalog.generated";
 import { CHARACTER_NOTES } from "./character-notes";
-import { PORTRAIT_CATALOG } from "../content/portrait-catalog.generated";
+import { isPortraitRecord, PORTRAIT_CATALOG } from "../content/portrait-catalog.generated";
+import { portraitHdEntry, type PortraitHdEntry } from "../content/portrait-hd";
 import { STAGE_INDEX } from "../content/stage-index";
 import type { StageId } from "../types";
 
@@ -38,6 +39,8 @@ export interface CharacterEntry {
   readonly group: CharacterGroupId;
   readonly portraitRecord: number | null;
   readonly portrait: string | null;
+  /** `REMAKE-192` 的高清肖像；沒有專屬肖像或原版沒有高清版（`D/63`）時為 `null`。 */
+  readonly portraitHd: PortraitHdEntry | null;
   readonly allySlot: number | null;
   readonly enemySlot: number | null;
   readonly note: string | null;
@@ -111,12 +114,16 @@ function buildEntry(entry: CharacterCatalogEntry): CharacterEntry {
     ? null
     : PORTRAIT_CATALOG[String(entry.portraitRecord) as keyof typeof PORTRAIT_CATALOG]
       ?.source ?? null;
+  const portraitHd = isPortraitRecord(entry.portraitRecord)
+    ? portraitHdEntry(entry.portraitRecord) ?? null
+    : null;
   return {
     id: entry.id,
     name: entry.name,
     group: groupOf(entry),
     portraitRecord: entry.portraitRecord,
     portrait,
+    portraitHd,
     allySlot: entry.allySlot,
     enemySlot: entry.enemySlot,
     note: CHARACTER_NOTES[entry.id] ?? null,

@@ -60,6 +60,11 @@ export class PortraitHdPlayer {
     readonly video: HTMLVideoElement,
     readonly canvas: HTMLCanvasElement,
     private readonly testMode: boolean,
+    /**
+     * 視訊載入或解碼失敗時呼叫。遊戲內的肖像把這條記錄本次執行退回原版；圖鑑在資源門之外，
+     * 自己的對照切換只停在封面，不去動遊戲的回退狀態。
+     */
+    private readonly onFailure: (reason: string) => void = (reason) => markPortraitHdFailed(record, reason),
   ) {
     this.context = canvas.getContext("2d");
     this.compose = document.createElement("canvas");
@@ -72,7 +77,7 @@ export class PortraitHdPlayer {
       void video.play().catch(() => undefined);
     });
     video.addEventListener("error", () => {
-      markPortraitHdFailed(record, video.error?.message || `media error ${video.error?.code ?? "unknown"}`);
+      this.onFailure(video.error?.message || `media error ${video.error?.code ?? "unknown"}`);
     });
   }
 

@@ -19,6 +19,15 @@ test("RoadMap 展示候選方向、QQ 群與原始二維碼", async ({ page }) =
   await expect(page.getByTestId("roadmap-notice")).toContainText("並非已承諾的開發時程");
   await expect(page.getByTestId("roadmap-item-hd-portraits")).toContainText("立繪高清化重製");
   await expect(page.getByTestId("roadmap-item-ai-voices")).toContainText("AI 角色配音");
+  // 已經能在遊戲裡開啟的方向要標出來，並指到玩家實際切換的地方。
+  await expect(page.getByTestId("roadmap-status-hd-portraits")).toHaveText("已實裝");
+  await expect(page.getByTestId("roadmap-item-hd-portraits")).toContainText("美術風格");
+  await expect(page.getByTestId("roadmap-status-ai-voices")).toHaveText("已實裝");
+  await expect(page.getByTestId("roadmap-item-ai-voices")).toContainText("劇情語音");
+  // 交響配樂已有，重編音效還沒有：只算部分實裝。
+  await expect(page.getByTestId("roadmap-status-arranged-audio")).toHaveText("部分實裝");
+  await expect(page.getByTestId("roadmap-item-arranged-audio")).toContainText("交響");
+  await expect(page.getByTestId("roadmap-status-enhanced-effects")).toHaveCount(0);
 
   await expect(page.getByTestId("roadmap-qq-group")).toContainText("1107513111");
   const qr = page.getByRole("img", { name: "QQ 交流群 1107513111 二維碼" });
@@ -33,6 +42,7 @@ test("RoadMap 展示候選方向、QQ 群與原始二維碼", async ({ page }) =
   await page.getByTestId("roadmap-tab-story").click();
   await expect(page.getByTestId("roadmap-item-richer-dialogue")).toContainText("豐富人物對話");
   await expect(page.getByTestId("roadmap-item-hd-portraits")).toHaveCount(0);
+  await expect(page.locator(".rn-roadmap-status")).toHaveCount(0);
 
   await page.getByTestId("roadmap-tab-community").click();
   await expect(page.getByTestId("roadmap-item-campaign-balance-mods"))
