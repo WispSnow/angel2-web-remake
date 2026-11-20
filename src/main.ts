@@ -286,6 +286,7 @@ const mountController = (
           ),
         );
         if (generation !== surfaceGeneration || controller.phase !== "ending") return;
+        audio.markRouteMusicReady("ending");
         destroySurface = mountStage49EndingUi(root, controller, audio);
       };
       void mount();
@@ -304,6 +305,7 @@ const mountController = (
           ],
         );
         if (generation !== surfaceGeneration || controller.phase !== "credits") return;
+        audio.markRouteMusicReady("credits");
         destroySurface = mountCreditsUi(root, controller);
       };
       void mount();

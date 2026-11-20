@@ -47,6 +47,12 @@ const battleMusicSide = (phase: GamePhase): BattleMusicSide | undefined => {
   return undefined;
 };
 
+/** Surfaces whose phase switches before their resource route is ready (see `markRouteMusicReady`). */
+export type RouteMusicPhase = "ending" | "credits";
+
+const isRouteMusicPhase = (phase: GamePhase): phase is RouteMusicPhase =>
+  phase === "ending" || phase === "credits";
+
 const WALK_FADE_MS = 60;
 
 const isWalkCue = (cue: { group: string; record: number; reason: string }): boolean =>
@@ -64,6 +70,8 @@ export class AudioManager {
   private selectedBaseMusic?: MusicProgram;
   private musicBoxSequence = 0;
   private musicBoxBase?: { id: string | undefined; expired: boolean };
+  /** The route phase whose gate has released; cleared as soon as the phase moves on. */
+  private readyRoute?: RouteMusicPhase;
   private readonly music: MusicTransport;
   private readonly effects: SoundEffectTransport;
   private readonly effectRequestCounts: Record<SoundEffectChannel, number> = {
@@ -147,6 +155,20 @@ export class AudioManager {
     const record = SPEECH_RECORD_BY_CHARACTER[character];
     if (record === undefined) return;
     this.playEffect(ASSETS.audio.speech[record - 57], 0.24, "speech");
+  }
+
+  /**
+   * A stage's asset gate holds the controller before the phase changes, but the ending and the
+   * credits switch phase first and only mount their surface once the route gate has the files.
+   * Selecting their track on the phase change would make the transport fetch the file on its own,
+   * beside the gate's request (`REMAKE-185` remixes included), and start it over the loading
+   * overlay. So those phases stay silent until the mount code reports the route ready; by then
+   * the gate has primed the encoded bytes and the selection costs no request.
+   */
+  markRouteMusicReady(route: RouteMusicPhase): void {
+    if (this.controller.phase !== route) return;
+    this.readyRoute = route;
+    this.syncMusic();
   }
 
   private unlock(): void {
@@ -277,6 +299,13 @@ export class AudioManager {
       || this.controller.phase === "nextStage"
     ) {
       desired = undefined;
+    }
+
+    const phase = this.controller.phase;
+    if (this.readyRoute !== phase) this.readyRoute = undefined;
+    if (isRouteMusicPhase(phase) && this.readyRoute !== phase) {
+      desired = undefined;
+      restart = false;
     }
 
     ({ desired, restart } = this.applyMusicBoxPlayback(desired, restart));
