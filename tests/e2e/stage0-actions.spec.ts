@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { MAP_COMBAT_FRAME_KEYS, recordCanvasFrames } from "./canvas-frame-recorder";
 import { captureVisualAudit } from "./visual-audit";
 
 type ClassActionId = "archer-shot" | "fire-1" | "heal-1" | "lightning-1" | "recovery-1";
@@ -420,6 +421,7 @@ test("M00.6 sister technique menu preserves nested cancel and both native timeli
   await openActorMenu(page);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-fire-1").click();
+  const fireFrames = await recordCanvasFrames(page, [...MAP_COMBAT_FRAME_KEYS, "mapCombatEffectTopLefts", "mapActionHd"]);
   await clickMapCell(page, 380, 177);
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as ActionDebugState;
@@ -447,6 +449,16 @@ test("M00.6 sister technique menu preserves nested cancel and both native timeli
       && current.specialActionPresentation === undefined;
   });
   const afterFire = await state(page);
+  // `MAGIC/22` is a one-tile descriptor drawn from the target cell's top-left, like every other
+  // descriptor; bottom-centring shifted the narrower last frame (32x42) right and down.
+  const fireTiles = (await fireFrames.stop()).filter(({ mapCombatPhase }) => mapCombatPhase === "fireEffect");
+  expect(fireTiles.map(({ mapCombatFrame }) => mapCombatFrame)).toEqual(["0", "1", "2", "3", "4", "5", "6"]);
+  for (const tile of fireTiles) {
+    expect(tile.mapCombatEffectTopLefts, `frame ${tile.mapCombatFrame}`)
+      .toBe(`${enemyBefore.x * 40},${enemyBefore.y * 44}`);
+    // `REMAKE-203`: the default 原版 art style keeps the original frames.
+    expect(tile.mapActionHd, `frame ${tile.mapCombatFrame}`).toBe("original:style");
+  }
   expect(afterFire.specialActionPresentationTrace.filter(({ phase }) => phase === "fireEffect"))
     .toHaveLength(7);
   expect(afterFire.specialActionPresentationTrace.findLast(
@@ -637,3 +649,130 @@ for (const [classId, nativeRecord, voiceRecord] of [
     }));
   });
 }
+
+const DISPLAY_KEY = "angel2.preferences.display.v1";
+const FIRE_1_HD = "/assets/original/map-actions/hd/fire-1/hd.mp4";
+const useHdArtStyle = (page: Page) => page.addInitScript(([key, value]) => localStorage.setItem(key, value), [
+  DISPLAY_KEY,
+  JSON.stringify({ imageScaling: "sharp", interfaceZoom: 100, portraitStyle: "hd" }),
+] as const);
+
+declare global {
+  interface Window {
+    __mapActionHdTicks?: number[];
+  }
+}
+
+/** Every tick the HD canvas draws, in order (it updates on its own animation frames, not on controller emits). */
+const recordHdTicks = (page: Page) => page.evaluate(() => {
+  const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=map-action-hd-canvas]");
+  if (!canvas) throw new Error("the HD map-action canvas is not mounted");
+  const ticks: number[] = [];
+  window.__mapActionHdTicks = ticks;
+  new MutationObserver(() => {
+    const tick = canvas.dataset.mapActionHdTick;
+    if (tick !== undefined) ticks.push(Number(tick));
+  }).observe(canvas, { attributes: true, attributeFilter: ["data-map-action-hd-tick"] });
+});
+
+const castSisterFire = async (page: Page) => {
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-fire-1").click();
+  const frames = await recordCanvasFrames(page, [...MAP_COMBAT_FRAME_KEYS, "mapActionHd", "mapActionHdFrameTicks"]);
+  await clickMapCell(page, 380, 177);
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState;
+    return current.lastSpecialAction?.actionId === "fire-1" && current.specialActionPresentation === undefined;
+  });
+  return (await frames.stop()).filter(({ mapCombatPhase }) => mapCombatPhase === "fireEffect");
+};
+
+test("REMAKE-203: in 高清 the sister's 1F plays the HD clip on its own canvas through the original frames", async ({ page }) => {
+  await useHdArtStyle(page);
+  // `slowMap` keeps the native 10 ms per tick under ?test=1, so the HD clip plays at its real speed.
+  await page.goto("/?test=1&skipStartup=1&slowMap=1");
+  await forceSetup(page, "sister");
+  const before = await state(page);
+  const enemyBefore = before.units.find(({ id }) => id === "2:48")!;
+  await expect.poll(() => page.evaluate((source) => [...document.querySelectorAll("video")]
+    .some((video) => video.dataset.sourceUrl === source && video.readyState >= 2), FIRE_1_HD), { timeout: 15_000 }).toBe(true);
+  await recordHdTicks(page);
+  const hdCanvas = page.getByTestId("map-action-hd-canvas");
+  const audit = process.env.VISUAL_AUDIT === "1";
+  if (audit) {
+    // The mushroom cloud lasts ~200 ms: hold the program clock once the HD tick passes 35. The HD layer keeps drawing
+    // its current frame while the program is paused, and the clock resumes where it stopped.
+    await page.evaluate(async () => {
+      const clock = await import("/src/game/program-clock.ts");
+      const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=map-action-hd-canvas]")!;
+      const observer = new MutationObserver(() => {
+        if (Number(canvas.dataset.mapActionHdTick ?? -1) < 35) return;
+        observer.disconnect();
+        clock.setProgramPaused(true);
+        document.documentElement.dataset.hdHeld = "true";
+      });
+      observer.observe(canvas, { attributes: true, attributeFilter: ["data-map-action-hd-tick"] });
+    });
+  }
+  const capture = audit ? (async () => {
+    await page.waitForFunction(() => document.documentElement.dataset.hdHeld === "true", null, { timeout: 15_000 });
+    // the pause overlay would dim the picture; hide it for the capture only
+    const overlay = await page.addStyleTag({ content: ".program-pause-overlay { display: none !important; }" });
+    await page.waitForTimeout(200);
+    await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-sister-fire-hd.png" });
+    await overlay.evaluate((element) => element.remove());
+    await page.evaluate(async () => (await import("/src/game/program-clock.ts")).setProgramPaused(false));
+  })() : Promise.resolve();
+  const fire = await castSisterFire(page);
+  await capture;
+
+  // the controller still emits and waits the seven original frames; the HD layer draws them all, no original tile
+  expect(fire.map(({ mapCombatFrame }) => mapCombatFrame)).toEqual(["0", "1", "2", "3", "4", "5", "6"]);
+  expect(fire.map(({ mapActionHdFrameTicks }) => mapActionHdFrameTicks))
+    .toEqual(["0,10", "10,20", "20,30", "30,40", "40,50", "50,60", "60,70"]);
+  for (const frame of fire) {
+    expect(frame.mapActionHd, `frame ${frame.mapCombatFrame}`).toBe("hd");
+    expect(frame.mapCombatEffectTileCount, `frame ${frame.mapCombatFrame}`).toBe("0");
+  }
+  const ticks = await page.evaluate(() => window.__mapActionHdTicks ?? []);
+  expect(ticks.length).toBeGreaterThan(10);
+  expect(Math.min(...ticks)).toBeGreaterThanOrEqual(0);
+  expect(Math.max(...ticks)).toBeLessThan(70);
+  expect(Math.max(...ticks)).toBeGreaterThan(55);
+  expect(ticks.every((tick, index) => index === 0 || tick >= ticks[index - 1])).toBe(true);
+  await expect(hdCanvas).not.toHaveAttribute("data-map-action-hd-action", /./u);
+
+  // the result, the life drain and the sound request are those of the original presentation
+  const after = await state(page);
+  expect(after.specialActionPresentationTrace.filter(({ phase }) => phase === "fireEffect")).toHaveLength(7);
+  expect(after.audioCueLog).toContainEqual(expect.objectContaining({ group: "magic", record: 83, reason: "fire-1-start" }));
+  expect(after.units.find(({ id }) => id === enemyBefore.id)?.life).toBe(enemyBefore.life - after.lastSpecialAction!.damage);
+});
+
+test("REMAKE-203: a 1F HD clip that cannot be decoded falls back to the original frames for the whole cast", async ({ page }) => {
+  await useHdArtStyle(page);
+  // the clip's bytes arrive, but the video element is handed something it cannot decode
+  await page.addInitScript((source) => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "src")!;
+    Object.defineProperty(HTMLMediaElement.prototype, "src", {
+      ...descriptor,
+      set(this: HTMLMediaElement, value: string) {
+        descriptor.set!.call(this, this.dataset.sourceUrl === source ? "data:video/mp4;base64,AAAAAAAA" : value);
+      },
+    });
+  }, FIRE_1_HD);
+  const warnings: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "warning") warnings.push(message.text());
+  });
+  await page.goto("/?test=1&skipStartup=1");
+  await forceSetup(page, "sister");
+  await expect.poll(() => warnings.some((text) => text.includes("HD map action fire-1 falls back to the original"))).toBe(true);
+  const fire = await castSisterFire(page);
+  expect(fire.map(({ mapCombatFrame }) => mapCombatFrame)).toEqual(["0", "1", "2", "3", "4", "5", "6"]);
+  for (const frame of fire) {
+    expect(frame.mapActionHd, `frame ${frame.mapCombatFrame}`).toBe("original:failed");
+    expect(Number(frame.mapCombatEffectTileCount), `frame ${frame.mapCombatFrame}`).toBeGreaterThan(0);
+  }
+});

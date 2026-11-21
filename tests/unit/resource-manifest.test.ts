@@ -13,6 +13,7 @@ import {
 } from "../../src/game/debug-scenario-catalog";
 import { STAGE_INDEX } from "../../src/game/content/stage-index";
 import { STORY_HD_ENTRIES } from "../../src/game/content/story-hd.generated";
+import { mapActionHdEntries } from "../../src/game/content/map-action-hd";
 import { STORY_HD_EPILOGUE, STORY_HD_INTRO, STORY_HD_THE_END, STORY_HD_TITLE, storyHdAssetUrls, storyHdIntroAssetUrls, storyHdTitleAssetUrls } from "../../src/game/content/story-hd";
 import { musicProgramFor } from "../../src/game/content/music";
 import {
@@ -224,6 +225,18 @@ describe("versioned resource manifest", () => {
     for (const pack of manifest.packs.filter(({ id }) => id !== "stream:story-hd")) {
       for (const url of resolvedPackUrls(manifest, pack.id)) {
         expect(url.includes("/story/hd/"), `${pack.id} must not carry ${url}`).toBe(false);
+      }
+    }
+
+    // `REMAKE-203`: the HD map-technique clips and their manifest, likewise in no stage or route pack.
+    const mapActionHd = resolvedPackUrls(manifest, "stream:map-actions-hd");
+    const mapActionHdFiles = mapActionHdEntries().map(({ video }) => video.source);
+    expect(mapActionHd.size).toBe(mapActionHdFiles.length + 1);
+    for (const url of mapActionHdFiles) expect(mapActionHd).toContain(url);
+    expect(mapActionHd).toContain("/assets/original/map-actions/hd/hd-manifest.json");
+    for (const pack of manifest.packs.filter(({ id }) => id !== "stream:map-actions-hd")) {
+      for (const url of resolvedPackUrls(manifest, pack.id)) {
+        expect(url.includes("/map-actions/hd/"), `${pack.id} must not carry ${url}`).toBe(false);
       }
     }
   });

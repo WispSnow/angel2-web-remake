@@ -158,6 +158,10 @@ for (const { relative } of allFiles) {
   } else if (relative.startsWith("story/hd/")) {
     // `REMAKE-196`: HD story illustrations follow the same rule as HD portraits.
     addToPack("stream:story-hd", url);
+  } else if (relative.startsWith("map-actions/hd/")) {
+    // `REMAKE-203`: HD map-technique effects follow the same rule; the gate asks for the
+    // clips of the techniques a stage's classes can cast.
+    addToPack("stream:map-actions-hd", url);
   } else if (relative.startsWith("portraits/") || relative.startsWith("portrait-animation/")) {
     addToPack("stream:portraits", url);
   } else if (relative.startsWith("ending/")) addToPack("ending", url);
@@ -281,6 +285,7 @@ addPack("credits", "製作人員表資料");
 addPack("stream:portraits", "肖像串流資料");
 addPack("stream:portraits-hd", "高清肖像串流資料");
 addPack("stream:story-hd", "高清劇情插圖串流資料");
+addPack("stream:map-actions-hd", "高清技術特效串流資料");
 addPack("stream:full-combat", "全景戰鬥串流資料");
 addPack("stream:map-units", "棋子按需資料");
 addPack("stream:music", "其餘音樂串流資料");

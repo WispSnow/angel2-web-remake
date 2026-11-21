@@ -66,6 +66,11 @@
 
 .technique-lab-stage-card { overflow: hidden; }
 
+/* 高清特效畫布（`REMAKE-203`）是 Phaser 畫布容器的兄弟節點，以百分比蓋在同一塊區域上。 */
+.technique-lab-canvas-frame {
+  position: relative;
+}
+
 .technique-lab-canvas {
   width: 100%;
   aspect-ratio: 640 / 484;

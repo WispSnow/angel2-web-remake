@@ -238,6 +238,59 @@ test("initial fire and healing remain available on the shared map surface", asyn
   }
 });
 
+test("HD art style plays 1F–4F as HD clips on the original timeline and leaves other techniques original", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/technique-lab.html");
+  const canvas = page.locator("#technique-lab-canvas canvas");
+  const hd = page.getByTestId("map-action-hd-canvas");
+  const style = page.getByTestId("technique-lab-art-style");
+  await expect(style).toHaveValue("original");
+  await expect(canvas).toHaveAttribute("data-art-style", "original");
+  const contracts = [
+    { code: "1F", action: "fire-1", duration: 700, time: 300 },
+    { code: "2F", action: "fire-2", duration: 1200, time: 850 },
+    { code: "3F", action: "fire-3", duration: 1950, time: 1050 },
+    { code: "4F", action: "fire-4", duration: 2900, time: 1700 },
+  ] as const;
+  for (const contract of contracts) {
+    expect(await page.evaluate((code) =>
+      window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode(code), contract.code)).toBe(true);
+    await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
+    await style.selectOption("original");
+    await seek(page, contract.time);
+    expect(Number(await canvas.getAttribute("data-effect-tile-count"))).toBeGreaterThan(0);
+    await expect(hd).not.toHaveAttribute("data-map-action-hd-action", /./u);
+    const frame = page.locator(".technique-lab-canvas-frame");
+    const original = await frame.screenshot();
+    await style.selectOption("hd");
+    // 第一次選高清時視訊可能還在載入：載好前照畫原版，載好後同一時點改畫高清。
+    await expect.poll(async () => {
+      await seek(page, contract.time);
+      return hd.getAttribute("data-map-action-hd-action");
+    }, { timeout: 15_000 }).toBe(contract.action);
+    // 時間軸與原版完全相同：同一份總長度，高清版不畫任何原版圖塊，停在拖動到的 tick。
+    expect((await labState(page))?.playback.durationMs).toBe(contract.duration);
+    await expect(canvas).toHaveAttribute("data-art-style", "hd");
+    await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
+    await expect(hd).toHaveAttribute("data-map-action-hd-tick", (contract.time / 10).toFixed(1));
+    await expect.poll(async () => (await frame.screenshot()).equals(original)).toBe(false);
+    if (contract.code === "4F") {
+      await captureVisualAudit(page, { path: "artifacts/playwright/technique-lab-hd-fire-4-dragon.png", fullPage: true });
+    }
+    await seek(page, contract.duration);
+    await expect(canvas).toHaveAttribute("data-technique-phase", "none");
+    await expect(hd).not.toHaveAttribute("data-map-action-hd-action", /./u);
+  }
+  // 沒有高清版的技能照畫原版。
+  expect(await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("1H"))).toBe(true);
+  await seek(page, 200);
+  await expect(canvas).toHaveAttribute("data-art-style", "hd");
+  await expect(hd).not.toHaveAttribute("data-map-action-hd-action", /./u);
+  expect(Number(await canvas.getAttribute("data-effect-tile-count"))).toBeGreaterThan(0);
+  expect(pageErrors).toEqual([]);
+});
+
 test("intermediate fire composes 21 source tiles into twelve native draws", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));

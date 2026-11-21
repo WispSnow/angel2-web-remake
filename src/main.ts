@@ -15,7 +15,7 @@ import { mountStage49EndingUi } from "./game/stage49-ending-ui";
 import { mountCreditsUi } from "./game/credits-ui";
 import "./credits.css";
 import { ResourcePackLoader } from "./game/resource-loader";
-import { classPresentationAssetUrls } from "./game/content/class-presentation-assets";
+import { classPresentationAssetUrls, stagePresentationActionIds } from "./game/content/class-presentation-assets";
 import { originalDebugEditorAssetUrls } from "./game/original-debug-mode";
 import { ASSETS as STAGE0_ASSETS, createStage0Units } from "./game/content/stage0";
 import { stageDialoguePortraitRecords } from "./game/content/portrait-assets";
@@ -40,6 +40,7 @@ import {
   portraitHdUrlsForStyle,
 } from "./game/portrait-style";
 import { epilogueHdUrlsForStyle, storyHdUrlsForStyle, theEndHdUrlsForStyle } from "./game/story-hd-style";
+import { mapActionHdUrlsForStyle } from "./game/map-action-hd";
 import { stageStoryBackgroundUrls } from "./game/stage-runtime";
 import {
   prepareStartupMusic,
@@ -112,6 +113,8 @@ const stageAssetGate: StageAssetGate = (stageId, resolveRequirements) => {
         ...portraitHdUrlsForStyle(requirements.portraitRecords, undefined, requirements.nativeStage),
         // `REMAKE-196`：高清劇情插圖同一規則，只帶本關劇情用到、而且有高清版的那幾張。
         ...storyHdUrlsForStyle(requirements.storyBackgroundUrls ?? []),
+        // `REMAKE-203`：高清技術特效也一樣，只帶本關職業施放得出、而且有高清版的技術。
+        ...mapActionHdUrlsForStyle(stagePresentationActionIds(requirements)),
       ];
     },
     async () => {
@@ -163,12 +166,13 @@ const stage0PortraitRecords: readonly PortraitRecord[] = [...new Set<PortraitRec
   ...stage0Units.map(({ portrait }) => portrait),
   ...stageDialoguePortraitRecords(STAGE0_DEFINITION),
 ])];
-const stage0PresentationAssets = classPresentationAssetUrls({
+const stage0ClassRequirements = {
   allyClassIds: stage0Units.filter(({ side }) => side === 1).map(({ classId }) => classId),
   encounterClassIds: stage0Units.map(({ classId }) => classId),
   nativeStage: 0,
   portraitRecords: stage0PortraitRecords,
-});
+};
+const stage0PresentationAssets = classPresentationAssetUrls(stage0ClassRequirements);
 
 /** 換一局（重新掛載控制器）時換掉上一局的訂閱，不讓舊控制器繼續下載。 */
 let stopHdPortraitDownloads: (() => void) | undefined;
@@ -341,11 +345,14 @@ const mountController = (
     } else if (controller.phase === "credits") {
       urls = theEndHdUrlsForStyle(style);
     } else {
-      const { portraitRecords, nativeStage, storyBackgroundUrls } = controllerAssetRequirements(controller);
+      const requirements = controllerAssetRequirements(controller);
+      const { portraitRecords, nativeStage, storyBackgroundUrls } = requirements;
       urls = [
         ...portraitHdUrlsForStyle(portraitRecords, style, nativeStage),
         // `REMAKE-196`：本關劇情插圖的高清循環一併補進租約。
         ...storyHdUrlsForStyle(storyBackgroundUrls ?? [], style),
+        // `REMAKE-203`：本關職業施放得出的技術特效也是。
+        ...mapActionHdUrlsForStyle(stagePresentationActionIds(requirements), style),
       ];
     }
     void stagedResources.extendActiveStage(urls)
@@ -461,6 +468,7 @@ else {
         ...stage0PresentationAssets,
         ...portraitHdUrlsForStyle(stage0PortraitRecords),
         ...storyHdUrlsForStyle(stageStoryBackgroundUrls(STAGE0_ASSETS)),
+        ...mapActionHdUrlsForStyle(stagePresentationActionIds(stage0ClassRequirements)),
         ...stageRemixMusicUrls(STAGE0_DEFINITION.music, loadMusicPreferences(localStorage).musicStyle),
       ]);
     }, (urls) => resourceLoader.ensureVoice(urls), (urls) => resourceLoader.extendActiveStage(urls));

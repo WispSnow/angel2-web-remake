@@ -44,6 +44,10 @@ import {
 } from "./map-action-atlas";
 import type { StompPresentationStep } from "../stomp-presentation";
 import { renderPrayerPresentation } from "./PrayerRenderer";
+import { MapActionHdLayer } from "./map-action-hd-layer";
+import { mapActionHdEntry } from "../content/map-action-hd";
+import { mapActionHdFailed, markMapActionHdFailed } from "../map-action-hd";
+import type { PortraitStyle } from "../preferences";
 import type { PrayerOutcomeKind } from "../simulation/actions/types";
 
 const TILE_WIDTH = 40;
@@ -114,7 +118,11 @@ export type TechniqueLabVisualFrame =
     readonly rolledAmount?: number;
     readonly unitId: string;
   }
-  | { readonly kind: "fire"; readonly frame: number }
+  /**
+   * `timeMs`：連續的時間軸位置，高清特效（`REMAKE-203`）據此在原版逐幀節點之間連續地動；`rate` 是時間軸
+   * 相對原速的播放倍率，暫停時為 0。
+   */
+  | { readonly kind: "fire"; readonly frame: number; readonly timeMs: number; readonly rate: number }
   | { readonly kind: "heal-primary"; readonly frame: number }
   | { readonly kind: "heal-tail"; readonly frame: number }
   | { readonly kind: "recovery"; readonly frame: number }
@@ -137,6 +145,8 @@ export interface TechniqueLabSceneHandle {
   readonly game: Phaser.Game;
   setVisualFrame(frame: TechniqueLabVisualFrame): void;
   setFrozenUnitIds(unitIds: readonly string[]): void;
+  /** 實驗室自己的「美術風格」：高清時有高清版的技術（`REMAKE-203`）改畫高清特效，其餘照畫原版。 */
+  setArtStyle(style: PortraitStyle): void;
 }
 
 export function startTechniqueLabPhaser(
@@ -146,6 +156,7 @@ export function startTechniqueLabPhaser(
   let sceneInstance: TechniqueLabScene | undefined;
   let pendingFrame: TechniqueLabVisualFrame = { kind: "none" };
   let pendingFrozenUnitIds: readonly string[] = [];
+  let artStyle: PortraitStyle = "original";
 
   class TechniqueLabScene extends Phaser.Scene {
     private state!: TechniqueLabState;
@@ -154,6 +165,7 @@ export function startTechniqueLabPhaser(
     private frozenObjects: Phaser.GameObjects.Image[] = [];
     private effectObjects: Phaser.GameObjects.GameObject[] = [];
     private overlay!: Phaser.GameObjects.Graphics;
+    private mapActionHd?: MapActionHdLayer;
 
     constructor() {
       super("technique-lab");
@@ -184,6 +196,12 @@ export function startTechniqueLabPhaser(
       );
       this.add.image(0, 0, "technique-lab-map").setOrigin(0).setDepth(0);
       this.overlay = this.add.graphics().setDepth(3);
+      // 高清特效畫在蓋住整塊實驗室畫布的 DOM 畫布上（Phaser 畫布被 CSS 縮放，高清細節畫進去會被縮掉）。
+      // 掛在 Phaser 容器的外框上（兄弟節點），不放進容器裡，免得容器內出現第二塊 canvas。
+      this.mapActionHd = new MapActionHdLayer(parent.parentElement ?? parent, {
+        hostWidth: WIDTH, hostHeight: HEIGHT, left: 0, top: 0, width: WIDTH, height: HEIGHT,
+      }, markMapActionHdFailed);
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.mapActionHd?.destroy());
       this.unsubscribe = session.subscribe((state) => {
         this.state = state;
         this.drawState();
@@ -206,12 +224,31 @@ export function startTechniqueLabPhaser(
       for (const object of this.unitObjects) {
         (object as Phaser.GameObjects.Image).setVisible(true);
       }
+      const hdEntry = frame.kind === "fire" && artStyle === "hd" && this.state
+        ? mapActionHdEntry(`fire-${this.state.actionCode.charAt(0)}`)
+        : undefined;
+      if (hdEntry) this.mapActionHd?.prepare([hdEntry]);
+      const hdReady = hdEntry && !mapActionHdFailed(hdEntry.actionId) && this.mapActionHd?.ready(hdEntry.actionId);
+      if (!hdReady) this.mapActionHd?.setShow(undefined);
       if (!this.state || frame.kind === "none") {
         this.updateCanvasDataset(frame, 0);
         return;
       }
       const center = session.effectCenter();
       if (!center) {
+        this.mapActionHd?.setShow(undefined);
+        this.updateCanvasDataset(frame, 0);
+        return;
+      }
+      if (frame.kind === "fire" && hdEntry && hdReady) {
+        const timeMs = frame.timeMs;
+        this.mapActionHd?.setShow({
+          entry: hdEntry,
+          tick: () => timeMs / 10,
+          target: () => ({ x: center.x * TILE_WIDTH + TILE_WIDTH / 2, y: (center.y + 1) * TILE_HEIGHT }),
+          rate: frame.rate,
+          playing: frame.rate > 0,
+        });
         this.updateCanvasDataset(frame, 0);
         return;
       }
@@ -593,6 +630,7 @@ export function startTechniqueLabPhaser(
         ? frame.frame.kind === "main" ? String(frame.frame.globalDrawIndex) : String(frame.frame.frame)
         : "frame" in frame ? String(frame.frame) : "-1";
       canvas.dataset.effectTileCount = String(count);
+      canvas.dataset.artStyle = artStyle;
       canvas.dataset.effectTextureKeys = this.effectObjects.flatMap((object) =>
         object instanceof Phaser.GameObjects.Image ? [mapActionDebugTextureKey(object)] : []).join(",");
       canvas.dataset.effectAtlasFrames = this.effectObjects.flatMap((object) => {
@@ -672,6 +710,10 @@ export function startTechniqueLabPhaser(
     setFrozenUnitIds(unitIds): void {
       pendingFrozenUnitIds = [...unitIds];
       sceneInstance?.drawFrozenUnits();
+    },
+    setArtStyle(style): void {
+      artStyle = style;
+      sceneInstance?.drawVisualFrame(pendingFrame);
     },
   };
 }

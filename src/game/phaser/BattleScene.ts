@@ -42,6 +42,18 @@ import {
   BATTLE_VIEWPORT_LEFT,
   BATTLE_VIEWPORT_TOP,
 } from "../scaling-constants";
+import { mapActionHdEntries, type MapActionHdEntry } from "../content/map-action-hd";
+import {
+  activeMapActionHd,
+  mapActionHdFailed,
+  mapActionHdFrameSpan,
+  mapActionHdTick,
+  markMapActionHdFailed,
+  type MapActionHdFrameClock,
+} from "../map-action-hd";
+import { portraitStyle } from "../portrait-style";
+import { programNow } from "../program-clock";
+import { MapActionHdLayer } from "./map-action-hd-layer";
 
 const TILE_WIDTH = BATTLE_TILE_WIDTH;
 const TILE_HEIGHT = BATTLE_TILE_HEIGHT;
@@ -281,6 +293,15 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private cursorGraphics!: Phaser.GameObjects.Graphics;
     private rangeMaskTiles: Phaser.GameObjects.TileSprite[] = [];
     private combatEffects: Phaser.GameObjects.GameObject[] = [];
+    /** `REMAKE-203` 高清技術特效的畫布層與目前這次施法（第 0 幀決定走高清或原版，整次施法不改）。 */
+    private mapActionHd: MapActionHdLayer | undefined;
+    private mapActionHdCast: {
+      result: object;
+      entry: MapActionHdEntry | undefined;
+      reason: string;
+      frame: number;
+      clock: MapActionHdFrameClock | undefined;
+    } | undefined;
     private turnTransitionEffects: Phaser.GameObjects.Image[] = [];
     private terrainOverrideImages: Phaser.GameObjects.Image[] = [];
     private turnTransitionMask?: Phaser.Display.Masks.GeometryMask;
@@ -389,6 +410,18 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.objectiveDestinationGraphics = this.add.graphics().setDepth(4);
       this.shotRouteGraphics = this.add.graphics().setDepth(6);
       this.cursorGraphics = this.add.graphics().setDepth(10);
+      const phaserRoot = this.game.canvas.parentElement;
+      const logicalScreen = phaserRoot?.parentElement;
+      if (phaserRoot && logicalScreen?.classList.contains("logical-screen")) {
+        this.mapActionHd = new MapActionHdLayer(logicalScreen, {
+          hostWidth: 640,
+          hostHeight: 350,
+          left: BATTLE_VIEWPORT_LEFT,
+          top: BATTLE_VIEWPORT_TOP,
+          width: 400,
+          height: 308,
+        }, markMapActionHdFailed, phaserRoot.nextSibling);
+      }
       this.drawObjectiveDestinations();
       if (!this.textures.exists("native-range-dither")) {
         const texture = this.textures.createCanvas("native-range-dither", 8, 2);
@@ -443,6 +476,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         this.rangeMaskTiles = [];
         for (const effect of this.combatEffects) effect.destroy();
         this.combatEffects = [];
+        this.mapActionHd?.destroy();
+        this.mapActionHd = undefined;
         for (const effect of this.turnTransitionEffects) effect.destroy();
         this.turnTransitionEffects = [];
         for (const image of this.terrainOverrideImages) image.destroy();
@@ -1268,9 +1303,73 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       }
     }
 
+    /**
+     * `REMAKE-203`：這一幀技術特效是否交給高清畫布層畫。一次施法在第 0 幀決定（偏好、條目、資源租約、
+     * 視訊是否已解碼），之後整次施法照同一個決定；只有視訊中途失敗才從下一幀起改畫原版。
+     */
+    private syncMapActionHd(): boolean {
+      const layer = this.mapActionHd;
+      if (!layer) return false;
+      const special = controller.specialActionPresentation;
+      const canvas = this.game.canvas;
+      if (portraitStyle() === "hd") {
+        layer.prepare(mapActionHdEntries().filter((entry) => activeMapActionHd(entry.actionId)));
+      }
+      if (!special || special.phase !== "fireEffect") {
+        this.mapActionHdCast = undefined;
+        layer.setShow(undefined);
+        if (controller.isTestMode) delete canvas.dataset.mapActionHd;
+        return false;
+      }
+      if (this.mapActionHdCast?.result !== special.result) {
+        const actionId = special.result.actionId;
+        const entry = activeMapActionHd(actionId);
+        const reason = portraitStyle() !== "hd" ? "style"
+          : !entry ? (mapActionHdFailed(actionId) ? "failed" : "unavailable")
+            : layer.ready(actionId) ? "" : "not-ready";
+        this.mapActionHdCast = { result: special.result, entry: reason ? undefined : entry, reason, frame: -1, clock: undefined };
+      }
+      const cast = this.mapActionHdCast;
+      const entry = cast.entry;
+      const span = entry ? mapActionHdFrameSpan(entry, special.frame) : undefined;
+      if (!entry || !span || mapActionHdFailed(entry.actionId)) {
+        if (entry) cast.reason = mapActionHdFailed(entry.actionId) ? "failed" : "frame";
+        cast.entry = undefined;
+        layer.setShow(undefined);
+        if (controller.isTestMode) canvas.dataset.mapActionHd = `original:${cast.reason}`;
+        return false;
+      }
+      if (cast.frame !== special.frame || !cast.clock) {
+        cast.frame = special.frame;
+        cast.clock = {
+          ...span,
+          delayMs: controller.mapCombatFrameDelay(special.nativeTicks),
+          emittedAt: programNow(),
+        };
+      }
+      const clock = cast.clock;
+      const center = special.center;
+      const camera = this.cameras.main;
+      layer.setShow({
+        entry,
+        tick: () => mapActionHdTick(clock, programNow()),
+        target: () => ({
+          x: center.x * TILE_WIDTH + TILE_WIDTH / 2 - camera.scrollX,
+          y: (center.y + 1) * TILE_HEIGHT - camera.scrollY,
+        }),
+        rate: ((clock.endTick - clock.startTick) * 10) / clock.delayMs,
+      });
+      if (controller.isTestMode) {
+        canvas.dataset.mapActionHd = "hd";
+        canvas.dataset.mapActionHdFrameTicks = `${clock.startTick},${clock.endTick}`;
+      }
+      return true;
+    }
+
     private drawCombatEffects(): void {
       for (const effect of this.combatEffects) effect.destroy();
       this.combatEffects = [];
+      const hdFire = this.syncMapActionHd();
       const presentation = controller.combatPresentation;
       const special = controller.specialActionPresentation;
       const routePulse = controller.routePulsePresentation;
@@ -1480,8 +1579,17 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             );
           }
         }
-        else if (special.phase === "fireEffect" && special.result.actionId === "fire-1") {
-          texture = `map-fire-1-${special.frame}`;
+        else if (special.phase === "fireEffect" && special.result.actionId === "fire-1" && !hdFire) {
+          // `MAGIC/22` is a one-tile descriptor at offset (0,0), drawn from the target cell's top-left like
+          // every other descriptor (the technique lab does the same). Bottom-centring pushed the narrower
+          // last frame (32x42) 4 px right and 2 px down, and frames 2-5 (40x43) 1 px down.
+          this.combatEffects.push(
+            addMapActionImage(this,
+              center.x * TILE_WIDTH,
+              center.y * TILE_HEIGHT,
+              `map-fire-1-${special.frame}`,
+            ).setOrigin(0).setDepth(8),
+          );
         }
         else if (special.phase === "healPrimary" && special.result.actionId === "heal-1") {
           texture = `map-heal-1-primary-${special.frame}`;
@@ -1496,7 +1604,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               texture,
             ).setOrigin(.5, 1).setDepth(8),
           );
-        } else if (special.phase === "fireEffect"
+        } else if (special.phase === "fireEffect" && !hdFire
           && (special.result.actionId === "fire-2" || special.result.actionId === "fire-3"
             || special.result.actionId === "fire-4")) {
           const fireId = special.result.actionId;
@@ -1855,6 +1963,11 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             const atlasFrame = mapActionAtlasFrame(effect);
             return atlasFrame ? [atlasFrame] : [];
           }).join(",");
+          canvas.dataset.mapCombatEffectTopLefts = this.combatEffects.flatMap((effect) => {
+            if (!(effect instanceof Phaser.GameObjects.Image)) return [];
+            const topLeft = effect.getTopLeft();
+            return [`${Math.round(topLeft.x)},${Math.round(topLeft.y)}`];
+          }).join(";");
           if (special.phase === "prayerEffect") {
             const prayer = special.result.affectedUnits.find(
               ({ unitId }) => unitId === special.lifeChangeUnitId,

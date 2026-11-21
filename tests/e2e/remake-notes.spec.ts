@@ -214,6 +214,11 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
     await expect(storyArt).toContainText(model);
   }
   await expect(storyArt).toContainText("The end");
+  // REMAKE-203: the HD technique effects name the models that redrew the frames and filled the motion between them.
+  const effects = page.getByTestId("remake-disclaimer-ai-effects");
+  for (const model of ["Qwen-Image-Edit", "MiniMax", "美術風格"]) {
+    await expect(effects).toContainText(model);
+  }
   await expect(page.getByTestId("remake-note-REMAKE-100")).toHaveCount(0);
   await captureVisualAudit(page.locator(".rn-dialog"), {
     path: "artifacts/playwright/remake-disclaimer-desktop.png",

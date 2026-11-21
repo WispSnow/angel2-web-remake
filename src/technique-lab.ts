@@ -33,6 +33,7 @@ import {
 import {
   TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS,
 } from "./game/content/technique-lab-formal-assets";
+import type { PortraitStyle } from "./game/preferences";
 import {
   buildLightningTimeline,
   iceFrameAtGlobalIndex,
@@ -108,7 +109,9 @@ root.innerHTML = `
 
     <div class="technique-lab-layout">
       <section class="technique-lab-stage-card" aria-label="技能地圖預覽">
-        <div id="technique-lab-canvas" class="technique-lab-canvas" data-testid="technique-lab-canvas"></div>
+        <div class="technique-lab-canvas-frame">
+          <div id="technique-lab-canvas" class="technique-lab-canvas" data-testid="technique-lab-canvas"></div>
+        </div>
         <div class="technique-lab-transport">
           <button type="button" data-command="restart" data-testid="technique-lab-restart">從頭</button>
           <button type="button" data-command="play" data-testid="technique-lab-play">播放</button>
@@ -152,6 +155,11 @@ root.innerHTML = `
             <option value="1" selected>1× 原速</option><option value="2">2×</option><option value="4">4×</option>
           </select>
         </label>
+        <label>美術風格
+          <select data-testid="technique-lab-art-style" id="technique-lab-art-style">
+            <option value="original">原版</option><option value="hd">高清</option>
+          </select>
+        </label>
         <label class="technique-lab-check"><input id="technique-lab-sound" type="checkbox" /> 技能原聲音效</label>
         <div class="technique-lab-actions">
           <button type="button" data-command="reset">恢復示例配置</button>
@@ -162,6 +170,7 @@ root.innerHTML = `
         </p>
         <p class="technique-lab-boundary">
           未實現技能保留在原版清單中但不可選。龍、頭、手沒有原版我方地圖圖形，只能配置為敵方。
+          「高清」特效目前只有炎暴 1F–4F，其餘技能照畫原版；時間軸、音效與結算節點與原版完全相同。
         </p>
       </aside>
     </div>
@@ -174,9 +183,10 @@ const sideSelectCandidate = root.querySelector<HTMLSelectElement>("#technique-la
 const classSelectCandidate = root.querySelector<HTMLSelectElement>("#technique-lab-class");
 const speedSelectCandidate = root.querySelector<HTMLSelectElement>("#technique-lab-speed");
 const soundInputCandidate = root.querySelector<HTMLInputElement>("#technique-lab-sound");
+const artStyleSelectCandidate = root.querySelector<HTMLSelectElement>("#technique-lab-art-style");
 const timelineInputCandidate = root.querySelector<HTMLInputElement>('[data-testid="technique-lab-timeline"]');
 if (!canvasRootCandidate || !actionSelectCandidate || !sideSelectCandidate || !classSelectCandidate
-  || !speedSelectCandidate || !soundInputCandidate || !timelineInputCandidate) {
+  || !speedSelectCandidate || !soundInputCandidate || !timelineInputCandidate || !artStyleSelectCandidate) {
   throw new Error("technique laboratory controls missing");
 }
 const canvasRoot: HTMLElement = canvasRootCandidate;
@@ -186,6 +196,7 @@ const classSelect: HTMLSelectElement = classSelectCandidate;
 const speedSelect: HTMLSelectElement = speedSelectCandidate;
 const soundInput: HTMLInputElement = soundInputCandidate;
 const timelineInput: HTMLInputElement = timelineInputCandidate;
+const artStyleSelect: HTMLSelectElement = artStyleSelectCandidate;
 
 const session = new TechniqueLabSession();
 const isStompCode = (code: TechniqueLabNativeCode): code is "1D" | "2D" | "3D" =>
@@ -204,6 +215,12 @@ const recoveryPresentationFor = (code: "1I" | "2I" | "3I") => code === "3I"
 const isConstructionCode = (code: TechniqueLabNativeCode): code is "1K" | "2K" =>
   code === "1K" || code === "2K";
 const renderer = startTechniqueLabPhaser(session, canvasRoot);
+// 實驗室可用 `?art=hd` 直接打開高清特效（`REMAKE-203`），方便與原版對照；只影響本頁表現，不碰遊戲偏好。
+const isArtStyle = (value: unknown): value is PortraitStyle => value === "original" || value === "hd";
+const initialArtStyle = new URLSearchParams(window.location.search).get("art");
+let artStyle: PortraitStyle = isArtStyle(initialArtStyle) ? initialArtStyle : "original";
+artStyleSelect.value = artStyle;
+renderer.setArtStyle(artStyle);
 let playing = true;
 let speed = 1;
 let sound = false;
@@ -357,7 +374,7 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
     const drawCount = definition.phases.reduce((total, candidate) => total + candidate.drawCount, 0);
     visibleFrame = Math.min(drawCount - 1, Math.floor(currentTimeMs / (waitNativeTicks * 10)));
     phase = "fire";
-    return { kind: "fire", frame: visibleFrame };
+    return { kind: "fire", frame: visibleFrame, timeMs: currentTimeMs, rate: playing ? speed : 0 };
   }
   if (code === "1H") {
     const primaryDuration = STAGE0_ACTION_PRESENTATION_ASSETS.heal1.primary.length * 50;
@@ -1048,6 +1065,12 @@ soundInput.addEventListener("change", () => {
   render();
 });
 timelineInput.addEventListener("input", () => seek(Number(timelineInput.value)));
+artStyleSelect.addEventListener("change", () => {
+  if (!isArtStyle(artStyleSelect.value)) return;
+  artStyle = artStyleSelect.value;
+  renderer.setArtStyle(artStyle);
+  render();
+});
 
 function animate(): void {
   const now = programNow();
@@ -1084,6 +1107,7 @@ declare global {
       play: () => void;
       pause: () => void;
       setActionCode: (code: TechniqueLabNativeCode) => boolean;
+      setArtStyle: (style: PortraitStyle) => void;
     };
   }
 }
@@ -1097,6 +1121,12 @@ window.__ANGEL2_TECHNIQUE_LAB__ = {
   },
   pause: () => {
     playing = false;
+  },
+  setArtStyle: (style) => {
+    artStyle = style;
+    artStyleSelect.value = style;
+    renderer.setArtStyle(style);
+    render();
   },
   setActionCode: (code) => {
     timeMs = 0;

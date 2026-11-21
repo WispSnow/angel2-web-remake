@@ -4800,6 +4800,11 @@ export class GameController {
     this.emit();
   }
 
+  /** 控制器為一幀地圖表現等待的毫秒數（`REMAKE-203` 高清特效的時鐘要對齊它）。只讀，不改任何狀態。 */
+  mapCombatFrameDelay(nativeTicks: number): number {
+    return this.mapCombatDelay(nativeTicks);
+  }
+
   private mapCombatDelay(nativeTicks: number): number {
     if (this.testMode && !this.mapCombatRealTime) return Math.max(4, nativeTicks * 4);
     if (this.presentationFast) return Math.max(3, Math.round(nativeTicks * 2.5));

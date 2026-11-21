@@ -64,7 +64,6 @@ export function classPresentationAssetUrls(
   const commonTrail = fullCombatAtlasById.get("common-trail");
   if (encounterClasses.size > 0 && commonTrail) urls.add(commonTrail.image);
 
-  const actionIds = new Set<BattleActionId>();
   for (const classId of encounterClasses) {
     let fullCombatSideCount = 0;
     for (const physicalSide of ["left", "right"] as const) {
@@ -76,12 +75,27 @@ export function classPresentationAssetUrls(
     if (fullCombatSideCount === 0) {
       throw new Error(`missing full-combat atlas for class ${classId}`);
     }
+  }
+  for (const url of mapActionAtlasAssetsForActions(stagePresentationActionIds(requirements))) urls.add(url);
+  return [...urls].sort();
+}
+
+/**
+ * 本關會出現的職業（含我方轉職閉包）在兩邊可能用到的地圖動作。地圖動作圖集與 `REMAKE-203` 的高清技術特效
+ * 都按這份清單進資源門。
+ */
+export function stagePresentationActionIds(
+  requirements: StageClassPresentationRequirements,
+): ReadonlySet<BattleActionId> {
+  const encounterClasses = new Set<UnitClassId>([
+    ...requirements.encounterClassIds,
+    ...promotionReachableClassIds(requirements.allyClassIds),
+  ]);
+  const actionIds = new Set<BattleActionId>();
+  for (const classId of encounterClasses) {
     for (const side of [1, 2] as const) {
-      for (const actionId of presentationActionIdsForClass(classId, side)) {
-        actionIds.add(actionId);
-      }
+      for (const actionId of presentationActionIdsForClass(classId, side)) actionIds.add(actionId);
     }
   }
-  for (const url of mapActionAtlasAssetsForActions(actionIds)) urls.add(url);
-  return [...urls].sort();
+  return actionIds;
 }

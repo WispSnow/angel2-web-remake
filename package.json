@@ -103,6 +103,7 @@
     "content:voice": "node scripts/generate-voice-catalog.mjs",
     "content:portraits-hd": "node scripts/generate-portrait-hd.mjs",
     "content:story-hd": "node scripts/generate-story-hd.mjs",
+    "content:map-action-hd": "node scripts/generate-map-action-hd.mjs",
     "assets:audit": "node scripts/audit-image-assets.mjs"
   },
   "dependencies": {
