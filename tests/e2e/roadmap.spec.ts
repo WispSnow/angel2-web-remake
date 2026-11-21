@@ -24,9 +24,10 @@ test("RoadMap 展示候選方向、QQ 群與原始二維碼", async ({ page }) =
   await expect(page.getByTestId("roadmap-item-hd-portraits")).toContainText("美術風格");
   await expect(page.getByTestId("roadmap-status-ai-voices")).toHaveText("已實裝");
   await expect(page.getByTestId("roadmap-item-ai-voices")).toContainText("劇情語音");
-  // 交響配樂已有，重編音效還沒有：只算部分實裝。
-  await expect(page.getByTestId("roadmap-status-arranged-audio")).toHaveText("部分實裝");
+  // 交響配樂整條做到；音效沿用原版，重編音效已取消，不再出現在候選裡。
+  await expect(page.getByTestId("roadmap-status-arranged-audio")).toHaveText("已實裝");
   await expect(page.getByTestId("roadmap-item-arranged-audio")).toContainText("交響");
+  await expect(page.getByTestId("roadmap-item-arranged-audio")).not.toContainText("音效");
   await expect(page.getByTestId("roadmap-status-enhanced-effects")).toHaveCount(0);
 
   await expect(page.getByTestId("roadmap-qq-group")).toContainText("1107513111");

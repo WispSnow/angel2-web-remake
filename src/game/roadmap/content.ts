@@ -49,13 +49,13 @@ export const ROADMAP_CONTENT: Readonly<Record<RoadmapTab, readonly RoadmapItem[]
         + "「音效開關」面板隨時切換，預設關閉。",
     },
     {
-      // REMAKE-181、185～187。音效與環境音仍是原版。
+      // REMAKE-181、185～187。音效一律沿用原版：用戶於 2026-11-20 取消音效重編，這裡不再列。
       id: "arranged-audio",
       label: "音樂",
-      title: "重編音樂與音效包",
-      status: "partial",
-      description: "「交響」音樂風格已可使用：全部 36 首原曲各有一首交響改編，在開場方框或「音樂開關」面板與原版音軌"
-        + "自由切換。環境氛圍音與招式打擊音效的重編仍在規劃中，目前一律使用原版音效。",
+      title: "交響改編音樂",
+      status: "shipped",
+      description: "在開場方框或「音樂開關」面板選擇「交響」音樂風格：全部 36 首原曲各有一首交響改編，"
+        + "可隨時與原版音軌切換，預設仍為原版。",
     },
     {
       id: "enhanced-effects",
