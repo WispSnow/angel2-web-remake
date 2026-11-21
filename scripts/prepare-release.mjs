@@ -269,11 +269,11 @@ if (await pathExists(storyHdManifestPath)) {
     }
   }
 }
-// `REMAKE-203`: HD map-technique clips follow the same rule (fetched only when the player picks 高清).
+// `REMAKE-203`/`REMAKE-204`: HD map-technique clips follow the same rule (fetched only when the player picks 高清).
 const mapActionHdManifestPath = path.join(releaseDirectory, "assets/original/map-actions/hd/hd-manifest.json");
 if (await pathExists(mapActionHdManifestPath)) {
   const mapActionHdManifest = JSON.parse(await readFile(mapActionHdManifestPath, "utf8"));
-  for (const entry of mapActionHdManifest.actions) {
+  for (const entry of mapActionHdManifest.clips) {
     const released = await readFile(path.join(releaseDirectory, "assets/original", entry.output));
     if (createHash("sha256").update(released).digest("hex") !== entry.sha256) {
       throw new Error(`release HD map action differs from its manifest: ${entry.output}`);

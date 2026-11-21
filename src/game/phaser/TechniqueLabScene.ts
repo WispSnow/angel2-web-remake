@@ -45,7 +45,7 @@ import {
 import type { StompPresentationStep } from "../stomp-presentation";
 import { renderPrayerPresentation } from "./PrayerRenderer";
 import { MapActionHdLayer } from "./map-action-hd-layer";
-import { mapActionHdEntry } from "../content/map-action-hd";
+import { mapActionHdCastTimeline, mapActionHdVisibleAt } from "../content/map-action-hd";
 import { mapActionHdFailed, markMapActionHdFailed } from "../map-action-hd";
 import type { PortraitStyle } from "../preferences";
 import type { PrayerOutcomeKind } from "../simulation/actions/types";
@@ -119,12 +119,15 @@ export type TechniqueLabVisualFrame =
     readonly unitId: string;
   }
   /**
-   * `timeMs`：連續的時間軸位置，高清特效（`REMAKE-203`）據此在原版逐幀節點之間連續地動；`rate` 是時間軸
-   * 相對原速的播放倍率，暫停時為 0。
+   * `timeMs`：連續的時間軸位置，高清特效（`REMAKE-203`、`REMAKE-204`）據此在原版逐幀節點之間連續地動；
+   * `rate` 是時間軸相對原速的播放倍率，暫停時為 0。`heal-blank` 是 `1H` 的空白清除幀，`hd-afterglow`
+   * 是原版已結束、高清餘韻還在播的那段（只在高清時出現）。
    */
   | { readonly kind: "fire"; readonly frame: number; readonly timeMs: number; readonly rate: number }
-  | { readonly kind: "heal-primary"; readonly frame: number }
-  | { readonly kind: "heal-tail"; readonly frame: number }
+  | { readonly kind: "heal-primary"; readonly frame: number; readonly timeMs: number; readonly rate: number }
+  | { readonly kind: "heal-blank"; readonly timeMs: number; readonly rate: number }
+  | { readonly kind: "heal-tail"; readonly frame: number; readonly timeMs: number; readonly rate: number }
+  | { readonly kind: "hd-afterglow"; readonly timeMs: number; readonly rate: number }
   | { readonly kind: "recovery"; readonly frame: number }
   | {
     readonly kind: "status";
@@ -145,8 +148,15 @@ export interface TechniqueLabSceneHandle {
   readonly game: Phaser.Game;
   setVisualFrame(frame: TechniqueLabVisualFrame): void;
   setFrozenUnitIds(unitIds: readonly string[]): void;
-  /** 實驗室自己的「美術風格」：高清時有高清版的技術（`REMAKE-203`）改畫高清特效，其餘照畫原版。 */
+  /** 實驗室自己的「美術風格」：高清時有高清版的技術（`REMAKE-203`、`REMAKE-204`）改畫高清特效，其餘照畫原版。 */
   setArtStyle(style: PortraitStyle): void;
+}
+
+/** 實驗室動作代碼對到有高清版的動作（`1F`→`fire-1`、`2H`→`heal-2`）；其餘沒有。 */
+export function techniqueLabHdActionId(actionCode: string): string | undefined {
+  const match = /^([1-4])([FH])$/u.exec(actionCode);
+  if (!match) return undefined;
+  return `${match[2] === "F" ? "fire" : "heal"}-${match[1]}`;
 }
 
 export function startTechniqueLabPhaser(
@@ -224,31 +234,44 @@ export function startTechniqueLabPhaser(
       for (const object of this.unitObjects) {
         (object as Phaser.GameObjects.Image).setVisible(true);
       }
-      const hdEntry = frame.kind === "fire" && artStyle === "hd" && this.state
-        ? mapActionHdEntry(`fire-${this.state.actionCode.charAt(0)}`)
+      const hdActionId = "timeMs" in frame && artStyle === "hd" && this.state
+        ? techniqueLabHdActionId(this.state.actionCode)
         : undefined;
-      if (hdEntry) this.mapActionHd?.prepare([hdEntry]);
-      const hdReady = hdEntry && !mapActionHdFailed(hdEntry.actionId) && this.mapActionHd?.ready(hdEntry.actionId);
-      if (!hdReady) this.mapActionHd?.setShow(undefined);
+      const hdTimeline = hdActionId ? mapActionHdCastTimeline(hdActionId) : undefined;
+      const hdClips = hdTimeline?.segments.map(({ clip }) => clip) ?? [];
+      this.mapActionHd?.prepare(hdClips);
+      const hdReady = hdClips.length > 0
+        && hdClips.every(({ clipId }) => !mapActionHdFailed(clipId) && this.mapActionHd?.ready(clipId));
+      if (!hdReady) this.mapActionHd?.setShows([]);
       if (!this.state || frame.kind === "none") {
         this.updateCanvasDataset(frame, 0);
         return;
       }
       const center = session.effectCenter();
       if (!center) {
-        this.mapActionHd?.setShow(undefined);
+        this.mapActionHd?.setShows([]);
         this.updateCanvasDataset(frame, 0);
         return;
       }
-      if (frame.kind === "fire" && hdEntry && hdReady) {
-        const timeMs = frame.timeMs;
-        this.mapActionHd?.setShow({
-          entry: hdEntry,
-          tick: () => timeMs / 10,
-          target: () => ({ x: center.x * TILE_WIDTH + TILE_WIDTH / 2, y: (center.y + 1) * TILE_HEIGHT }),
-          rate: frame.rate,
-          playing: frame.rate > 0,
-        });
+      if ("timeMs" in frame && hdTimeline && hdReady) {
+        // every clip visible at this point of the timeline (an afterglow overlaps the next clip's start)
+        const rate = frame.rate;
+        const camera = this.cameras.main;
+        this.mapActionHd?.setShows(mapActionHdVisibleAt(hdTimeline, frame.timeMs / 10).map(({ clip, tick }) => ({
+          clip,
+          tick: () => tick,
+          // the HD canvas covers the lab viewport, not the scrolled world: take the camera scroll off
+          target: () => ({
+            x: center.x * TILE_WIDTH + TILE_WIDTH / 2 - camera.scrollX,
+            y: (center.y + 1) * TILE_HEIGHT - camera.scrollY,
+          }),
+          rate,
+          playing: rate > 0,
+        })));
+        this.updateCanvasDataset(frame, 0);
+        return;
+      }
+      if (frame.kind === "heal-blank" || frame.kind === "hd-afterglow") {
         this.updateCanvasDataset(frame, 0);
         return;
       }
@@ -319,13 +342,14 @@ export function startTechniqueLabPhaser(
           ).setOrigin(0).setDepth(8));
         });
       } else if (frame.kind === "heal-primary" || frame.kind === "heal-tail") {
+        // one-tile descriptors at offset (0,0), drawn from the cell's top-left like the battle scene
         this.effectObjects.push(addMapActionImageFromSource(this,
-          center.x * TILE_WIDTH + TILE_WIDTH / 2,
-          center.y * TILE_HEIGHT + TILE_HEIGHT,
+          center.x * TILE_WIDTH,
+          center.y * TILE_HEIGHT,
           frame.kind === "heal-primary"
             ? STAGE0_ACTION_PRESENTATION_ASSETS.heal1.primary[frame.frame]
             : STAGE0_ACTION_PRESENTATION_ASSETS.heal1.tail[frame.frame],
-        ).setOrigin(.5, 1).setDepth(8));
+        ).setOrigin(0).setDepth(8));
       } else if (frame.kind === "recovery") {
         const recovery = this.state.actionCode === "3I"
           ? STAGE1_ACTION_PRESENTATION.recovery3

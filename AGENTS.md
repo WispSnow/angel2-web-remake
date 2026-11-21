@@ -258,11 +258,13 @@ pnpm exec playwright install ffmpeg
   只播一次的视频，长度至少是该段停留时间（`max(等待, 打字)`，旁白更长时取旁白），生成器按尾声计时与旁白时长核对，工作台 `tools/epilogue.py`；
   旁白变长就要重出视频。清单第 6 版另带高清「The end」（`REMAKE-201`，`the-end-hd.ts`）：製作人員表后 `UN/54` 第 0 幀里 320×200
   插图的一段无缝循环，原版四帧手臂动作也演在里面，手写字与爱心照原版像素；第 0 幀与四帧叠加图一变就拒绝生成，工作台 `tools/the_end.py`。
-- 可选高清地图技术特效（`REMAKE-203`，跟随「美術風格　高清」）的 `map-action-hd.generated.ts` 由
+- 可选高清地图技术特效（`REMAKE-203` 火系、`REMAKE-204` 治疗与休息，跟随「美術風格　高清」）的 `map-action-hd.generated.ts` 由
   `scripts/generate-map-action-hd.mjs` 从素材包 `map-actions/hd/hd-manifest.json` 生成（`pnpm content:map-action-hd`，
-  从 git 忽略的工作台导入用 `-- --import tmp/fx-hd/export-pack`，工作台见 `tmp/fx-hd/tools/`）。每个动作一段堆叠视频，
-  每 native tick 一帧；原版图集一变、时长或帧起点与原版时间线不符就拒绝生成。高清特效只换表现：控制器照原版逐帧
-  emit 与等待，高清画布层只在每帧的原版时段内连续前进，一次施法在第 0 帧决定走高清或原版。
+  从 git 忽略的工作台导入用 `-- --import tmp/fx-hd/export-pack`，工作台见 `tmp/fx-hd/tools/`）。每段片段一支堆叠视频，
+  每 native tick 一帧，原版时间线之后可带余韵（`afterglowTicks`）；原版图集一变、时长或帧起点与原版时间线不符就拒绝生成。
+  动作的哪个表现阶段由哪段片段画写在 `src/game/content/map-action-hd.ts` 的分段表（三档治疗与休息共用收尾片段）。
+  高清特效只换表现：控制器照原版逐帧 emit 与等待，高清画布层在每帧的原版时段内连续前进，余韵在控制器离开后由画布层
+  自己播完、不让控制器多等；一次施法在第一帧决定走高清或原版。
 - `src/game/content/character-catalog.generated.ts` 由 `scripts/generate-character-catalog.mjs`
   生成，来源是原版角色描述子表、关卡模板、胜负条件表、逐关事件处理器与对白语料；修改证据后
   运行 `pnpm content:characters`。角色出场关卡必须同时合并静态模板、名单候选、事件生成与对白

@@ -3504,7 +3504,7 @@ export class GameController {
       this.restPresentation = { unit, phase, frame, nativeTicks };
       this.restPresentationTrace.push({ unit, phase, frame, nativeTicks });
       this.emit();
-      await pause(this.testMode ? 120 : this.mapCombatDelay(nativeTicks));
+      await pause(this.restFrameDelay(nativeTicks));
     };
 
     // Native player and AI rest both enter 1000:5D12: MAGIC/0 tile codes
@@ -4803,6 +4803,11 @@ export class GameController {
   /** 控制器為一幀地圖表現等待的毫秒數（`REMAKE-203` 高清特效的時鐘要對齊它）。只讀，不改任何狀態。 */
   mapCombatFrameDelay(nativeTicks: number): number {
     return this.mapCombatDelay(nativeTicks);
+  }
+
+  /** 休息表現一幀等待的毫秒數（`REMAKE-204` 高清收尾的時鐘要對齊它；測試模式固定 120 ms）。只讀。 */
+  restFrameDelay(nativeTicks: number): number {
+    return this.testMode ? 120 : this.mapCombatDelay(nativeTicks);
   }
 
   private mapCombatDelay(nativeTicks: number): number {

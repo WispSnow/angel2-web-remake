@@ -134,6 +134,9 @@ test("individual player rest reuses the silent MAGIC/0 healing finish", async ({
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-map-combat-phase", "restEffect");
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-map-combat-target", allyBefore.id);
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-map-combat-effect-tile-count", "1");
+  // `DS:60E0`'s one-tile descriptors start at the resting unit's cell top-left.
+  await expect(page.getByTestId("battle-canvas"))
+    .toHaveAttribute("data-map-combat-effect-top-lefts", `${allyBefore.x * 40},${allyBefore.y * 44}`);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-player-rest-effect.png",
   });
@@ -380,6 +383,7 @@ test("M00.6 sister technique menu preserves nested cancel and both native timeli
   await page.keyboard.press("Alt");
   await expect.poll(async () => (await state(page)).actionMode).toBe("techniqueMenu");
   await page.getByTestId("technique-heal-1").click();
+  const healFrames = await recordCanvasFrames(page, [...MAP_COMBAT_FRAME_KEYS, "mapCombatEffectTopLefts"]);
   await clickMapCell(page, 300, 177);
 
   await page.waitForFunction(() => {
@@ -398,6 +402,16 @@ test("M00.6 sister technique menu preserves nested cancel and both native timeli
       && current.specialActionPresentation === undefined;
   });
   const afterHeal = await state(page);
+  // `UN/61` and the shared `MAGIC/0` finish are one-tile descriptors at (0,0): every tile starts at the
+  // target cell's top-left. Bottom-centring dragged the finish's smaller early sparkles down and right.
+  const healTiles = (await healFrames.stop()).filter(({ mapCombatPhase }) =>
+    mapCombatPhase === "healPrimary" || mapCombatPhase === "healTail");
+  expect(healTiles.filter(({ mapCombatPhase }) => mapCombatPhase === "healTail")
+    .map(({ mapCombatFrame }) => mapCombatFrame)).toEqual(["0", "1", "2", "3", "4"]);
+  for (const tile of healTiles) {
+    expect(tile.mapCombatEffectTopLefts, `${tile.mapCombatPhase} ${tile.mapCombatFrame}`)
+      .toBe(`${allyBefore.x * 40},${allyBefore.y * 44}`);
+  }
   expect(afterHeal.specialActionPresentationTrace.filter(({ phase }) => phase === "healPrimary"))
     .toHaveLength(39);
   expect(afterHeal.specialActionPresentationTrace.filter(({ phase }) => phase === "healTail"))
@@ -652,6 +666,8 @@ for (const [classId, nativeRecord, voiceRecord] of [
 
 const DISPLAY_KEY = "angel2.preferences.display.v1";
 const FIRE_1_HD = "/assets/original/map-actions/hd/fire-1/hd.mp4";
+const HEAL_1_HD = "/assets/original/map-actions/hd/heal-1/hd.mp4";
+const HEAL_TAIL_HD = "/assets/original/map-actions/hd/heal-tail/hd.mp4";
 const useHdArtStyle = (page: Page) => page.addInitScript(([key, value]) => localStorage.setItem(key, value), [
   DISPLAY_KEY,
   JSON.stringify({ imageScaling: "sharp", interfaceZoom: 100, portraitStyle: "hd" }),
@@ -660,6 +676,7 @@ const useHdArtStyle = (page: Page) => page.addInitScript(([key, value]) => local
 declare global {
   interface Window {
     __mapActionHdTicks?: number[];
+    __mapActionHdShows?: string[];
   }
 }
 
@@ -674,6 +691,25 @@ const recordHdTicks = (page: Page) => page.evaluate(() => {
     if (tick !== undefined) ticks.push(Number(tick));
   }).observe(canvas, { attributes: true, attributeFilter: ["data-map-action-hd-tick"] });
 });
+
+/** Every set of clips the HD canvas draws (`clip:tick;clip:tick`), in order, including afterglows after the cast. */
+const recordHdShows = (page: Page) => page.evaluate(() => {
+  const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=map-action-hd-canvas]");
+  if (!canvas) throw new Error("the HD map-action canvas is not mounted");
+  const shows: string[] = [];
+  window.__mapActionHdShows = shows;
+  new MutationObserver(() => {
+    const value = canvas.dataset.mapActionHdShows;
+    if (value) shows.push(value);
+  }).observe(canvas, { attributes: true, attributeFilter: ["data-map-action-hd-shows"] });
+});
+
+const hdVideosReady = (page: Page, sources: readonly string[]) => page.evaluate((wanted) => wanted.every((source) =>
+  [...document.querySelectorAll("video")].some((video) => video.dataset.sourceUrl === source && video.readyState >= 2)), sources);
+
+/** Ticks the HD canvas drew for one clip, from the recorded show sets. */
+const recordedClipTicks = async (page: Page, clipId: string): Promise<number[]> => (await page.evaluate(() => window.__mapActionHdShows ?? []))
+  .flatMap((set) => set.split(";").filter((entry) => entry.startsWith(`${clipId}:`)).map((entry) => Number(entry.split(":")[1])));
 
 const castSisterFire = async (page: Page) => {
   await openActorMenu(page);
@@ -750,6 +786,112 @@ test("REMAKE-203: in 高清 the sister's 1F plays the HD clip on its own canvas 
   expect(after.units.find(({ id }) => id === enemyBefore.id)?.life).toBe(enemyBefore.life - after.lastSpecialAction!.damage);
 });
 
+test("REMAKE-204: in 高清 the sister's 1H plays the heart and the shared finish as HD clips; the finish fades out after the controller moves on", async ({ page }) => {
+  await useHdArtStyle(page);
+  // `slowMap` keeps the native 10 ms per tick under ?test=1, so the clips play at their real speed.
+  await page.goto("/?test=1&skipStartup=1&slowMap=1");
+  await forceSetup(page, "sister");
+  const before = await state(page);
+  const allyBefore = before.units.find(({ id }) => id === "1:1")!;
+  await expect.poll(() => hdVideosReady(page, [HEAL_1_HD, HEAL_TAIL_HD]), { timeout: 15_000 }).toBe(true);
+  await recordHdShows(page);
+  const hdCanvas = page.getByTestId("map-action-hd-canvas");
+  const audit = process.env.VISUAL_AUDIT === "1";
+  if (audit) {
+    // hold the program clock while the blue ring pulses out of the heart (HD tick 130), as the 1F audit does
+    await page.evaluate(async () => {
+      const clock = await import("/src/game/program-clock.ts");
+      const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=map-action-hd-canvas]")!;
+      const observer = new MutationObserver(() => {
+        if (canvas.dataset.mapActionHdAction !== "heal-1" || Number(canvas.dataset.mapActionHdTick ?? -1) < 130) return;
+        observer.disconnect();
+        clock.setProgramPaused(true);
+        document.documentElement.dataset.hdHeld = "true";
+      });
+      observer.observe(canvas, { attributes: true, attributeFilter: ["data-map-action-hd-tick"] });
+    });
+  }
+  const capture = audit ? (async () => {
+    await page.waitForFunction(() => document.documentElement.dataset.hdHeld === "true", null, { timeout: 15_000 });
+    const overlay = await page.addStyleTag({ content: ".program-pause-overlay { display: none !important; }" });
+    await page.waitForTimeout(200);
+    await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-sister-heal-hd.png" });
+    await overlay.evaluate((element) => element.remove());
+    await page.evaluate(async () => (await import("/src/game/program-clock.ts")).setProgramPaused(false));
+  })() : Promise.resolve();
+
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-heal-1").click();
+  const recorded = await recordCanvasFrames(page, [...MAP_COMBAT_FRAME_KEYS, "mapActionHd", "mapActionHdFrameTicks"]);
+  await clickMapCell(page, 300, 177);
+  await capture;
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState;
+    return current.lastSpecialAction?.actionId === "heal-1" && current.specialActionPresentation === undefined;
+  });
+  // the controller has moved on: the finish's afterglow is still on the HD canvas, past the original 75 ticks
+  await expect(hdCanvas).toHaveAttribute("data-map-action-hd-action", "heal-tail");
+  await expect(hdCanvas).not.toHaveAttribute("data-map-action-hd-action", /./u, { timeout: 5_000 });
+
+  const frames = (await recorded.stop()).filter(({ mapCombatPhase }) =>
+    mapCombatPhase === "healPrimary" || mapCombatPhase === "healBlank" || mapCombatPhase === "healTail");
+  // 39 heart frames, the blank cleanup and the five finish frames, all drawn by the HD layer, no original tile
+  expect(frames.map(({ mapCombatPhase }) => mapCombatPhase)).toEqual([
+    ...Array<string>(39).fill("healPrimary"), "healBlank", ...Array<string>(5).fill("healTail"),
+  ]);
+  for (const frame of frames) {
+    expect(frame.mapActionHd, `${frame.mapCombatPhase} ${frame.mapCombatFrame}`).toBe("hd");
+    expect(frame.mapCombatEffectTileCount, `${frame.mapCombatPhase} ${frame.mapCombatFrame}`).toBe("0");
+  }
+  expect(frames[39]?.mapActionHdFrameTicks).toBe("195,200");
+  expect(frames.slice(40).map(({ mapActionHdFrameTicks }) => mapActionHdFrameTicks))
+    .toEqual(["0,15", "15,30", "30,45", "45,60", "60,75"]);
+  const heart = await recordedClipTicks(page, "heal-1");
+  const finish = await recordedClipTicks(page, "heal-tail");
+  expect(Math.max(...heart)).toBeLessThan(200);
+  expect(finish.every((tick, index) => index === 0 || tick >= finish[index - 1])).toBe(true);
+  expect(Math.max(...finish)).toBeGreaterThan(90);
+  expect(Math.max(...finish)).toBeLessThan(120);
+
+  // the afterglow never held the controller: the original timeline, sound and healing are unchanged
+  const after = await state(page);
+  expect(after.specialActionPresentationTrace.filter(({ phase }) => phase === "healTail").map(({ nativeTicks }) => nativeTicks))
+    .toEqual([15, 15, 15, 15, 15]);
+  expect(after.audioCueLog).toContainEqual(expect.objectContaining({ group: "e", record: 36, reason: "heal-1-start" }));
+  expect(after.units.find(({ id }) => id === allyBefore.id)?.life).toBe(allyBefore.life + after.lastSpecialAction!.healing);
+});
+
+test("REMAKE-204: in 高清 resting plays the shared finish clip and lets its afterglow fade after the rest", async ({ page }) => {
+  await useHdArtStyle(page);
+  await page.goto("/?test=1&skipStartup=1");
+  await waitForGameReady(page);
+  await page.evaluate(() => window.__ANGEL2__?.forceRestSetup());
+  await expect.poll(() => hdVideosReady(page, [HEAL_TAIL_HD]), { timeout: 15_000 }).toBe(true);
+  await recordHdShows(page);
+  const recorded = await recordCanvasFrames(page, [...MAP_COMBAT_FRAME_KEYS, "mapActionHd", "mapActionHdFrameTicks"]);
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-rest").click();
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState | undefined;
+    return current?.round === 2 && !current.restPresentation;
+  });
+  const frames = (await recorded.stop()).filter(({ mapCombatPhase }) => mapCombatPhase === "restEffect");
+  expect(frames.map(({ mapCombatFrame }) => mapCombatFrame)).toEqual(["0", "1", "2", "3", "4"]);
+  for (const frame of frames) {
+    expect(frame.mapActionHd, `restEffect ${frame.mapCombatFrame}`).toBe("hd");
+    expect(frame.mapCombatEffectTileCount, `restEffect ${frame.mapCombatFrame}`).toBe("0");
+  }
+  expect(frames.map(({ mapActionHdFrameTicks }) => mapActionHdFrameTicks)).toEqual(["0,15", "15,30", "30,45", "45,60", "60,75"]);
+  await expect.poll(async () => Math.max(...await recordedClipTicks(page, "heal-tail")), { timeout: 5_000 }).toBeGreaterThan(90);
+  await expect(page.getByTestId("map-action-hd-canvas")).not.toHaveAttribute("data-map-action-hd-action", /./u, { timeout: 5_000 });
+  // resting stays silent and keeps its original timing
+  const after = await state(page);
+  expect(after.restPresentationTrace.map(({ phase, nativeTicks }) => `${phase}:${nativeTicks}`))
+    .toEqual([...Array<string>(5).fill("restEffect:15"), "restBlank:15"]);
+  expect(after.audioCueLog).not.toContainEqual(expect.objectContaining({ group: "e", record: 36 }));
+});
+
 test("REMAKE-203: a 1F HD clip that cannot be decoded falls back to the original frames for the whole cast", async ({ page }) => {
   await useHdArtStyle(page);
   // the clip's bytes arrive, but the video element is handed something it cannot decode
@@ -768,7 +910,7 @@ test("REMAKE-203: a 1F HD clip that cannot be decoded falls back to the original
   });
   await page.goto("/?test=1&skipStartup=1");
   await forceSetup(page, "sister");
-  await expect.poll(() => warnings.some((text) => text.includes("HD map action fire-1 falls back to the original"))).toBe(true);
+  await expect.poll(() => warnings.some((text) => text.includes("HD map action clip fire-1 falls back to the original"))).toBe(true);
   const fire = await castSisterFire(page);
   expect(fire.map(({ mapCombatFrame }) => mapCombatFrame)).toEqual(["0", "1", "2", "3", "4", "5", "6"]);
   for (const frame of fire) {

@@ -42,8 +42,10 @@ import {
 } from "./game/map-technique-presentation";
 import {
   startTechniqueLabPhaser,
+  techniqueLabHdActionId,
   type TechniqueLabVisualFrame,
 } from "./game/phaser/TechniqueLabScene";
+import { mapActionHdCastTimeline } from "./game/content/map-action-hd";
 import {
   TechniqueLabSession,
   type TechniqueLabNativeCode,
@@ -229,6 +231,12 @@ let lastAnimationTime = programNow();
 let lightningTimeline: readonly TimedLightningFrame[] = [];
 let stompTimeline: readonly StompPresentationStep[] = [];
 let durationMs = 0;
+/**
+ * 高清時技術在原版時間線之後還有多少餘韻（`REMAKE-204`）：時間軸延長這麼多讓餘韻播完；原版的「完成」仍在
+ * `durationMs`，規則與讀數不變。
+ */
+let afterglowMs = 0;
+const timelineEndMs = (): number => durationMs + afterglowMs;
 let phase = "main";
 let visibleFrame = 0;
 let playedAudioCues = new Set<number>();
@@ -345,7 +353,14 @@ function rebuildTimeline(): void {
   } else {
     throw new Error(`${session.state.actionCode} has no technique laboratory timeline`);
   }
-  timelineInput.max = String(durationMs);
+  const hdTimeline = artStyle === "hd" ? hdCastTimeline() : undefined;
+  afterglowMs = hdTimeline ? Math.max(0, hdTimeline.endTick - hdTimeline.durationTicks) * 10 : 0;
+  timelineInput.max = String(timelineEndMs());
+}
+
+function hdCastTimeline(): ReturnType<typeof mapActionHdCastTimeline> {
+  const actionId = techniqueLabHdActionId(session.state.actionCode);
+  return actionId ? mapActionHdCastTimeline(actionId) : undefined;
 }
 
 function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
@@ -381,16 +396,16 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
     if (currentTimeMs < primaryDuration) {
       visibleFrame = Math.floor(currentTimeMs / 50);
       phase = "heal-primary";
-      return { kind: "heal-primary", frame: visibleFrame };
+      return { kind: "heal-primary", frame: visibleFrame, timeMs: currentTimeMs, rate: playing ? speed : 0 };
     }
     if (currentTimeMs < primaryDuration + 50) {
       visibleFrame = -1;
       phase = "heal-blank";
-      return { kind: "none" };
+      return { kind: "heal-blank", timeMs: currentTimeMs, rate: playing ? speed : 0 };
     }
     visibleFrame = Math.min(4, Math.floor((currentTimeMs - primaryDuration - 50) / 150));
     phase = "heal-tail";
-    return { kind: "heal-tail", frame: visibleFrame };
+    return { kind: "heal-tail", frame: visibleFrame, timeMs: currentTimeMs, rate: playing ? speed : 0 };
   }
   if (code === "2H" || code === "3H") {
     const definition = TECHNIQUE_LAB_HEAL[code];
@@ -406,7 +421,12 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
         const tail = phaseIndex === definition.phases.length - 1;
         visibleFrame = tail ? localFrame : primaryFrameBase + localFrame;
         phase = tail ? "heal-tail" : "heal-primary";
-        return { kind: tail ? "heal-tail" : "heal-primary", frame: visibleFrame };
+        return {
+          kind: tail ? "heal-tail" : "heal-primary",
+          frame: visibleFrame,
+          timeMs: currentTimeMs,
+          rate: playing ? speed : 0,
+        };
       }
       remainingNativeTicks -= phaseDuration;
       if (phaseIndex < definition.phases.length - 1) primaryFrameBase += candidate.drawCount;
@@ -733,7 +753,9 @@ function render(): void {
   } else if (completed) {
     phase = "complete";
     visibleFrame = -1;
-    renderer.setVisualFrame({ kind: "none" });
+    renderer.setVisualFrame(timeMs < timelineEndMs()
+      ? { kind: "hd-afterglow", timeMs, rate: playing ? speed : 0 }
+      : { kind: "none" });
     renderer.setFrozenUnitIds([...frozenUnitIds]);
   } else {
     renderer.setFrozenUnitIds([...frozenUnitIds]);
@@ -763,7 +785,7 @@ function render(): void {
       ? "構築完成 · 原版即時地圖重繪"
       : "普通移動前 · 無專用技能動畫"
     : completed
-    ? "完成 · 無殘留"
+    ? timeMs < timelineEndMs() ? "完成 · 高清餘韻" : "完成 · 無殘留"
     : timeMs >= durationMs - terminalHoldMs()
       ? `${phase} · 末幀保持 ${terminalHoldMs()} ms`
     : phase === "cleanup"
@@ -772,7 +794,7 @@ function render(): void {
         ? `逐格錯相命中 · ${visibleFrame}`
       : `${phase} · ${visibleFrame}`;
   setReadout("phase", phaseLabel);
-  setReadout("time", `${Math.round(timeMs)} / ${durationMs} ms`);
+  setReadout("time", `${Math.round(timeMs)} / ${durationMs} ms${afterglowMs > 0 ? ` · 餘韻到 ${timelineEndMs()} ms` : ""}`);
   setReadout("actor", actor ? `${className(actor.classId)} · ${actor.side === 1 ? "我" : "敵"}` : "未指定");
   setReadout("target", center
     ? `${center.x}, ${center.y}${selfCentered ? " · 施法者中心" : ""}`
@@ -928,7 +950,7 @@ function restart(autoplay = true): void {
 
 function seek(nextTimeMs: number): void {
   stopAudio();
-  timeMs = Math.max(0, Math.min(durationMs, nextTimeMs));
+  timeMs = Math.max(0, Math.min(timelineEndMs(), nextTimeMs));
   if (timeMs < durationMs && session.state.actionCode.endsWith("C")) {
     iceOutcomeCleared = false;
     iceOutcomeApplied = false;
@@ -991,7 +1013,7 @@ function step(): void {
           : TECHNIQUE_LAB_ICE[
             session.state.actionCode as keyof typeof TECHNIQUE_LAB_ICE
           ].cycle.waitPerDrawNativeTicks * 10;
-  seek(Math.min(durationMs, timeMs + interval));
+  seek(Math.min(timelineEndMs(), timeMs + interval));
 }
 
 function syncClassAvailability(): void {
@@ -1020,7 +1042,7 @@ root.addEventListener("click", (event) => {
   const command = button.dataset.command;
   if (command === "restart") restart(true);
   else if (command === "play") {
-    if (timeMs >= durationMs) timeMs = 0;
+    if (timeMs >= timelineEndMs()) timeMs = 0;
     playing = true;
     lastAnimationTime = programNow();
     playAudioBetween(-1, timeMs);
@@ -1069,6 +1091,8 @@ artStyleSelect.addEventListener("change", () => {
   if (!isArtStyle(artStyleSelect.value)) return;
   artStyle = artStyleSelect.value;
   renderer.setArtStyle(artStyle);
+  rebuildTimeline();
+  timeMs = Math.min(timeMs, timelineEndMs());
   render();
 });
 
@@ -1080,9 +1104,9 @@ function animate(): void {
     // frame's RAF timestamp. Never let that older timestamp move the semantic
     // animation clock below zero or into an invalid generated frame.
     const elapsedMs = Math.max(0, now - lastAnimationTime);
-    timeMs = Math.min(durationMs, timeMs + elapsedMs * speed);
+    timeMs = Math.min(timelineEndMs(), timeMs + elapsedMs * speed);
     playAudioBetween(previous, timeMs);
-    if (timeMs >= durationMs) playing = false;
+    if (timeMs >= timelineEndMs()) playing = false;
     render();
   }
   lastAnimationTime = now;
@@ -1126,6 +1150,8 @@ window.__ANGEL2_TECHNIQUE_LAB__ = {
     artStyle = style;
     artStyleSelect.value = style;
     renderer.setArtStyle(style);
+    rebuildTimeline();
+    timeMs = Math.min(timeMs, timelineEndMs());
     render();
   },
   setActionCode: (code) => {

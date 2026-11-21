@@ -42,9 +42,15 @@ import {
   BATTLE_VIEWPORT_LEFT,
   BATTLE_VIEWPORT_TOP,
 } from "../scaling-constants";
-import { mapActionHdEntries, type MapActionHdEntry } from "../content/map-action-hd";
 import {
-  activeMapActionHd,
+  mapActionHdActionIds,
+  mapActionHdClipFrame,
+  mapActionHdSegmentFor,
+  type MapActionHdClip,
+} from "../content/map-action-hd";
+import {
+  activeMapActionHdCast,
+  mapActionHdCastFailed,
   mapActionHdFailed,
   mapActionHdFrameSpan,
   mapActionHdTick,
@@ -293,13 +299,16 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private cursorGraphics!: Phaser.GameObjects.Graphics;
     private rangeMaskTiles: Phaser.GameObjects.TileSprite[] = [];
     private combatEffects: Phaser.GameObjects.GameObject[] = [];
-    /** `REMAKE-203` 高清技術特效的畫布層與目前這次施法（第 0 幀決定走高清或原版，整次施法不改）。 */
+    /**
+     * 高清技術特效（`REMAKE-203`、`REMAKE-204`）的畫布層與目前這次施法或休息（第一幀決定走高清或原版，
+     * 整次不改）。`key` 是這次施法的結果物件（休息是休息的單位），`emit` 是目前這一幀（階段＋幀號）。
+     */
     private mapActionHd: MapActionHdLayer | undefined;
     private mapActionHdCast: {
-      result: object;
-      entry: MapActionHdEntry | undefined;
+      key: object;
+      hd: boolean;
       reason: string;
-      frame: number;
+      emit: string;
       clock: MapActionHdFrameClock | undefined;
     } | undefined;
     private turnTransitionEffects: Phaser.GameObjects.Image[] = [];
@@ -1304,60 +1313,74 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     }
 
     /**
-     * `REMAKE-203`：這一幀技術特效是否交給高清畫布層畫。一次施法在第 0 幀決定（偏好、條目、資源租約、
-     * 視訊是否已解碼），之後整次施法照同一個決定；只有視訊中途失敗才從下一幀起改畫原版。
+     * 這一幀技術特效（`REMAKE-203` 火系、`REMAKE-204` 治療與休息）是否交給高清畫布層畫。一次施法或休息在
+     * 第一幀決定（偏好、分段片段、資源租約、視訊是否已解碼），之後整次照同一個決定；只有視訊中途失敗才從
+     * 下一幀起改畫原版。片段最後一幀帶餘韻時，控制器離開後由畫布層自己播完（不擋控制器）。
      */
     private syncMapActionHd(): boolean {
       const layer = this.mapActionHd;
       if (!layer) return false;
-      const special = controller.specialActionPresentation;
       const canvas = this.game.canvas;
       if (portraitStyle() === "hd") {
-        layer.prepare(mapActionHdEntries().filter((entry) => activeMapActionHd(entry.actionId)));
+        layer.prepare(mapActionHdActionIds().flatMap((actionId) => activeMapActionHdCast(actionId)?.clips ?? []));
       }
-      if (!special || special.phase !== "fireEffect") {
+      const special = controller.specialActionPresentation;
+      const rest = controller.restPresentation;
+      const context = special && mapActionHdSegmentFor(special.result.actionId, special.phase)
+        ? {
+          key: special.result as object, actionId: special.result.actionId, phase: special.phase as string,
+          frame: special.frame, center: special.center, delayMs: () => controller.mapCombatFrameDelay(special.nativeTicks),
+        }
+        : !special && rest && mapActionHdSegmentFor("rest", rest.phase)
+          ? {
+            key: rest.unit as object, actionId: "rest", phase: rest.phase as string, frame: rest.frame,
+            center: { x: rest.unit.x, y: rest.unit.y }, delayMs: () => controller.restFrameDelay(rest.nativeTicks),
+          }
+          : undefined;
+      if (!context) {
         this.mapActionHdCast = undefined;
-        layer.setShow(undefined);
+        layer.setShow(undefined);   // an afterglow on the last clip keeps playing by itself
         if (controller.isTestMode) delete canvas.dataset.mapActionHd;
         return false;
       }
-      if (this.mapActionHdCast?.result !== special.result) {
-        const actionId = special.result.actionId;
-        const entry = activeMapActionHd(actionId);
+      if (this.mapActionHdCast?.key !== context.key) {
+        const cast = activeMapActionHdCast(context.actionId);
         const reason = portraitStyle() !== "hd" ? "style"
-          : !entry ? (mapActionHdFailed(actionId) ? "failed" : "unavailable")
-            : layer.ready(actionId) ? "" : "not-ready";
-        this.mapActionHdCast = { result: special.result, entry: reason ? undefined : entry, reason, frame: -1, clock: undefined };
+          : mapActionHdCastFailed(context.actionId) ? "failed"
+            : !cast ? "unavailable"
+              : cast.clips.every(({ clipId }) => layer.ready(clipId)) ? "" : "not-ready";
+        this.mapActionHdCast = { key: context.key, hd: !reason, reason, emit: "", clock: undefined };
       }
       const cast = this.mapActionHdCast;
-      const entry = cast.entry;
-      const span = entry ? mapActionHdFrameSpan(entry, special.frame) : undefined;
-      if (!entry || !span || mapActionHdFailed(entry.actionId)) {
-        if (entry) cast.reason = mapActionHdFailed(entry.actionId) ? "failed" : "frame";
-        cast.entry = undefined;
+      const segment = mapActionHdSegmentFor(context.actionId, context.phase);
+      const clip: MapActionHdClip | undefined = cast.hd && segment ? activeMapActionHdCast(context.actionId)?.clips
+        .find(({ clipId }) => clipId === segment.clipId) : undefined;
+      const clipFrame = segment ? mapActionHdClipFrame(segment, context.phase, context.frame) : undefined;
+      const span = clip && clipFrame !== undefined ? mapActionHdFrameSpan(clip, clipFrame) : undefined;
+      if (!cast.hd || !clip || !span || mapActionHdFailed(clip.clipId)) {
+        if (cast.hd) cast.reason = clip && mapActionHdFailed(clip.clipId) ? "failed" : "frame";
+        cast.hd = false;
         layer.setShow(undefined);
         if (controller.isTestMode) canvas.dataset.mapActionHd = `original:${cast.reason}`;
         return false;
       }
-      if (cast.frame !== special.frame || !cast.clock) {
-        cast.frame = special.frame;
-        cast.clock = {
-          ...span,
-          delayMs: controller.mapCombatFrameDelay(special.nativeTicks),
-          emittedAt: programNow(),
-        };
+      const emit = `${context.phase}:${context.frame}`;
+      if (cast.emit !== emit || !cast.clock) {
+        cast.emit = emit;
+        cast.clock = { ...span, delayMs: context.delayMs(), emittedAt: programNow() };
       }
       const clock = cast.clock;
-      const center = special.center;
+      const center = context.center;
       const camera = this.cameras.main;
       layer.setShow({
-        entry,
+        clip,
         tick: () => mapActionHdTick(clock, programNow()),
         target: () => ({
           x: center.x * TILE_WIDTH + TILE_WIDTH / 2 - camera.scrollX,
           y: (center.y + 1) * TILE_HEIGHT - camera.scrollY,
         }),
         rate: ((clock.endTick - clock.startTick) * 10) / clock.delayMs,
+        linger: clock.limitTick !== undefined,
       });
       if (controller.isTestMode) {
         canvas.dataset.mapActionHd = "hd";
@@ -1369,7 +1392,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private drawCombatEffects(): void {
       for (const effect of this.combatEffects) effect.destroy();
       this.combatEffects = [];
-      const hdFire = this.syncMapActionHd();
+      const hdEffect = this.syncMapActionHd();
       const presentation = controller.combatPresentation;
       const special = controller.specialActionPresentation;
       const routePulse = controller.routePulsePresentation;
@@ -1495,13 +1518,16 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         return;
       }
       if (rest) {
-        if (rest.phase === "restEffect") {
+        if (rest.phase === "restEffect" && !hdEffect) {
+          // `DS:60E0` repeats the healing finish's one-tile `MAGIC/0` descriptors at offset (0,0), so the
+          // tiles start at the cell's top-left; the smaller early sparkles (24x25, 32x40, 32x38) are centred
+          // inside their own tile, and bottom-centring pushed them down and right.
           this.combatEffects.push(
             addMapActionImage(this,
-              rest.unit.x * TILE_WIDTH + TILE_WIDTH / 2,
-              rest.unit.y * TILE_HEIGHT + TILE_HEIGHT,
+              rest.unit.x * TILE_WIDTH,
+              rest.unit.y * TILE_HEIGHT,
               `map-heal-1-tail-${rest.frame}`,
-            ).setOrigin(.5, 1).setDepth(8),
+            ).setOrigin(0).setDepth(8),
           );
         }
         if (controller.isTestMode) {
@@ -1509,6 +1535,11 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           canvas.dataset.mapCombatFrame = String(rest.frame);
           canvas.dataset.mapCombatTarget = rest.unit.id;
           canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
+          canvas.dataset.mapCombatEffectTopLefts = this.combatEffects.flatMap((effect) => {
+            if (!(effect instanceof Phaser.GameObjects.Image)) return [];
+            const topLeft = effect.getTopLeft();
+            return [`${Math.round(topLeft.x)},${Math.round(topLeft.y)}`];
+          }).join(";");
           delete canvas.dataset.mapCombatLifeChangeUnit;
           delete canvas.dataset.mapCombatDisplayedLife;
           delete canvas.dataset.mapCombatStompPhase;
@@ -1579,7 +1610,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             );
           }
         }
-        else if (special.phase === "fireEffect" && special.result.actionId === "fire-1" && !hdFire) {
+        else if (special.phase === "fireEffect" && special.result.actionId === "fire-1" && !hdEffect) {
           // `MAGIC/22` is a one-tile descriptor at offset (0,0), drawn from the target cell's top-left like
           // every other descriptor (the technique lab does the same). Bottom-centring pushed the narrower
           // last frame (32x42) 4 px right and 2 px down, and frames 2-5 (40x43) 1 px down.
@@ -1591,10 +1622,21 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             ).setOrigin(0).setDepth(8),
           );
         }
-        else if (special.phase === "healPrimary" && special.result.actionId === "heal-1") {
-          texture = `map-heal-1-primary-${special.frame}`;
+        else if (((special.phase === "healPrimary" && special.result.actionId === "heal-1")
+          || special.phase === "healTail") && !hdEffect) {
+          // `UN/61` (DS:7058) and the shared `MAGIC/0` finish (DS:608A) are one-tile descriptors at offset
+          // (0,0): every tile starts at the target cell's top-left. The finish's first three sparkles are
+          // smaller tiles centred inside themselves, so bottom-centring dragged the burst down and right.
+          this.combatEffects.push(
+            addMapActionImage(this,
+              center.x * TILE_WIDTH,
+              center.y * TILE_HEIGHT,
+              special.phase === "healTail"
+                ? `map-heal-1-tail-${special.frame}`
+                : `map-heal-1-primary-${special.frame}`,
+            ).setOrigin(0).setDepth(8),
+          );
         }
-        else if (special.phase === "healTail") texture = `map-heal-1-tail-${special.frame}`;
 
         if (texture) {
           this.combatEffects.push(
@@ -1604,7 +1646,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               texture,
             ).setOrigin(.5, 1).setDepth(8),
           );
-        } else if (special.phase === "fireEffect" && !hdFire
+        } else if (special.phase === "fireEffect" && !hdEffect
           && (special.result.actionId === "fire-2" || special.result.actionId === "fire-3"
             || special.result.actionId === "fire-4")) {
           const fireId = special.result.actionId;
@@ -1640,7 +1682,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               ).setOrigin(0).setDepth(8),
             );
           });
-        } else if (special.phase === "healPrimary" && special.result.actionId === "heal-2") {
+        } else if (special.phase === "healPrimary" && special.result.actionId === "heal-2" && !hdEffect) {
           const descriptor = presentationCatalog!.heal2.phases[0]
             .descriptorSequence[special.frame];
           descriptor?.low7BitFrameIndices.forEach((sourceFrame, index) => {
@@ -1655,7 +1697,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               ).setOrigin(0).setDepth(8),
             );
           });
-        } else if (special.phase === "healPrimary" && special.result.actionId === "heal-3") {
+        } else if (special.phase === "healPrimary" && special.result.actionId === "heal-3" && !hdEffect) {
           let phaseFrame = special.frame;
           const phase = presentationCatalog!.heal3.phases.slice(0, -1).find((candidate) => {
             if (phaseFrame < candidate.descriptorSequence.length) return true;

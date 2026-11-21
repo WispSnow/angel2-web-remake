@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 
-// REMAKE-203 optional HD map-technique effects. The asset pack's map-actions/hd/hd-manifest.json is the source of
-// truth; this script turns it into src/game/content/map-action-hd.generated.ts after checking every file:
+// Optional HD map-technique effects (REMAKE-203 fire, REMAKE-204 heal and rest). The asset pack's
+// map-actions/hd/hd-manifest.json is the source of truth; this script turns it into
+// src/game/content/map-action-hd.generated.ts after checking every file:
 //
-// - every entry is a map action with an original graphics timeline here (TECHNIQUE_LAB_FIRE for 1F-4F), and no action
-//   appears twice;
-// - the original atlas (map-action-atlases/<action>.png + .json) each entry was made from still hashes the same, so a
+// - every entry is a clip with an original graphics timeline here (TECHNIQUE_LAB_FIRE for 1F-4F, the parsed 1H
+//   presentation for heal-1, TECHNIQUE_LAB_HEAL for 2H/3H and the shared MAGIC/0 finish, which rest repeats), and no
+//   clip appears twice;
+// - the original atlas (map-action-atlases/<atlas>.png + .json) each clip was made from still hashes the same, so a
 //   later change to the original frames forces the HD version to be reviewed;
 // - the timing contract: durationTicks equals the original timeline, frameStartTicks are the original frames' start
-//   ticks, and the video holds exactly one frame per native tick (100 fps);
+//   ticks, and the video holds exactly one frame per native tick (100 fps) for the original timeline plus the clip's
+//   afterglow (REMAKE-204: the effect may fade out past the original's last frame instead of vanishing);
 // - every MP4 matches its hash, holds one video track and no audio, has moov before mdat, and its size fits the
 //   stacked layout (colour at 0,0 and 1 - alpha at alphaX,alphaY, not overlapping); no stray file ships under
 //   map-actions/hd/.
@@ -28,36 +31,68 @@ const hdRoot = path.join(assetRoot, "map-actions/hd");
 const manifestPath = path.join(hdRoot, "hd-manifest.json");
 const generatedModule = path.join(root, "src/game/content/map-action-hd.generated.ts");
 const FORMAT = "ANGEL2 HD map actions";
-const VERSION = 1;
+const VERSION = 2;
 const FPS = 100;
 const SCALE = 4;
-/** Map actions whose original timeline this script can check, with their technique code. */
-const TIMELINE_CODES = { "fire-1": "1F", "fire-2": "2F", "fire-3": "3F", "fire-4": "4F" };
+/** Longest afterglow a clip may carry past the original timeline (native ticks). */
+const MAX_AFTERGLOW = 100;
+/** Clips drawn from another action's atlas (the shared healing finish lives in the 1H atlas). */
+const ATLAS = { "heal-tail": "heal-1" };
 
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
 const fail = (message) => {
   throw new Error(`map action HD catalog: ${message}`);
 };
 
-const { TECHNIQUE_LAB_FIRE } = (await runnerImport(path.join(root, "src/game/content/technique-lab.generated.ts"),
-  { root, logLevel: "silent" })).module;
+const load = async (file) => (await runnerImport(path.join(root, file), { root, logLevel: "silent" })).module;
+const { TECHNIQUE_LAB_FIRE, TECHNIQUE_LAB_HEAL } = await load("src/game/content/technique-lab.generated.ts");
+const { STAGE0_ACTION_PRESENTATION_ASSETS, STAGE0_REST_PRESENTATION } = await load("src/game/content/stage0-actions.generated.ts");
+const techniqueEvidence = JSON.parse(await readFile(path.join(root, "reverse/parsed/native/technique-presentations.json"), "utf8"));
+
+/** Draw counts and waits of each clip's original phases, in the order the controller emits them. */
+function originalPhases(clipId) {
+  const fire = { "fire-1": "1F", "fire-2": "2F", "fire-3": "3F", "fire-4": "4F" }[clipId];
+  if (fire) {
+    return TECHNIQUE_LAB_FIRE[fire].phases.map((phase) => ({ draws: phase.descriptorSequence.length, wait: phase.waitPerDrawNativeTicks }));
+  }
+  if (clipId === "heal-1") {
+    // `UN/61` tile codes 1..39 and a blank tile 0, one draw every 5 ticks; the controller draws the 39 atlas frames
+    // and then its blank cleanup frame
+    const primary = techniqueEvidence.presentations.heal.actions.find(({ code }) => code === "1H").phases[0];
+    if (primary.drawCount !== STAGE0_ACTION_PRESENTATION_ASSETS.heal1.primary.length + 1) fail("1H draw count disagrees with its atlas");
+    return [{ draws: primary.drawCount, wait: primary.waitPerDrawNativeTicks }];
+  }
+  if (clipId === "heal-tail") {
+    // the MAGIC/0 finish every heal ends with; rest (`DS:60E0`) draws the same five descriptors at the same pace
+    const finish = TECHNIQUE_LAB_HEAL["2H"].phases.at(-1);
+    if (finish.resource !== "MAGIC/0" || STAGE0_REST_PRESENTATION.frameCount !== finish.drawCount
+      || STAGE0_REST_PRESENTATION.waitPerFrameNativeTicks !== finish.waitPerDrawNativeTicks) {
+      fail("the healing finish and rest no longer share one timeline");
+    }
+    return [{ draws: finish.drawCount, wait: finish.waitPerDrawNativeTicks }];
+  }
+  const heal = { "heal-2": "2H", "heal-3": "3H" }[clipId];
+  if (heal) {
+    return TECHNIQUE_LAB_HEAL[heal].phases.slice(0, -1).map((phase) => ({ draws: phase.drawCount, wait: phase.waitPerDrawNativeTicks }));
+  }
+  return fail(`${clipId} has no original timeline to check`);
+}
 
 /** Start tick of every original frame, in the order the controller emits them, and the timeline's total. */
-function originalTimeline(actionId) {
-  const code = TIMELINE_CODES[actionId] ?? fail(`${actionId} has no original timeline to check`);
+function originalTimeline(clipId) {
   const starts = [];
   let tick = 0;
-  for (const phase of TECHNIQUE_LAB_FIRE[code].phases) {
-    for (let index = 0; index < phase.descriptorSequence.length; index += 1) {
+  for (const { draws, wait } of originalPhases(clipId)) {
+    for (let index = 0; index < draws; index += 1) {
       starts.push(tick);
-      tick += phase.waitPerDrawNativeTicks;
+      tick += wait;
     }
   }
   return { starts, duration: tick };
 }
 
-async function originalAtlasSha256(actionId) {
-  const base = path.join(assetRoot, "map-action-atlases", actionId);
+async function originalAtlasSha256(clipId) {
+  const base = path.join(assetRoot, "map-action-atlases", ATLAS[clipId] ?? clipId);
   return sha256(Buffer.concat([await readFile(`${base}.png`), await readFile(`${base}.json`)]));
 }
 
@@ -108,15 +143,15 @@ function mp4Tracks(buffer) {
 
 async function importWorkbench(workbench) {
   const exported = JSON.parse(await readFile(path.join(workbench, "manifest.json"), "utf8"));
-  if (exported.format !== "angel2-map-action-hd-export" || exported.version !== 1) fail("unexpected workbench export format");
+  if (exported.format !== "angel2-map-action-hd-export" || exported.version !== 2) fail("unexpected workbench export format");
   await rm(hdRoot, { recursive: true, force: true });
-  const actions = [];
-  for (const entry of exported.actions) {
-    await mkdir(path.join(hdRoot, entry.actionId), { recursive: true });
-    await copyFile(path.join(workbench, entry.file), path.join(hdRoot, entry.actionId, "hd.mp4"));
-    actions.push({
-      actionId: entry.actionId,
-      output: `map-actions/hd/${entry.actionId}/hd.mp4`,
+  const clips = [];
+  for (const entry of exported.clips) {
+    await mkdir(path.join(hdRoot, entry.clipId), { recursive: true });
+    await copyFile(path.join(workbench, entry.file), path.join(hdRoot, entry.clipId, "hd.mp4"));
+    clips.push({
+      clipId: entry.clipId,
+      output: `map-actions/hd/${entry.clipId}/hd.mp4`,
       bytes: entry.bytes,
       sha256: entry.sha256,
       width: entry.width,
@@ -131,17 +166,19 @@ async function importWorkbench(workbench) {
       alphaX: entry.alphaX,
       alphaY: entry.alphaY,
       durationTicks: entry.durationTicks,
+      afterglowTicks: entry.afterglowTicks,
       frameStartTicks: entry.frameStartTicks,
-      originalAtlasSha256: await originalAtlasSha256(entry.actionId),
+      originalAtlasSha256: await originalAtlasSha256(entry.clipId),
     });
   }
   const manifest = {
     format: FORMAT,
     version: VERSION,
-    decision: "REMAKE-203",
-    video: "H.264 yuv420p CRF 14, 100 fps (one frame per native tick), faststart, no audio; stacked colour x alpha and "
-      + "1 - alpha halves with an 8 px gap, side by side when the frame is taller than wide",
-    actions,
+    decisions: ["REMAKE-203", "REMAKE-204"],
+    video: "H.264 yuv420p CRF 14, 100 fps (one frame per native tick, the original timeline plus the afterglow), "
+      + "faststart, no audio; stacked colour x alpha and 1 - alpha halves with an 8 px gap, side by side when the frame "
+      + "is taller than wide",
+    clips,
   };
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   return manifest;
@@ -151,8 +188,8 @@ async function validate(manifest) {
   if (manifest.format !== FORMAT || manifest.version !== VERSION) fail("unexpected manifest format");
   const seen = new Set();
   const expectedFiles = new Set(["hd-manifest.json"]);
-  for (const entry of manifest.actions) {
-    const label = entry.actionId;
+  for (const entry of manifest.clips) {
+    const label = entry.clipId;
     if (seen.has(label)) fail(`${label} appears twice`);
     seen.add(label);
     const timeline = originalTimeline(label);
@@ -163,7 +200,12 @@ async function validate(manifest) {
     if (JSON.stringify(entry.frameStartTicks) !== JSON.stringify(timeline.starts)) {
       fail(`${label} frame start ticks differ from the original timeline`);
     }
-    if (entry.fps !== FPS || entry.frames !== entry.durationTicks) fail(`${label} must hold one frame per native tick at ${FPS} fps`);
+    if (!Number.isInteger(entry.afterglowTicks) || entry.afterglowTicks < 0 || entry.afterglowTicks > MAX_AFTERGLOW) {
+      fail(`${label} afterglow must be 0..${MAX_AFTERGLOW} native ticks`);
+    }
+    if (entry.fps !== FPS || entry.frames !== entry.durationTicks + entry.afterglowTicks) {
+      fail(`${label} must hold one frame per native tick at ${FPS} fps for its timeline and afterglow`);
+    }
     if (entry.scale !== SCALE) fail(`${label} scale must be ${SCALE}`);
     if (entry.originX < 0 || entry.originX > entry.frameWidth || entry.originY < 0 || entry.originY > entry.frameHeight) {
       fail(`${label} target origin lies outside the frame`);
@@ -200,25 +242,25 @@ const manifest = importIndex >= 0
   : JSON.parse(await readFile(manifestPath, "utf8"));
 await validate(manifest);
 
-const actions = [...manifest.actions].sort((a, b) => a.actionId.localeCompare(b.actionId));
-const entries = actions.map((entry) => [
-  `  ${JSON.stringify(entry.actionId)}: {`,
-  `    actionId: ${JSON.stringify(entry.actionId)},`,
+const clips = [...manifest.clips].sort((a, b) => a.clipId.localeCompare(b.clipId));
+const entries = clips.map((entry) => [
+  `  ${JSON.stringify(entry.clipId)}: {`,
+  `    clipId: ${JSON.stringify(entry.clipId)},`,
   `    video: { source: ${JSON.stringify(`/assets/original/${entry.output}`)}, width: ${entry.width}, height: ${entry.height}, frames: ${entry.frames}, fps: ${entry.fps} },`,
   `    scale: ${entry.scale}, frameWidth: ${entry.frameWidth}, frameHeight: ${entry.frameHeight},`,
   `    originX: ${entry.originX}, originY: ${entry.originY}, alphaX: ${entry.alphaX}, alphaY: ${entry.alphaY},`,
-  `    durationTicks: ${entry.durationTicks},`,
+  `    durationTicks: ${entry.durationTicks}, afterglowTicks: ${entry.afterglowTicks},`,
   `    frameStartTicks: ${JSON.stringify(entry.frameStartTicks)},`,
   "  },",
 ].join("\n"));
 await writeFile(generatedModule, [
   "// Generated by scripts/generate-map-action-hd.mjs from map-actions/hd/hd-manifest.json; do not edit by hand.",
-  "import type { MapActionHdEntry } from \"./map-action-hd\";",
+  "import type { MapActionHdClip } from \"./map-action-hd\";",
   "",
-  "export const MAP_ACTION_HD_ENTRIES: Readonly<Record<string, MapActionHdEntry>> = {",
+  "export const MAP_ACTION_HD_CLIPS: Readonly<Record<string, MapActionHdClip>> = {",
   ...entries,
   "};",
   "",
 ].join("\n"));
-const bytes = actions.reduce((sum, entry) => sum + entry.bytes, 0);
-console.log(`map action HD catalog: ${actions.length} actions, ${(bytes / 1024 / 1024).toFixed(1)} MiB -> ${path.relative(root, generatedModule)}`);
+const bytes = clips.reduce((sum, entry) => sum + entry.bytes, 0);
+console.log(`map action HD catalog: ${clips.length} clips, ${(bytes / 1024 / 1024).toFixed(1)} MiB -> ${path.relative(root, generatedModule)}`);

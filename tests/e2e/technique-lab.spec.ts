@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { captureVisualAudit } from "./visual-audit";
 
 const labState = (page: Page) => page.evaluate(() =>
@@ -238,6 +238,22 @@ test("initial fire and healing remain available on the shared map surface", asyn
   }
 });
 
+/**
+ * Every HD clip the layer draws lands inside the lab viewport (640×484): its target point is the effect cell seen
+ * through the scrolled lab camera, not the cell's world position (which put clips off-canvas).
+ */
+async function expectHdClipsOnScreen(hd: Locator): Promise<void> {
+  const rects = (await hd.getAttribute("data-map-action-hd-rects") ?? "").split(";").filter(Boolean)
+    .map((rect) => rect.split(",").map(Number));
+  expect(rects.length).toBeGreaterThan(0);
+  for (const [x = 0, y = 0, w = 0, h = 0] of rects) {
+    expect(x + w / 2, `clip centre x of ${rects.join(" ")}`).toBeGreaterThan(0);
+    expect(x + w / 2, `clip centre x of ${rects.join(" ")}`).toBeLessThan(640);
+    expect(y + h / 2, `clip centre y of ${rects.join(" ")}`).toBeGreaterThan(0);
+    expect(y + h / 2, `clip centre y of ${rects.join(" ")}`).toBeLessThan(484);
+  }
+}
+
 test("HD art style plays 1F–4F as HD clips on the original timeline and leaves other techniques original", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -274,6 +290,7 @@ test("HD art style plays 1F–4F as HD clips on the original timeline and leaves
     await expect(canvas).toHaveAttribute("data-art-style", "hd");
     await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
     await expect(hd).toHaveAttribute("data-map-action-hd-tick", (contract.time / 10).toFixed(1));
+    await expectHdClipsOnScreen(hd);
     await expect.poll(async () => (await frame.screenshot()).equals(original)).toBe(false);
     if (contract.code === "4F") {
       await captureVisualAudit(page, { path: "artifacts/playwright/technique-lab-hd-fire-4-dragon.png", fullPage: true });
@@ -283,11 +300,71 @@ test("HD art style plays 1F–4F as HD clips on the original timeline and leaves
     await expect(hd).not.toHaveAttribute("data-map-action-hd-action", /./u);
   }
   // 沒有高清版的技能照畫原版。
-  expect(await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("1H"))).toBe(true);
+  expect(await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("1C"))).toBe(true);
   await seek(page, 200);
   await expect(canvas).toHaveAttribute("data-art-style", "hd");
   await expect(hd).not.toHaveAttribute("data-map-action-hd-action", /./u);
   expect(Number(await canvas.getAttribute("data-effect-tile-count"))).toBeGreaterThan(0);
+  expect(pageErrors).toEqual([]);
+});
+
+test("REMAKE-204: HD art style plays 1H–3H as HD clips and runs the shared finish's afterglow past the original end", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/technique-lab.html?art=hd");
+  const canvas = page.locator("#technique-lab-canvas canvas");
+  const hd = page.getByTestId("map-action-hd-canvas");
+  // original timeline lengths (ms) and where each heal's own clip hands over to the shared finish
+  const contracts = [
+    { code: "1H", clip: "heal-1", duration: 2750, finishAt: 2000 },
+    { code: "2H", clip: "heal-2", duration: 2150, finishAt: 1400 },
+    { code: "3H", clip: "heal-3", duration: 2350, finishAt: 1600 },
+  ] as const;
+  for (const contract of contracts) {
+    expect(await page.evaluate((code) => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode(code), contract.code)).toBe(true);
+    await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
+    await expect.poll(async () => {
+      await seek(page, 600);
+      return hd.getAttribute("data-map-action-hd-action");
+    }, { timeout: 15_000 }).toBe(contract.clip);
+    await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
+    await expect(hd).toHaveAttribute("data-map-action-hd-tick", "60.0");
+    await expectHdClipsOnScreen(hd);
+    // the original's end and its readouts stay where they were; the timeline only runs on for the afterglow
+    const playback = (await labState(page))?.playback;
+    expect(playback?.durationMs).toBe(contract.duration);
+    await expect(page.locator('[data-readout="time"]')).toContainText(`/ ${contract.duration} ms · 餘韻到`);
+    // the finish starts on the original beat
+    await seek(page, contract.finishAt + 50);
+    await expect(hd).toHaveAttribute("data-map-action-hd-action", "heal-tail");
+    await expect(hd).toHaveAttribute("data-map-action-hd-shows", contract.code === "1H"
+      ? "heal-tail:5.0"
+      // 2H/3H: their own clip's afterglow still overlaps the finish's first frames
+      : `${contract.clip}:${((contract.finishAt + 50) / 10).toFixed(1)};heal-tail:5.0`);
+    // past the original end: the finish keeps fading out, no original tile, and the readout says so
+    await seek(page, contract.duration + 200);
+    await expect(canvas).toHaveAttribute("data-technique-phase", "hd-afterglow");
+    await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
+    await expect(hd).toHaveAttribute("data-map-action-hd-shows", "heal-tail:95.0");
+    await expect(page.locator('[data-readout="phase"]')).toContainText("完成 · 高清餘韻");
+    if (contract.code === "2H") {
+      // the heart frame glows as it fades while the finish's first sparkle appears
+      await seek(page, contract.finishAt + 20);
+      // the HD layer draws a clip once its video has finished seeking to the frame
+      await page.waitForFunction(() => [...document.querySelectorAll<HTMLVideoElement>("video.map-action-hd-video")]
+        .filter((video) => /heal-(2|tail)/u.test(video.dataset.sourceUrl ?? ""))
+        .every((video) => !video.seeking && video.readyState >= 2));
+      await page.waitForTimeout(150);
+      await captureVisualAudit(page, { path: "artifacts/playwright/technique-lab-hd-heal-2-handover.png", fullPage: true });
+    }
+    await seek(page, Number(await page.getByTestId("technique-lab-timeline").getAttribute("max")));
+    await expect(canvas).toHaveAttribute("data-technique-phase", "none");
+    await expect(hd).not.toHaveAttribute("data-map-action-hd-action", /./u);
+  }
+  // 原版風格沒有餘韻：時間軸回到原版長度。
+  await page.getByTestId("technique-lab-art-style").selectOption("original");
+  await expect(page.locator('[data-readout="time"]')).not.toContainText("餘韻");
+  expect(Number(await page.getByTestId("technique-lab-timeline").getAttribute("max"))).toBe(2350);
   expect(pageErrors).toEqual([]);
 });
 
