@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { hostMenu, openHostMenu, openHostOverlay } from "./host-menu-helpers";
 import { captureVisualAudit } from "./visual-audit";
 
 const cursorOf = (page: Page) => page.evaluate(() =>
@@ -6,9 +7,9 @@ const cursorOf = (page: Page) => page.evaluate(() =>
 
 type NotesTab = "fixes" | "features" | "balance" | "controls" | "disclaimer";
 
-/** 宿主只有一顆入口按鈕且固定開在第一個分頁，其餘分頁要再點一次頁籤。 */
+/** 宿主選單只有一列入口且固定開在第一個分頁，其餘分頁要再點一次頁籤。 */
 const openNotes = async (page: Page, tab: NotesTab): Promise<void> => {
-  await page.getByTestId("remake-notes-open").click();
+  await openHostOverlay(page, "remake-notes");
   await expect(page.getByTestId("remake-notes-body")).toBeVisible();
   await expect(page.getByTestId("remake-notes-tab-fixes")).toHaveAttribute("aria-selected", "true");
   if (tab === "fixes") return;
@@ -16,29 +17,33 @@ const openNotes = async (page: Page, tab: NotesTab): Promise<void> => {
   await expect(page.getByTestId(`remake-notes-tab-${tab}`)).toHaveAttribute("aria-selected", "true");
 };
 
-test("三個覆蓋層入口並排在宿主工具列上，靠在縮放選項右側", async ({ page }) => {
+test("三個參考面板收在畫面右下角的選單裡，頁面上沒有畫面外的宿主列", async ({ page }) => {
   await page.goto("/");
-  const triggers = page.getByTestId("host-overlay-triggers");
-  await expect(triggers).toBeVisible();
-  // 分頁在各自覆蓋層的頁籤列，宿主這一行只保留三個表面的單一入口。
-  await expect(triggers.getByRole("button")).toHaveText(["復刻說明", "圖鑑", "RoadMap"]);
+  await expect(page.getByTestId("startup-screen")).toBeVisible();
+  await expect(page.getByTestId("host-overlay-triggers")).toHaveCount(0);
+  await expect(page.getByTestId("display-settings")).toHaveCount(0);
 
-  // 與「畫面縮放」同一條界線：原版沒有這些畫面，它們不得畫進 640×350 邏輯螢幕。
-  await expect(triggers.locator("xpath=ancestor::*[@data-testid='startup-screen']")).toHaveCount(0);
+  await openHostMenu(page);
+  // 每個面板只有一列入口；分頁在各自覆蓋層的頁籤列。
+  for (const id of ["remake-notes", "compendium", "roadmap"]) {
+    await expect(hostMenu(page).getByTestId(`host-menu-row-${id}`)).toHaveCount(1);
+  }
+  await expect(page.getByTestId("host-menu-row-remake-notes")).toContainText("復刻說明");
+  await expect(page.getByTestId("host-menu-row-compendium")).toContainText("圖鑑");
+  await expect(page.getByTestId("host-menu-row-roadmap")).toContainText("RoadMap");
 
-  const [scaling, notes] = await Promise.all([
-    page.getByTestId("image-scaling-integer").boundingBox(),
-    triggers.boundingBox(),
+  // 選單整組蓋在遊戲畫面上（1 倍畫面時完全落在 640×350 之內）。
+  const [screen, list] = await Promise.all([
+    page.getByTestId("startup-screen").boundingBox(),
+    page.getByTestId("host-menu-list").boundingBox(),
   ]);
-  expect(scaling).not.toBeNull();
-  expect(notes).not.toBeNull();
-  if (!scaling || !notes) return;
-  // 同一行、靠右：入口在縮放選項右側，且右緣貼齊該行的右端。
-  expect(notes.x).toBeGreaterThan(scaling.x + scaling.width);
-  expect(Math.abs(notes.y - scaling.y)).toBeLessThan(scaling.height);
-  const row = await page.getByTestId("display-settings").boundingBox();
-  expect(row).not.toBeNull();
-  if (row) expect(row.x + row.width - (notes.x + notes.width)).toBeLessThan(4);
+  expect(screen).not.toBeNull();
+  expect(list).not.toBeNull();
+  if (!screen || !list) return;
+  expect(list.x).toBeGreaterThanOrEqual(screen.x);
+  expect(list.y).toBeGreaterThanOrEqual(screen.y);
+  expect(list.x + list.width).toBeLessThanOrEqual(screen.x + screen.width);
+  expect(list.y + list.height).toBeLessThanOrEqual(screen.y + screen.height);
 });
 
 test("說明文件可在繁簡中文間切換，三個覆蓋層共用並記住選擇", async ({ page }) => {
@@ -63,7 +68,8 @@ test("說明文件可在繁簡中文間切換，三個覆蓋層共用並記住�
   await expect(notes.locator(".rn-foot")).toContainText("不会误触战场指令");
 
   await page.keyboard.press("Escape");
-  await page.getByTestId("compendium-open").click();
+  await expect(page.getByTestId("host-menu-row-remake-notes")).toBeFocused();
+  await page.getByTestId("host-menu-row-compendium").click();
   const compendium = page.getByTestId("compendium");
   await expect(compendium).toHaveAttribute("lang", "zh-Hans");
   await expect(page.getByTestId("compendium-tabs").getByRole("tab"))
@@ -84,7 +90,7 @@ test("說明文件可在繁簡中文間切換，三個覆蓋層共用並記住�
     .toBeVisible();
 
   await page.getByTestId("compendium-close").click();
-  await page.getByTestId("roadmap-open").click();
+  await page.getByTestId("host-menu-row-roadmap").click();
   const roadmap = page.getByTestId("roadmap");
   await expect(roadmap).toHaveAttribute("lang", "zh-Hans");
   await expect(page.getByTestId("roadmap-tabs").getByRole("tab"))
@@ -97,7 +103,7 @@ test("說明文件可在繁簡中文間切換，三個覆蓋層共用並記住�
 
   // 刷新後仍沿用本机偏好；切回繁體則立即還原同一頁，不重設目前分頁。
   await page.reload();
-  await page.getByTestId("roadmap-open").click();
+  await openHostOverlay(page, "roadmap");
   await expect(page.getByTestId("roadmap-tab-presentation")).toHaveText("画面与声音");
   await page.getByTestId("roadmap-language-traditional").click();
   await expect(page.getByTestId("roadmap-tab-presentation")).toHaveText("畫面與聲音");
@@ -115,6 +121,7 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
     "存檔語義",
     "原子提交",
     "宿主工具列",
+    "宿主選單",
     "處理器",
     "渲染器",
     "戰鬥動畫實驗室",
@@ -128,7 +135,7 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
       + "戰鬥動畫、音效與加速等設置僅影響視聽演出，不改變實際數值與結算規則。",
   );
   await expect(page.locator(".rn-foot")).toHaveText(
-    "打開本說明不會暫停遊戲進程；視窗內的按鍵操作僅供查閱，不會誤觸戰場指令。",
+    "遊戲在選單打開期間保持暫停；關閉本說明會回到選單，視窗內的按鍵不會誤觸戰場指令。",
   );
   for (const term of playerFacingDevTerms) await expect(body).not.toContainText(term);
   const poisonFix = page.getByTestId("remake-note-REMAKE-004");
@@ -230,10 +237,10 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
 
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("remake-notes-body")).toBeHidden();
-  await expect(page.getByTestId("remake-notes-open")).toBeFocused();
+  await expect(page.getByTestId("host-menu-row-remake-notes")).toBeFocused();
 
   // 入口固定開在第一個分頁，不記住上次停在哪一頁。
-  await page.getByTestId("remake-notes-open").click();
+  await page.getByTestId("host-menu-row-remake-notes").click();
   await expect(page.getByTestId("remake-notes-tab-fixes")).toHaveAttribute("aria-selected", "true");
 });
 
@@ -590,7 +597,7 @@ test("操作說明在窄螢幕收為單欄且分頁列可橫向捲動", async ({
   });
 });
 
-test("面板打開時鍵盤不會操作戰場，敵方階段照常跑完", async ({ page }) => {
+test("面板打開時鍵盤不會操作戰場，遊戲停在原處直到玩家回到遊戲", async ({ page }) => {
   await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await expect(page.locator("#bottom-round-text")).toHaveText("第 1 回合");
@@ -610,12 +617,14 @@ test("面板打開時鍵盤不會操作戰場，敵方階段照常跑完", async
   await expect(page.getByTestId("objective-panel")).toBeHidden();
   await expect(page.getByTestId("group-command-menu")).toBeHidden();
 
-  // 說明視窗不暫停模擬：關掉之後戰場停在原處，玩家繼續打同一個回合。
+  // 說明視窗從暫停選單打開：關掉回到選單，遊戲仍停著；回到遊戲後玩家繼續打同一個回合。
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("remake-notes-body")).toBeHidden();
-  await expect(page.getByTestId("remake-notes-open")).toBeFocused();
-  // 焦點刻意留在入口按鈕上，所以要先移開再用鍵盤操作戰場。
-  await page.getByTestId("remake-notes-open").blur();
+  await expect(page.getByTestId("host-menu-row-remake-notes")).toBeFocused();
+  await expect(page.locator("html")).toHaveAttribute("data-program-paused", "true");
+  await page.keyboard.press("Escape");
+  await expect(hostMenu(page)).toBeHidden();
+  expect(await cursorOf(page)).toEqual(before);
 
   await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
@@ -628,8 +637,13 @@ test("面板打開時鍵盤不會操作戰場，敵方階段照常跑完", async
       (window.__ANGEL2__?.getState() as { groupCommandDialogueId?: string }).groupCommandDialogueId);
   }).toBeUndefined();
 
-  // 全部休息即交出本回合，敵方階段在面板打開時繼續推進到下一個回合。
+  // 全部休息即交出本回合；面板開著時敵方階段停在原處，回到遊戲後才推進到下一個回合。
   await openNotes(page, "fixes");
+  const roundWhilePaused = await page.locator("#bottom-round-text").textContent();
+  await page.waitForTimeout(1500);
+  await expect(page.locator("#bottom-round-text")).toHaveText(roundWhilePaused ?? "");
+  await expect(page.locator("html")).toHaveAttribute("data-program-paused", "true");
+  await page.keyboard.press("p");
+  await expect(page.getByTestId("remake-notes-body")).toBeHidden();
   await expect(page.locator("#bottom-round-text")).toHaveText("第 2 回合", { timeout: 45_000 });
-  await expect(page.getByTestId("remake-notes-body")).toBeVisible();
 });

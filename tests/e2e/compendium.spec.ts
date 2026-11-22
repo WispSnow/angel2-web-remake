@@ -1,11 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openHostMenu, openHostOverlay } from "./host-menu-helpers";
 import { captureVisualAudit } from "./visual-audit";
 
 type CompendiumTab = "classes" | "characters";
 
-/** 入口固定開在職業圖鑑，角色圖鑑要再點一次頁籤。 */
+/** 選單入口固定開在職業圖鑑，角色圖鑑要再點一次頁籤。 */
 const openCompendium = async (page: Page, tab: CompendiumTab): Promise<void> => {
-  await page.getByTestId("compendium-open").click();
+  await openHostOverlay(page, "compendium");
   await expect(page.getByTestId("compendium-body")).toBeVisible();
   await expect(page.getByTestId("compendium-tab-classes")).toHaveAttribute("aria-selected", "true");
   if (tab === "classes") return;
@@ -13,7 +14,7 @@ const openCompendium = async (page: Page, tab: CompendiumTab): Promise<void> => 
   await expect(page.getByTestId(`compendium-tab-${tab}`)).toHaveAttribute("aria-selected", "true");
 };
 
-test("圖鑑有兩個分頁，Esc 關閉並交還焦點給自己的入口", async ({ page }) => {
+test("圖鑑有兩個分頁，Esc 關閉並交還焦點給選單裡自己的入口", async ({ page }) => {
   await page.goto("/");
   await openCompendium(page, "classes");
   await expect(page.getByTestId("compendium-tabs").getByRole("tab"))
@@ -22,9 +23,9 @@ test("圖鑑有兩個分頁，Esc 關閉並交還焦點給自己的入口", asyn
 
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("compendium-body")).toBeHidden();
-  await expect(page.getByTestId("compendium-open")).toBeFocused();
+  await expect(page.getByTestId("host-menu-row-compendium")).toBeFocused();
 
-  await page.getByTestId("compendium-open").click();
+  await page.getByTestId("host-menu-row-compendium").click();
   await expect(page.getByTestId("compendium-tab-classes")).toHaveAttribute("aria-selected", "true");
 });
 
@@ -172,7 +173,7 @@ test("職業圖鑑：默认静态站立，棋子与全景共用阵营且四种�
 
   // 关闭后重新进入职业图鉴，总是回到静态站立默认页。
   await page.getByTestId("compendium-close").click();
-  await page.getByTestId("compendium-open").click();
+  await page.getByTestId("host-menu-row-compendium").click();
   await expect(page.getByTestId("compendium-animation-stand"))
     .toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("compendium-combat-stage")).toHaveAttribute("data-static", "true");
@@ -282,8 +283,9 @@ test("圖鑑入口在面板還沒載入完成前標成忙碌", async ({ page }) 
   });
 
   await page.goto("/?test=1&debugScenario=stage-00-player");
-  const trigger = page.getByTestId("compendium-open");
-  await expect(trigger).toBeVisible();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await openHostMenu(page);
+  const trigger = page.getByTestId("host-menu-row-compendium");
   await trigger.click();
   await expect(trigger).toHaveAttribute("aria-busy", "true");
   await expect(page.getByTestId("compendium-body")).toHaveCount(0);

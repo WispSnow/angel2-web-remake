@@ -1,11 +1,12 @@
 # 当前开发状态
 
-更新日期：2026-11-20
+更新日期：2026-11-22
 
 ## 状态摘要
 
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
+| 右下角宿主选单取代画面下方工具列 | `implemented` | 用户于 2026-11-22 要求页面只显示游戏画面：画面下方的宿主工具列（畫面縮放、暫停、原版Debug、復刻說明、圖鑑、RoadMap）收进逻辑画面右下角小图标呼出的宿主选单，图标平时 30% 不透明，悬浮／聚焦／选单打开时完整显示。打开选单即暂停，选单画在暂停层上，独立「暫停」按钮取消；三个参考面板只从选单打开，打开期间游戏保持暂停，`Esc` 逐层返回、`P`／`Pause` 直接恢复。外框借用原版系统选单与勝利條件面板素材，文字用现代字体；桌面整数倍窗口不再为工具列预留高度。设计见 [`07-ui-ux-and-presentation.md`](../design/remake-gdd/07-ui-ux-and-presentation.md) 与 [`systems/program-pause.md`](../design/remake-gdd/systems/program-pause.md)；验收为定向 Playwright 与截图 |
 | 音效现代化：取消 | `implemented` | 用户于 2026-11-20 取消音效现代化，音效一律沿用原版。当天试了两条路线，都被否决：Sonniss 素材库剪辑替换（第 0 关 13 条、67 个候选，「和原版差异太大」）；原版高清化（修削波、降 8-bit 底噪、补泛音，以及在 `ubuntu-ws` 上用 AudioSR 超分）。游戏内「RoadMap」的「重編音樂與音效包」改为「交響改編音樂」并标「已實裝」，正文不再提音效；07 文档 `[DD]` 与 `planning/ROADMAP.md` 同步；`roadmap.spec.ts` 改断言徽章为已實裝且面板不含「音效」。试做没有进入运行时或素材包：git 忽略的工作台 `tmp/sfx-modern/`、服务器 `~/Work/SfxHD` 与下载的 AudioSR 权重均已清除。 |
 | 高清治疗特效与特效余韵（`REMAKE-204`） | `done` | 用户 2026-11-21 要求继续做特效：治疗 `1H–3H` 与休息接入高清（三档治疗与休息共用一段收尾片段），并撤销「高清总长与原版严格一致」：片段可带余韵（收尾 45 tick 化成金色微光散去，`2H`、`3H` 的爱心与收尾开头重叠），余韵由高清层自己播完、不让控制器多等。同时修正 `MAGIC/0` 收尾（含休息）的帧位置（改为与原版一样从目标格左上角画），以及实验室高清特效没扣镜头卷动、一直画在画布外的错误（`REMAKE-203` 起）。单元、`stage0-actions.spec.ts`、`technique-lab.spec.ts` 相关用例通过；素材包待推送、未提交。做法与评审见 [`modern-effects-proposal.md`](audits/modern-effects-proposal.md) 第 10 节。 |
 | 高清地图技术特效（`REMAKE-203`） | `done` | 用户 2026-11-20 要求把原版逐帧特效现代化；第一条路线（代码逐像素重画）评审后否决、代码已移除。改为保留原版逐帧、AI 重绘关键帧并以视频模型补间（工作台 `tmp/fx-hd/`，git 忽略），火系 `1F–4F` 评审通过后接入游戏：跟随「美術風格　高清」，控制器照原版逐帧 emit 与等待，高清视频画在盖住战场视口的 WebGL 疊层上、每帧在原版时段内连续前进，一次施法在第 0 帧决定走高清或原版；素材包 `map-actions/hd/`（3.7 MiB，`pnpm content:map-action-hd` 生成并校验），资源门只在高清下带上本关职业施放得出的技术视频；技能实验室改为自己的「美術風格」。同时修正正式战场 `1F` 帧位置（改为与原版一样从目标格左上角画）。单元、`stage0-actions.spec.ts`、`technique-lab.spec.ts`、`remake-notes.spec.ts` 通过，截图人工查看；素材包待推送、未提交。其余特效族照画原版。做法与评审见 [`modern-effects-proposal.md`](audits/modern-effects-proposal.md)。 |

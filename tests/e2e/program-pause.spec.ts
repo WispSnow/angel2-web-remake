@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { hostMenu } from "./host-menu-helpers";
 import { captureVisualAudit } from "./visual-audit";
 
 interface PauseBattleState {
@@ -41,13 +42,15 @@ test("the host pause freezes Phaser, audio and battle input until an explicit re
   await expect(canvas).toBeVisible();
   const before = await battleState(page);
 
-  // Pointer-down also unlocks Web Audio, then the click establishes the pause.
-  await page.getByTestId("program-pause-toggle").click();
+  // Pointer-down also unlocks Web Audio, then the click on the corner menu
+  // establishes the pause: opening the host menu is the pause.
+  await page.getByTestId("host-menu-trigger").click();
   const overlay = page.getByTestId("program-pause-overlay");
   await expect(overlay).toBeVisible();
+  await expect(hostMenu(page)).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-program-paused", "true");
   await expect(canvas).toHaveAttribute("data-program-paused", "true");
-  await expect(page.getByTestId("program-pause-resume")).toBeFocused();
+  await expect(page.getByTestId("host-menu-row-resume")).toBeFocused();
   await expect.poll(() => page.locator("#app").getAttribute("data-sound-effect-context"))
     .toBe("suspended");
 
@@ -55,12 +58,16 @@ test("the host pause freezes Phaser, audio and battle input until an explicit re
   await page.keyboard.press("g");
   await page.waitForTimeout(150);
   expect(await battleState(page)).toEqual(before);
+  // 點一下壓暗的畫面也只是回到遊戲的選項之一；這裡先確認點在選單外框上不會漏到戰場。
+  await page.getByTestId("host-menu-description").click();
+  await expect(overlay).toBeVisible();
+  expect(await battleState(page)).toEqual(before);
   await captureVisualAudit(page, {
     path: "artifacts/playwright/program-pause-desktop.png",
     animations: "allow",
   });
 
-  await page.getByTestId("program-pause-resume").click();
+  await page.getByTestId("host-menu-row-resume").click();
   await expect(overlay).toBeHidden();
   await expect(canvas).toHaveAttribute("data-program-paused", "false");
   await expect.poll(() => page.locator("#app").getAttribute("data-sound-effect-context"))
@@ -73,8 +80,45 @@ test("the host pause freezes Phaser, audio and battle input until an explicit re
   // The keyboard-only path is available on laptops without a physical Pause key.
   await page.keyboard.press("p");
   await expect(overlay).toBeVisible();
+  await expect(hostMenu(page)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(overlay).toBeHidden();
+
+  // 點選單外壓暗的地方回到遊戲，這一下不會落到底下的戰場。
+  await page.keyboard.press("p");
+  await expect(overlay).toBeVisible();
+  await page.mouse.click(4, 4);
+  await expect(overlay).toBeHidden();
+  expect((await battleState(page)).actionMode).toBe(before.actionMode);
+});
+
+test("the reference panels opened from the menu keep the game paused until the player resumes", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  const canvas = page.getByTestId("battle-canvas");
+  await expect(canvas).toBeVisible();
+  await page.getByTestId("host-menu-trigger").click();
+  const row = page.getByTestId("host-menu-row-roadmap");
+  await row.click();
+  const panel = page.getByTestId("roadmap");
+  await expect(panel).toBeVisible();
+  await expect(canvas).toHaveAttribute("data-program-paused", "true");
+  // 面板蓋在暫停層之上，而且仍可操作。
+  await page.getByTestId("roadmap-tab-story").click();
+  await expect(page.getByTestId("roadmap-tab-story")).toHaveAttribute("aria-selected", "true");
+
+  // 面板內的 Esc 回到選單，遊戲仍停著。
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+  await expect(row).toBeFocused();
+  await expect(canvas).toHaveAttribute("data-program-paused", "true");
+
+  // 面板開著時按 P 直接回到遊戲，面板一併收起。
+  await row.click();
+  await expect(panel).toBeVisible();
+  await page.keyboard.press("p");
+  await expect(panel).toBeHidden();
+  await expect(hostMenu(page)).toBeHidden();
+  await expect(canvas).toHaveAttribute("data-program-paused", "false");
 });
 
 test("dialogue typing and portrait presentation retain their exact pause point", async ({ page }) => {

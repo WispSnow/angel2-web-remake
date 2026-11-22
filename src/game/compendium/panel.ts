@@ -146,7 +146,7 @@ const panel = createOverlayPanel<CompendiumTab>({
   testid: "compendium",
   eyebrow: "圖鑑",
   heading: "《天使帝國 II》Web 復刻版",
-  footer: "遊戲在後台正常運行；本視窗僅供查閱圖鑑資料，不會影響戰局進程、存檔或隨機序列。",
+  footer: "遊戲在選單打開期間保持暫停；本視窗僅供查閱圖鑑資料，不會影響戰局進程、存檔或隨機序列。",
   tabs: COMPENDIUM_TABS,
   render: renderTab,
   onBodyRendered: (body, tab) => {

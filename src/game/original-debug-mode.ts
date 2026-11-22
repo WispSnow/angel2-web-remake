@@ -13,7 +13,7 @@ import {
  * `REMAKE-174` 原版Debug模式的宿主開關與熱鍵對照。
  *
  * 原版（模組 29）要在戰鬥中按住數字鍵盤 1+3+5、依序按 S、W、F 才打開 DS:`132F`，而且只到
- * 本場戰鬥結束；用戶決定複刻只用工具列開關開啟，並按瀏覽器保存。開關和畫面縮放同屬宿主
+ * 本場戰鬥結束；用戶決定複刻只用宿主選單的開關開啟，並按瀏覽器保存。開關和畫面縮放同屬宿主
  * 偏好：它不進模擬狀態、PRNG、規則身份或存檔，只決定下面的熱鍵是否生效。
  */
 
@@ -180,113 +180,35 @@ export function isOriginalDebugFunctionKey(event: Pick<DebugKeyEvent, "code">): 
 }
 
 /** 這個鍵盤或指標事件之後，Caps Lock 算不算開著（Caps Lock 鍵本身的事件先於追蹤器更新）。 */
-function capsLockAfter(event: KeyboardEvent | PointerEvent): boolean {
+export function capsLockStateAfter(event: KeyboardEvent | PointerEvent): boolean {
   if (event instanceof KeyboardEvent && (event.key === "CapsLock" || event.code === "CapsLock")) {
     return event.type === "keydown" || event.getModifierState("CapsLock");
   }
   return capsLockEngaged(event);
 }
 
-const CAPS_LOCK_ON_TITLE = "Caps Lock 已開啟（按鈕外緣亮綠）：在我方待機、選格或轉職選擇時按熱鍵即可使用原版Debug。";
-const CAPS_LOCK_OFF_TITLE = "Caps Lock 未開啟：熱鍵會照平常的意思執行。"
-  + "macOS 的拼音輸入法短按 Caps Lock 只切換中英文，不會開啟 Caps Lock："
-  + "請長按到鍵盤指示燈亮起，或先切換到 ABC 輸入法。";
+/**
+ * 宿主選單說明框裡「原版Debug」的狀態句。熱鍵要 Caps Lock 開著才生效，而瀏覽器看到的狀態
+ * 不一定與鍵盤燈一致（輸入法可能吃掉這個鍵），所以寫的是遊戲實際讀到的狀態。
+ */
+export const ORIGINAL_DEBUG_OFF_TEXT = "原版內建的除錯熱鍵；開啟後回到戰場，打開 Caps Lock 即可使用。";
+export const ORIGINAL_DEBUG_CAPS_LOCK_ON_TEXT = "Caps Lock 已開啟（指示燈亮綠）：回到戰場，在我方待機、選格或轉職選擇時按熱鍵。";
+export const ORIGINAL_DEBUG_CAPS_LOCK_OFF_TEXT =
+  "Caps Lock 未開啟，熱鍵照平常的意思執行（macOS 拼音輸入法請長按 Caps Lock 到指示燈亮起）。";
 
-export const ORIGINAL_DEBUG_HOTKEY_SUMMARY =
-  "開啟後在戰場打開 Caps Lock 使用：F1 行為、F2 單位編輯、F3 敵方生命、F4 我方生命、"
-  + "F5／F6 技術測試、F10 全員再行動、U／D 經驗 ±50、－ 生命 −10、S 台詞、1 範圍讀數（按住）、"
-  + "2 格號、J 即時勝利、＊ 直達結局、M 音樂盒";
-
-/** 宿主工具列上的「原版Debug」開關；按鍵一律停在這裡，不得漏到戰場。 */
-export function mountOriginalDebugModeToggle(host: HTMLElement): () => void {
-  const group = document.createElement("div");
-  group.className = "original-debug-trigger";
-  // 提示用自繪 DOM 而不用 `title`：原生提示由系統畫、字級固定，不隨頁面縮放。
-  group.innerHTML = `<button type="button" data-testid="original-debug-toggle"
-    aria-describedby="original-debug-tip">原版Debug</button>
-    <div class="original-debug-tip" id="original-debug-tip" data-testid="original-debug-tip"
-      role="tooltip" hidden><p></p><p></p></div>`;
-  const button = group.querySelector<HTMLButtonElement>("button");
-  const tip = group.querySelector<HTMLElement>(".original-debug-tip");
-  const tipLines = group.querySelectorAll<HTMLElement>(".original-debug-tip p");
-  if (!button || !tip || tipLines.length !== 2) return () => undefined;
-  // 熱鍵要 Caps Lock 開著才生效，而瀏覽器看到的狀態不一定與鍵盤燈一致（輸入法可能吃掉這個鍵），
-  // 所以開關開著時把遊戲實際讀到的狀態畫在按鈕自己的外緣（`data-caps-engaged`）並寫進懸浮提示。
-  // 不另放標籤：工具列一行放不下時按鈕會折成兩行。
-  let capsLockOn = false;
-  const renderLamp = () => {
-    const enabled = originalDebugModeEnabled();
-    button.dataset.capsEngaged = String(enabled && capsLockOn);
-    tipLines[0].textContent = enabled
-      ? (capsLockOn ? CAPS_LOCK_ON_TITLE : CAPS_LOCK_OFF_TITLE)
-      : "原版Debug模式。";
-    tipLines[1].textContent = ORIGINAL_DEBUG_HOTKEY_SUMMARY;
-    if (!tip.hidden) placeTip();
-  };
-  // 固定定位、右緣對齊按鈕，再夾進視窗：工具列在頁面底部，窄視窗時提示不能溢出左右邊界。
-  const placeTip = () => {
-    const anchor = button.getBoundingClientRect();
-    const margin = 8;
-    const width = tip.offsetWidth;
-    const left = Math.min(Math.max(margin, anchor.right - width), window.innerWidth - width - margin);
-    tip.style.left = `${Math.max(margin, left)}px`;
-    tip.style.bottom = `${window.innerHeight - anchor.top + 6}px`;
-  };
-  const showTip = () => {
-    tip.hidden = false;
-    placeTip();
-  };
-  // 指標點擊會把焦點還給遊戲（見 click），失焦不能把游標仍停在按鈕上的提示收掉；
-  // 反過來指標離開也不收鍵盤聚焦中的提示。
-  const hideTipUnlessHeld = () => {
-    if (button.matches(":hover") || button.matches(":focus-visible")) return;
-    tip.hidden = true;
-  };
-  const observe = (event: KeyboardEvent | PointerEvent) => {
-    const next = capsLockAfter(event);
-    if (next === capsLockOn) return;
-    capsLockOn = next;
-    renderLamp();
-  };
-  const listeners = new AbortController();
-  for (const type of ["keydown", "keyup"] as const) {
-    window.addEventListener(type, observe, { capture: true, signal: listeners.signal });
-  }
-  for (const type of ["pointermove", "pointerdown"] as const) {
-    window.addEventListener(type, observe, { capture: true, passive: true, signal: listeners.signal });
-  }
-  window.addEventListener("blur", () => {
-    capsLockOn = false;
-    renderLamp();
-  }, { signal: listeners.signal });
-  const render = (enabled: boolean) => {
-    button.setAttribute("aria-pressed", String(enabled));
-    button.classList.toggle("is-selected", enabled);
-    renderLamp();
-  };
-  const click = (event: MouseEvent) => {
-    setOriginalDebugModeEnabled(!originalDebugModeEnabled());
-    // 工具列會攔下自己收到的按鍵。指標點完若焦點還留在這裡，緊接著的 Caps Lock 熱鍵就被
-    // 吃掉，看起來像開關沒生效；所以指標點擊（`detail > 0`）把焦點還給遊戲，鍵盤啟用則照常
-    // 保留焦點。
-    if (event.detail > 0) button.blur();
-  };
-  button.addEventListener("click", click);
-  button.addEventListener("pointerenter", showTip);
-  button.addEventListener("pointerleave", hideTipUnlessHeld);
-  button.addEventListener("focus", showTip);
-  button.addEventListener("blur", hideTipUnlessHeld);
-  group.addEventListener("keydown", (event) => {
-    event.stopPropagation();
-    if (event.key === "Escape") tip.hidden = true;
-  });
-  host.append(group);
-  const unsubscribe = onOriginalDebugModeChange(render);
-  render(originalDebugModeEnabled());
-  return () => {
-    unsubscribe();
-    listeners.abort();
-    button.removeEventListener("click", click);
-    group.remove();
-  };
-}
+/** 熱鍵對照，一律寫全；說明框用較小的字逐項排，每一項不從中間斷行。 */
+export const ORIGINAL_DEBUG_HOTKEYS: readonly string[] = [
+  "F1 行為",
+  "F2 單位編輯",
+  "F3／F4 敵我生命",
+  "F5／F6 技術測試",
+  "F10 全員再行動",
+  "U／D 經驗 ±50",
+  "－ 生命 −10",
+  "S 台詞",
+  "1 範圍讀數（按住）",
+  "2 格號",
+  "J 即時勝利",
+  "＊ 直達結局",
+  "M 音樂盒",
+];

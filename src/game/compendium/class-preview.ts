@@ -12,8 +12,13 @@ import {
 import { emptyUnitStatuses } from "../simulation/status";
 import type { AttackResult, BattleUnit, Side, UnitClassId } from "../types";
 import { renderCombat, type CombatPresentationRenderSource } from "../ui";
-import { programNow } from "../program-clock";
 import type { ClassPreviewSelection } from "./class-view";
+
+/**
+ * 圖鑑只能從宿主選單打開，而打開選單就暫停了遊戲；預覽若跟著程式時鐘走會一直停在
+ * 第一格。圖鑑是宿主參考表面，不屬於遊戲時間，所以用瀏覽器時鐘。
+ */
+const previewNow = (): number => performance.now();
 
 export interface ClassPreviewController {
   destroy(): void;
@@ -128,7 +133,7 @@ export function mountClassPreview(
     unitStats: classStatsFor,
   };
   let currentTime = startAt;
-  let previousFrameTime = programNow();
+  let previousFrameTime = previewNow();
   let replayAt: number | undefined;
   let animationFrame = 0;
   let destroyed = false;
@@ -191,7 +196,7 @@ export function mountClassPreview(
 
   const tick = (): void => {
     if (destroyed) return;
-    const now = programNow();
+    const now = previewNow();
     const elapsed = Math.min(100, now - previousFrameTime);
     previousFrameTime = now;
     if (replayAt !== undefined) {

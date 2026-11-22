@@ -1,8 +1,6 @@
-import { applyDesktopInterfaceZoom, isTauriDesktopRuntime } from "./desktop-runtime";
-import { mountHostChromeRadioGroup } from "./host-chrome-radio";
+import { applyDesktopInterfaceZoom } from "./desktop-runtime";
 import {
   DEFAULT_DISPLAY_PREFERENCES,
-  isInterfaceZoom,
   loadDisplayPreferences,
   saveDisplayPreferences,
   type InterfaceZoom,
@@ -10,7 +8,7 @@ import {
 
 /**
  * 桌面版的「介面縮放」。遊戲畫面在桌面版會等比放大填滿視窗（`scaling.ts` 只有在 Tauri
- * 執行階段才解除 1 倍上限），宿主工具列與三個參考面板卻是固定 px 的 DOM，因此螢幕越大
+ * 執行階段才解除 1 倍上限），宿主選單文字與三個參考面板卻是固定 px 的 DOM，因此螢幕越大
  * 兩者差距越大：1280×800 的預設視窗遊戲已經是 2 倍，原版 16×15 點陣字畫成 32 px，而
  * 面板正文仍是 14 px。
  *
@@ -30,10 +28,8 @@ export const INTERFACE_ZOOM_OPTIONS: readonly {
 ];
 
 export const INTERFACE_ZOOM_HINT =
-  "放大宿主介面：這一行與「復刻說明」、「圖鑑」、「RoadMap」。遊戲畫面仍會填滿視窗，不受影響。";
-
-const INTERFACE_ZOOM_TITLE =
-  "高解析度螢幕若沒有調整系統縮放，宿主文字會比遊戲畫面小上數倍；也可以直接用 Ctrl +/- 縮放。";
+  "放大「復刻說明」、「圖鑑」、「RoadMap」等說明視窗；遊戲畫面與這個選單仍跟著視窗大小。"
+  + "也可以直接用 Ctrl +/- 縮放。";
 
 const listeners = new Set<(zoom: InterfaceZoom) => void>();
 let current: InterfaceZoom | undefined;
@@ -74,7 +70,7 @@ export function onInterfaceZoomChange(listener: (zoom: InterfaceZoom) => void): 
 let restored = false;
 
 /**
- * 每個表面掛載時都會重新建立宿主工具列，但頁面縮放屬於整個 WebView，不屬於某個表面。
+ * 每個表面掛載時都會重新建立宿主選單，但頁面縮放屬於整個 WebView，不屬於某個表面。
  * 只在本次執行的第一次掛載時還原一次，之後就交給玩家：否則玩家用 `Ctrl +/-` 調過的
  * 倍率會在下一次切換表面時被偏好值蓋回去。
  */
@@ -85,36 +81,4 @@ export function restoreInterfaceZoomOnce(): void {
   // 新開的 WebView 本來就是 100%，不必為預設值多發一次呼叫。
   if (zoom === 100) return;
   void applyDesktopInterfaceZoom(zoom);
-}
-
-export function mountInterfaceZoomControls(container: HTMLElement): () => void {
-  // 網頁版沒有對應的 API，也不需要：瀏覽器自己的縮放就是同一件事。
-  if (!isTauriDesktopRuntime()) return () => undefined;
-  const hint = container.closest(".display-settings")
-    ?.querySelector<HTMLParagraphElement>(".display-settings-hint");
-  return mountHostChromeRadioGroup<`${InterfaceZoom}`>({
-    container,
-    labelId: "interface-zoom-label",
-    labelText: "介面縮放",
-    datasetKey: "interfaceZoom",
-    options: INTERFACE_ZOOM_OPTIONS.map(({ zoom, label }) => ({
-      value: `${zoom}` as `${InterfaceZoom}`,
-      label,
-      testid: `interface-zoom-${zoom}`,
-      title: INTERFACE_ZOOM_TITLE,
-    })),
-    read: () => `${interfaceZoom()}` as `${InterfaceZoom}`,
-    write: (value) => {
-      const zoom = Number(value);
-      if (isInterfaceZoom(zoom)) setInterfaceZoom(zoom);
-    },
-    subscribe: (listener) => onInterfaceZoomChange(
-      (zoom) => listener(`${zoom}` as `${InterfaceZoom}`),
-    ),
-    // 說明行是兩個控制項共用的，初次繪製留給「畫面縮放」，玩家真的動了才換成這一條。
-    onRender: (_value, initial) => {
-      if (initial || !hint) return;
-      hint.textContent = INTERFACE_ZOOM_HINT;
-    },
-  });
 }

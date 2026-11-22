@@ -758,8 +758,8 @@ test("REMAKE-203: in 高清 the sister's 1F plays the HD clip on its own canvas 
   }
   const capture = audit ? (async () => {
     await page.waitForFunction(() => document.documentElement.dataset.hdHeld === "true", null, { timeout: 15_000 });
-    // the pause overlay would dim the picture; hide it for the capture only
-    const overlay = await page.addStyleTag({ content: ".program-pause-overlay { display: none !important; }" });
+    // the pause overlay (and the lit corner menu icon) would cover the picture; hide them for the capture only
+    const overlay = await page.addStyleTag({ content: ".program-pause-overlay, .host-menu-trigger { display: none !important; }" });
     await page.waitForTimeout(200);
     await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-sister-fire-hd.png" });
     await overlay.evaluate((element) => element.remove());
@@ -818,7 +818,7 @@ test("REMAKE-204: in 高清 the sister's 1H plays the heart and the shared finis
   }
   const capture = audit ? (async () => {
     await page.waitForFunction(() => document.documentElement.dataset.hdHeld === "true", null, { timeout: 15_000 });
-    const overlay = await page.addStyleTag({ content: ".program-pause-overlay { display: none !important; }" });
+    const overlay = await page.addStyleTag({ content: ".program-pause-overlay, .host-menu-trigger { display: none !important; }" });
     await page.waitForTimeout(200);
     await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-sister-heal-hd.png" });
     await overlay.evaluate((element) => element.remove());

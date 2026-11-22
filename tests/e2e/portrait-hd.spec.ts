@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { enterAttackTargeting } from "./command-controls";
+import { openHostMenu, resumeFromHostMenu } from "./host-menu-helpers";
 import { captureVisualAudit } from "./visual-audit";
 
 /**
@@ -74,9 +75,10 @@ const sampleActivePortrait = (page: Page, name: string, duration: number) =>
 test("REMAKE-192: 原版 is the default and no HD file is requested", async ({ page }) => {
   const requests = hdRequests(page);
   await openPrebattleStory(page);
-  // REMAKE-193: the switch is not in the page chrome below the game screen.
-  await expect(page.getByTestId("display-settings")).toBeVisible();
-  await expect(page.getByTestId("display-settings").getByText("肖像")).toHaveCount(0);
+  // REMAKE-193: the switch is not in the host menu either; it lives in the entry panel.
+  await openHostMenu(page);
+  await expect(page.getByTestId("host-menu-list").getByText(/肖像|美術風格/)).toHaveCount(0);
+  await resumeFromHostMenu(page);
   await typingDone(page);
   await dialogue(page).click();
   await expect(dialogue(page)).toHaveAttribute("data-source-wait", "2");

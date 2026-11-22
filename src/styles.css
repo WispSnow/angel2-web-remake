@@ -62,7 +62,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 
 /* Tauri owns a real game window, so it consumes the full client area instead of
  * inheriting the browser build's 640px cap. The 640x350 logical surface still
- * scales as one unit; host controls remain unscaled and reserve their own row. */
+ * scales as one unit; the host menu lives inside it, so no row is reserved. */
 html[data-desktop-runtime="true"],
 html[data-desktop-runtime="true"] body,
 html[data-desktop-runtime="true"] #app {
@@ -89,11 +89,6 @@ html[data-desktop-runtime="true"] .stage49-viewport,
 html[data-desktop-runtime="true"] .credits-viewport {
   width: 100%;
   max-width: none;
-}
-html[data-desktop-runtime="true"] .display-settings {
-  margin-top: 0;
-  padding: 8px 12px;
-  background: #0b080be8;
 }
 html[data-desktop-runtime="true"] .stage49-help { display: none; }
 
@@ -2497,117 +2492,9 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .quit-screen h2,
 .quit-screen p { margin: 0; }
 
-/* Host-display controls. These sit outside the 640x350 logical screen because
- * they choose how the browser resamples the finished frame - the same class of
- * choice as browser zoom - and must not be mistaken for an original sub-menu
- * entry. They never reach the simulation, the PRNG or the save payload. */
-.display-settings {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  color: #c4ae86;
-  font: 12px/1.5 system-ui, sans-serif;
-}
-.display-settings-label {
-  color: #dba638;
-  font: 700 11px/1.2 system-ui, sans-serif;
-  letter-spacing: .18em;
-}
-/* 標籤與按鈕組現在包在各自的群組裡（畫面縮放、桌面版的介面縮放），群組自己補回
-   原本那 8px 的行內間距，整行看起來和單一控制項時一樣。 */
-.display-settings-group,
-.display-settings-interface { display: flex; align-items: center; gap: 8px; }
-.display-settings-options { display: flex; gap: 4px; }
-.display-settings-options > button {
-  padding: 3px 12px;
-  border: 1px solid #4b3527;
-  border-radius: 2px;
-  color: #c9b590;
-  background: #1a1214;
-  cursor: pointer;
-  font: 12px/1.5 system-ui, sans-serif;
-}
-.display-settings-options > button:hover { border-color: #7a5730; color: #f3dcae; }
-.display-settings-options > button.is-selected {
-  border-color: var(--gold);
-  color: var(--ink);
-  background: var(--gold);
-}
-/* 右對齊槽：屬於頁面而不屬於邏輯螢幕的入口都掛在同一行的右端。 */
-.display-settings-extras { display: flex; margin-left: auto; }
-.host-overlay-triggers { display: flex; gap: 4px; }
-.host-overlay-triggers > button {
-  padding: 3px 10px;
-  border: 1px solid #4b3527;
-  border-radius: 2px;
-  color: #c9b590;
-  background: linear-gradient(#1d1519, #140e11);
-  cursor: pointer;
-  font: 12px/1.5 system-ui, sans-serif;
-  white-space: nowrap;
-}
-.host-overlay-triggers > button:hover { border-color: var(--gold-dark); color: var(--gold); }
-/* 面板是動態載入的。指標移上去就先暖模組，所以大多數情況按下去是立刻開；連線很慢時
-   仍可能有一段等待，這時按鈕自己標成忙碌，讓玩家看得出是在讀取而不是沒反應。 */
-.host-overlay-triggers > button[aria-busy="true"] {
-  border-color: var(--gold-dark);
-  color: var(--gold);
-  cursor: progress;
-  opacity: .72;
-}
-/* `REMAKE-174`「原版Debug」：宿主開關，開啟時沿用畫面縮放的選中金色，讓玩家一眼看出
-   這一局戰鬥的 Caps Lock 熱鍵是活的。 */
-.original-debug-trigger { display: flex; margin-right: 4px; }
-/* 自繪提示：字級用 CSS px，隨頁面縮放（原生 title 不會）；位置由 mountOriginalDebugModeToggle 設定。 */
-.original-debug-tip {
-  position: fixed;
-  z-index: 6000;
-  box-sizing: border-box;
-  width: max-content;
-  max-width: min(34em, calc(100vw - 16px));
-  padding: 8px 12px;
-  border: 1px solid #d4a62d;
-  color: #fff4c7;
-  background: #160d0eef;
-  font: 14px/1.6 system-ui, sans-serif;
-  text-align: left;
-  pointer-events: none;
-}
-.original-debug-tip[hidden] { display: none; }
-.original-debug-tip p { margin: 0; }
-.original-debug-tip p + p { margin-top: 4px; color: #e7d7ac; }
-.original-debug-trigger > button {
-  padding: 3px 10px;
-  border: 1px solid #4b3527;
-  border-radius: 2px;
-  color: #c9b590;
-  background: linear-gradient(#1d1519, #140e11);
-  cursor: pointer;
-  font: 12px/1.5 system-ui, sans-serif;
-  white-space: nowrap;
-}
-.original-debug-trigger > button:hover { border-color: var(--gold-dark); color: var(--gold); }
-.original-debug-trigger > button[aria-pressed="true"] {
-  border-color: var(--gold);
-  color: var(--ink);
-  background: var(--gold);
-}
-.original-debug-trigger > button:focus-visible { outline: 2px solid #9fd9ff; outline-offset: 2px; }
-/* 開關開著且遊戲實際讀到 Caps Lock 開啟時，按鈕外緣亮綠（陰影不佔版面，不會讓工具列折行）；
-   輸入法可能吃掉 Caps Lock，所以顯示的是遊戲讀到的狀態而非鍵盤燈。 */
-.original-debug-trigger > button[data-caps-engaged="true"] {
-  box-shadow: 0 0 0 2px #7fd18b, 0 0 6px 1px rgba(127, 209, 139, .55);
-}
-.display-settings-hint { flex: 1 1 100%; margin: 0; color: #8d7c65; font-size: 11px; }
-
 @media (max-width: 560px) {
   .page-shell { width: 100%; padding: 12px 0 28px; }
   .eyebrow { font-size: 9px; }
-  .display-settings { padding: 0 12px; }
-  .display-settings-extras { margin-left: 0; }
-  .host-overlay-triggers { flex-wrap: wrap; }
 }
 /* `[DD]` 本作不跟隨系統「減少動態效果」。原版所有演出都是玩法節奏的一部分——`A/18`
    對話窗的開闔、選單方框的縮放、指針滑行、地圖脈動——把它們壓成瞬時等於換掉遊戲的

@@ -1,4 +1,3 @@
-import { mountHostChromeRadioGroup } from "./host-chrome-radio";
 import {
   DEFAULT_DISPLAY_PREFERENCES,
   loadDisplayPreferences,
@@ -7,11 +6,11 @@ import {
 } from "./preferences";
 
 /**
- * Host-display settings live outside the 640x350 logical screen on purpose. The
+ * Host-display settings stay out of the original sub-menu on purpose. The
  * in-battle sub-menu reproduces the original's fixed five-row box, so a sixth
  * row would falsify that layout evidence; picking how the browser resamples the
- * finished frame is the same class of choice as browser zoom and belongs to the
- * page chrome instead.
+ * finished frame is the same class of choice as browser zoom and lives in the
+ * host menu (`host-menu.ts`) instead.
  */
 export const IMAGE_SCALING_OPTIONS: readonly {
   mode: ImageScalingMode;
@@ -56,75 +55,4 @@ export function setImageScalingMode(mode: ImageScalingMode): void {
 export function onImageScalingChange(listener: (mode: ImageScalingMode) => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
-}
-
-/**
- * Right-aligned slot on the same host-chrome row as the scaling picker. Anything
- * that belongs to the page rather than the 640x350 logical screen lands here, so
- * the row is built once and its owners stay independent of each other.
- */
-export function hostChromeExtrasSlot(viewport: HTMLElement): HTMLElement | undefined {
-  return viewport.parentElement
-    ?.querySelector<HTMLElement>(":scope > .display-settings .display-settings-extras")
-    ?? undefined;
-}
-
-/**
- * 同一行上「畫面縮放」右邊的槽，給桌面版的「介面縮放」用。網頁版不掛任何東西：
- * 瀏覽器自己的縮放已經做同一件事，多一組按鈕只會多一份要維護的說明。
- */
-export function hostChromeInterfaceSlot(viewport: HTMLElement): HTMLElement | undefined {
-  return viewport.parentElement
-    ?.querySelector<HTMLElement>(":scope > .display-settings .display-settings-interface")
-    ?? undefined;
-}
-
-/**
- * Mounts the scaling picker as a sibling of the viewport. Every surface rebuilds
- * `#app` on mount, so the controls are rebuilt with it rather than persisted.
- */
-export function mountImageScalingControls(viewport: HTMLElement): () => void {
-  const host = viewport.parentElement;
-  if (!host) return () => undefined;
-  const existing = host.querySelector<HTMLElement>(":scope > .display-settings");
-  if (existing) return () => undefined;
-
-  const panel = document.createElement("div");
-  panel.className = "display-settings";
-  panel.dataset.testid = "display-settings";
-  panel.innerHTML = `
-    <div class="display-settings-group" data-image-scaling-slot></div>
-    <div class="display-settings-interface"></div>
-    <div class="display-settings-extras"></div>
-    <p class="display-settings-hint" data-testid="image-scaling-hint"></p>`;
-  host.insertBefore(panel, viewport.nextSibling);
-
-  const hint = panel.querySelector<HTMLParagraphElement>(".display-settings-hint");
-  const slot = panel.querySelector<HTMLElement>("[data-image-scaling-slot]");
-  if (!slot) return () => panel.remove();
-
-  const unmountGroup = mountHostChromeRadioGroup<ImageScalingMode>({
-    container: slot,
-    labelId: "display-settings-label",
-    labelText: "畫面縮放",
-    datasetKey: "imageScaling",
-    options: IMAGE_SCALING_OPTIONS.map(({ mode, label, hint: title }) => ({
-      value: mode,
-      label,
-      testid: `image-scaling-${mode}`,
-      title,
-    })),
-    read: imageScalingMode,
-    write: setImageScalingMode,
-    subscribe: onImageScalingChange,
-    onRender: (mode) => {
-      if (!hint) return;
-      hint.textContent = IMAGE_SCALING_OPTIONS.find((option) => option.mode === mode)?.hint ?? "";
-    },
-  });
-
-  return () => {
-    unmountGroup();
-    panel.remove();
-  };
 }

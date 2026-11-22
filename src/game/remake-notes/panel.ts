@@ -126,7 +126,7 @@ function renderControls(): string {
               { keys: ["Tab"], action: "下一名待行動角色", detail: "出擊介面切換名單與地圖落點" },
               { keys: ["G"], action: "集體命令", detail: "再按一次關閉" },
               { keys: ["O"], action: "勝利／失敗條件", detail: "再按一次關閉" },
-              { keys: ["P", "Pause"], action: "暫停整個遊戲", detail: "暫停層內亦可按 Esc 繼續" },
+              { keys: ["P", "Pause"], action: "暫停並打開選單", detail: "再按一次繼續；選單內 Esc 逐層返回" },
             ])}
           </div>
         </article>
@@ -138,6 +138,7 @@ function renderControls(): string {
               { keys: ["右鍵"], action: "取消／返回", detail: "戰場空白處改為切換下一名待行動角色" },
               { keys: ["滾輪"], action: "切換魔弓穿透彈道", detail: "僅於魔弓彈道預覽時生效" },
               { keys: ["畫面邊緣"], action: "捲動地圖", detail: "游標停留可連續平滑捲動" },
+              { keys: ["右下角圖示"], action: "暫停並打開選單", detail: "選單內右鍵逐層返回" },
             ])}
           </div>
         </article>
@@ -170,7 +171,7 @@ function renderControls(): string {
         </article>
         <article class="rn-control-card is-legacy" data-testid="remake-controls-original-debug">
           <header><span>DEBUG</span><h3>原版Debug</h3></header>
-          <p class="rn-control-note">先在畫面下方工具列打開「原版Debug」，再於我方待機、選格或轉職選擇時打開 Caps Lock 使用。</p>
+          <p class="rn-control-note">先在畫面右下角的選單打開「原版Debug」，再於我方待機、選格或轉職選擇時打開 Caps Lock 使用。</p>
           <div class="rn-control-list">
             ${renderControlRows([
               { keys: ["F1"], action: "游標下單位的 AI 行為" },
@@ -197,7 +198,7 @@ const panel = createOverlayPanel<RemakeNotesTab>({
   testid: "remake-notes",
   eyebrow: "復刻說明",
   heading: "《天使帝國 II》Web 復刻版",
-  footer: "打開本說明不會暫停遊戲進程；視窗內的按鍵操作僅供查閱，不會誤觸戰場指令。",
+  footer: "遊戲在選單打開期間保持暫停；關閉本說明會回到選單，視窗內的按鍵不會誤觸戰場指令。",
   tabs: REMAKE_NOTES_TABS,
   render: (tab) => tab === "disclaimer"
     ? renderDisclaimer(DISCLAIMER_SECTION)

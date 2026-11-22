@@ -1,12 +1,14 @@
 import { expect, test } from "@playwright/test";
+import { openHostMenu, openHostOverlay } from "./host-menu-helpers";
 import { captureVisualAudit } from "./visual-audit";
 
 test("RoadMap 展示候選方向、QQ 群與原始二維碼", async ({ page }) => {
   await page.goto("/");
-  const trigger = page.getByTestId("roadmap-open");
+  await openHostMenu(page);
+  const trigger = page.getByTestId("host-menu-row-roadmap");
   await expect(trigger).toBeVisible();
-  await expect(trigger).toHaveText("RoadMap");
-  await captureVisualAudit(page.getByTestId("display-settings"), {
+  await expect(trigger).toContainText("RoadMap");
+  await captureVisualAudit(page.getByTestId("host-menu"), {
     path: "artifacts/playwright/roadmap-trigger.png",
   });
 
@@ -70,7 +72,7 @@ test("RoadMap 展示候選方向、QQ 群與原始二維碼", async ({ page }) =
 test("RoadMap：放大後的矮視窗仍保留右欄社群卡", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("/");
-  await page.getByTestId("roadmap-open").click();
+  await openHostOverlay(page, "roadmap");
 
   const main = page.locator(".rn-roadmap-main");
   const community = page.locator(".rn-roadmap-community");
@@ -98,7 +100,7 @@ test("RoadMap：放大後的矮視窗仍保留右欄社群卡", async ({ page })
 test("RoadMap 在窄螢幕改為單欄且仍可完整捲動", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByTestId("roadmap-open").click();
+  await openHostOverlay(page, "roadmap");
 
   const roadmap = page.locator(".rn-roadmap");
   const item = page.getByTestId("roadmap-item-hd-portraits");

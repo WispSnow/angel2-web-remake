@@ -7,16 +7,18 @@ import {
   type DocumentationLanguage,
 } from "./documentation-language";
 import { escapeHtml } from "./markup";
+import { PROGRAM_PAUSE_EXEMPT_ATTRIBUTE } from "../program-pause";
 
 /**
  * 宿主覆蓋層的共用骨架，目前由「復刻說明」、「圖鑑」與「RoadMap」三個面板使用。
  *
- * 它們和「畫面縮放」一樣刻意留在 640×350 邏輯螢幕之外：原版沒有這些畫面，把它們畫進
- * 邏輯螢幕會偽造構圖證據。覆蓋層不暫停、不查詢、也不修改任何模擬狀態——底下的戰鬥
- * 照常跑完敵方階段，關掉之後玩家回到原本的局面。
+ * 它們刻意留在 640×350 邏輯螢幕之外：原版沒有這些畫面，把它們畫進邏輯螢幕會偽造構圖
+ * 證據。入口在宿主選單裡，打開選單就已經暫停了遊戲，所以面板開著的整段時間底下都停在
+ * 原處；面板本身不查詢、也不修改任何模擬狀態。根節點帶 `PROGRAM_PAUSE_EXEMPT_ATTRIBUTE`，
+ * 暫停時其餘頁面都是 `inert`，只有它和暫停層還能操作。
  *
- * 唯一需要隔離的是輸入：`ui.ts`、`startup.ts` 與結局畫面都把 `keydown` 綁在 `window`
- * 上，未攔截的按鍵會在玩家只是翻閱面板時移動戰場游標，所以覆蓋層內的按鍵一律停在這裡。
+ * 仍要隔離輸入：`ui.ts`、`startup.ts` 與結局畫面都把 `keydown` 綁在 `window` 上，暫停層
+ * 只攔下目標在可操作表面以外的按鍵，所以覆蓋層內的按鍵一律停在這裡。
  */
 
 export interface OverlayTab<Id extends string> {
@@ -136,6 +138,8 @@ export function createOverlayPanel<Id extends string>(
     const root = document.createElement("div");
     root.className = "rn-overlay";
     root.dataset.testid = testid;
+    // 先標記再掛進 body：暫停中新加入的 body 子節點會立刻被設成 `inert`。
+    root.setAttribute(PROGRAM_PAUSE_EXEMPT_ATTRIBUTE, "");
     root.innerHTML = `
       <div class="rn-scrim" data-overlay-dismiss></div>
       <section class="rn-dialog" role="dialog" aria-modal="true"

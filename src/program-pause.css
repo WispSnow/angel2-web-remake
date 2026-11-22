@@ -55,22 +55,15 @@
 .program-pause-dialog button:focus-visible { outline: 2px solid #9fd9ff; outline-offset: 3px; }
 .program-pause-dialog small { display: block; margin-top: 12px; color: #81735f; font-size: 10px; }
 
-.program-pause-trigger { display: flex; margin-right: 4px; }
-.program-pause-trigger > button {
-  padding: 3px 10px;
-  border: 1px solid #3e3225;
-  border-radius: 2px;
-  color: #b9a98e;
-  background: #11100f;
-  cursor: pointer;
-  font: 11px/1.5 ui-monospace, "SFMono-Regular", Menlo, monospace;
+/* 有宿主選單時（`host-menu.ts`），暫停層換成畫面上層的原版風格選單：只壓暗，不模糊、
+   不去色，凍結的那一格畫面保持原樣，選單的半透明網點底才看得出是蓋在戰場上。 */
+.program-pause-overlay[data-mode="host-menu"] .program-pause-scrim {
+  background: rgb(8 4 6 / 62%);
+  backdrop-filter: none;
 }
-.program-pause-trigger > button:hover { border-color: var(--gold-dark); color: var(--gold); }
-.program-pause-trigger > button:focus-visible { outline: 2px solid #9fd9ff; outline-offset: 2px; }
 
-/* CSS timelines belong to the frozen program. The pause dialog itself is a
-   browser control surface and intentionally remains outside #app. */
-html[data-program-paused="true"] #app *,
-html[data-program-paused="true"] .rn-overlay * {
+/* CSS timelines belong to the frozen program. The pause layer and the reference
+   panels it opens are host surfaces outside #app, so they keep animating. */
+html[data-program-paused="true"] #app * {
   animation-play-state: paused !important;
 }

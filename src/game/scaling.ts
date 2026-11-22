@@ -1,12 +1,6 @@
-import {
-  hostChromeExtrasSlot,
-  hostChromeInterfaceSlot,
-  imageScalingMode,
-  mountImageScalingControls,
-  onImageScalingChange,
-} from "./display-settings";
-import { mountHostOverlays } from "./host-overlays";
-import { mountInterfaceZoomControls, restoreInterfaceZoomOnce } from "./interface-zoom";
+import { imageScalingMode, onImageScalingChange } from "./display-settings";
+import { mountHostMenu } from "./host-menu";
+import { restoreInterfaceZoomOnce } from "./interface-zoom";
 import type { ImageScalingMode } from "./preferences";
 import {
   applyDesktopWindowTarget,
@@ -14,8 +8,6 @@ import {
   initializeDesktopRuntime,
 } from "./desktop-runtime";
 import { LOGICAL_SCREEN_HEIGHT, LOGICAL_SCREEN_WIDTH } from "./scaling-constants";
-import { mountOriginalDebugModeToggle } from "./original-debug-mode";
-import { mountProgramPauseButton } from "./program-pause";
 import { mountNativePointer } from "./native-pointer";
 
 export { LOGICAL_SCREEN_HEIGHT, LOGICAL_SCREEN_WIDTH } from "./scaling-constants";
@@ -87,28 +79,18 @@ export function configureGameScaling(
   options: GameScalingOptions = {},
 ): () => void {
   const desktop = initializeDesktopRuntime();
-  const unmountControls = mountImageScalingControls(viewport);
-  const panel = viewport.parentElement
-    ?.querySelector<HTMLElement>(":scope > .display-settings");
-  const extras = hostChromeExtrasSlot(viewport);
-  const unmountProgramPause = extras ? mountProgramPauseButton(extras) : () => undefined;
-  const unmountOriginalDebug = extras && options.originalDebugToggle !== false
-    ? mountOriginalDebugModeToggle(extras)
-    : () => undefined;
-  const unmountOverlays = extras ? mountHostOverlays(extras) : () => undefined;
-  const interfaceSlot = hostChromeInterfaceSlot(viewport);
-  const unmountInterfaceZoom = interfaceSlot
-    ? mountInterfaceZoomControls(interfaceSlot)
-    : () => undefined;
+  // 頁面上沒有畫面外的宿主列：設定、暫停與參考面板都收在畫面右下角的選單入口裡。
+  const unmountHostMenu = mountHostMenu(screen, {
+    originalDebugToggle: options.originalDebugToggle !== false,
+    interfaceZoom: desktop,
+  });
   restoreInterfaceZoomOnce();
   const pointer = mountNativePointer(screen);
   let integerResizeTimer: number | undefined;
 
   const availableDesktopHeight = (): number => Math.max(
     1,
-    document.documentElement.clientHeight
-      - viewport.getBoundingClientRect().top
-      - (panel?.getBoundingClientRect().height ?? 0),
+    document.documentElement.clientHeight - viewport.getBoundingClientRect().top,
   );
 
   const scheduleIntegerWindowResize = () => {
@@ -116,11 +98,10 @@ export function configureGameScaling(
     if (integerResizeTimer !== undefined) window.clearTimeout(integerResizeTimer);
     integerResizeTimer = window.setTimeout(() => {
       integerResizeTimer = undefined;
-      const chromeHeight = panel?.getBoundingClientRect().height ?? 0;
       const target = computeDesktopIntegerWindowTarget({
         viewportWidth: viewport.clientWidth,
         availableGameHeight: availableDesktopHeight(),
-        chromeHeight,
+        chromeHeight: 0,
         devicePixelRatio: window.devicePixelRatio || 1,
         screenAvailableWidth: window.screen.availWidth,
         screenAvailableHeight: window.screen.availHeight,
@@ -180,10 +161,6 @@ export function configureGameScaling(
     observer.disconnect();
     unsubscribe();
     pointer.dispose();
-    unmountInterfaceZoom();
-    unmountOverlays();
-    unmountOriginalDebug();
-    unmountProgramPause();
-    unmountControls();
+    unmountHostMenu();
   };
 }

@@ -7,11 +7,40 @@ import {
 
 const OVERLAY_TEST_ID = "program-pause-overlay";
 
+/**
+ * Body-level roots marked with this attribute stay interactive while the program
+ * is paused: the reference panels the host menu opens (復刻說明／圖鑑／RoadMap)
+ * live beside the pause overlay rather than inside it, and still have to take
+ * input, focus and scrolling while everything else is `inert`.
+ */
+export const PROGRAM_PAUSE_EXEMPT_ATTRIBUTE = "data-program-pause-exempt";
+
+/**
+ * What the pause overlay shows. The host menu registers itself while a game
+ * surface is mounted; without one (loading pages, a failed debug load) the
+ * overlay falls back to its own minimal 「遊戲已暫停」 dialog.
+ */
+export interface ProgramPausePresenter {
+  /** Mounted inside the overlay for as long as the presenter is registered. */
+  readonly element: HTMLElement;
+  /** Runs after the freeze boundary is in place; must move focus inside `element`. */
+  show(): void;
+  /** Runs on resume, before focus goes back to where it was. */
+  hide(): void;
+  /** `Esc` while focus sits outside every interactive pause surface. */
+  back(): void;
+}
+
 let installed = false;
 let overlay: HTMLElement | undefined;
+let dialog: HTMLElement | undefined;
 let returnFocusTo: HTMLElement | undefined;
 let priorInert = new Map<HTMLElement, boolean>();
 let bodyObserver: MutationObserver | undefined;
+/** Last registered wins; surfaces hand over by unregistering on teardown. */
+const presenters: ProgramPausePresenter[] = [];
+
+const activePresenter = (): ProgramPausePresenter | undefined => presenters.at(-1);
 
 const isEditable = (target: EventTarget | null): boolean =>
   target instanceof HTMLInputElement
@@ -23,11 +52,22 @@ const isToggleKey = (event: KeyboardEvent): boolean =>
   || (!event.altKey && !event.ctrlKey && !event.metaKey
     && event.key.toLowerCase() === "p" && !isEditable(event.target));
 
+const isExempt = (element: HTMLElement): boolean =>
+  element === overlay || element.hasAttribute(PROGRAM_PAUSE_EXEMPT_ATTRIBUTE);
+
+/** Targets that handle (and stop) their own keys while the program is paused. */
+const isPauseInteractive = (target: EventTarget | null): boolean =>
+  target instanceof Node
+  && (Boolean(overlay?.contains(target))
+    || (target instanceof Element
+      ? target.closest(`[${PROGRAM_PAUSE_EXEMPT_ATTRIBUTE}]`) !== null
+      : target.parentElement?.closest(`[${PROGRAM_PAUSE_EXEMPT_ATTRIBUTE}]`) !== null));
+
 const freezeBodyChildren = () => {
   if (!overlay) return;
   priorInert = new Map();
   const freeze = (element: HTMLElement) => {
-    if (element === overlay || priorInert.has(element)) return;
+    if (isExempt(element) || priorInert.has(element)) return;
     priorInert.set(element, element.inert);
     element.inert = true;
   };
@@ -54,17 +94,28 @@ const restoreBodyChildren = () => {
   priorInert.clear();
 };
 
+const syncMode = () => {
+  if (!overlay || !dialog) return;
+  const presenter = activePresenter();
+  overlay.dataset.mode = presenter ? "host-menu" : "dialog";
+  dialog.hidden = presenter !== undefined;
+};
+
 const applyPausedUi = (paused: boolean) => {
   if (!overlay) return;
   document.documentElement.dataset.programPaused = String(paused);
   overlay.hidden = !paused;
   overlay.setAttribute("aria-hidden", String(!paused));
+  syncMode();
+  const presenter = activePresenter();
   if (paused) {
     const active = document.activeElement;
     returnFocusTo = active instanceof HTMLElement ? active : undefined;
     freezeBodyChildren();
-    overlay.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+    if (presenter) presenter.show();
+    else dialog?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
   } else {
+    presenter?.hide();
     restoreBodyChildren();
     if (returnFocusTo?.isConnected) returnFocusTo.focus({ preventScroll: true });
     returnFocusTo = undefined;
@@ -95,19 +146,21 @@ export function installProgramPause(): void {
       <small>按 P、Pause 或 Esc 繼續</small>
     </section>`;
   document.body.appendChild(overlay);
+  dialog = overlay.querySelector<HTMLElement>(".program-pause-dialog") ?? undefined;
 
-  overlay.addEventListener("click", (event) => {
+  dialog?.addEventListener("click", (event) => {
     if ((event.target as Element).closest("button")) setProgramPaused(false);
   });
-  overlay.addEventListener("keydown", (event) => {
+  dialog?.addEventListener("keydown", (event) => {
     event.stopPropagation();
-    if (isToggleKey(event) || event.key === "Escape") {
+    if (event.key === "Escape") {
       event.preventDefault();
       if (!event.repeat) setProgramPaused(false);
     }
   });
   window.addEventListener("keydown", (event) => {
-    if (isProgramPaused() && overlay?.contains(event.target as Node)) return;
+    // P／Pause toggle from anywhere, including inside the menu or an open panel,
+    // so one key always means "back to the game".
     if (isToggleKey(event)) {
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -115,36 +168,44 @@ export function installProgramPause(): void {
       return;
     }
     if (!isProgramPaused()) return;
+    // The overlay and the panels it opened consume their own keys.
+    if (isPauseInteractive(event.target)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
+    // Focus can fall to `body` (a click on a non-focusable spot); `Esc` must still work.
+    if (event.key !== "Escape" || event.repeat) return;
+    const presenter = activePresenter();
+    if (presenter) presenter.back();
+    else setProgramPaused(false);
   }, { capture: true });
   onProgramPauseChange(applyPausedUi);
   applyPausedUi(isProgramPaused());
 }
 
-/** Adds the discoverable host-chrome control for the global keyboard action. */
-export function mountProgramPauseButton(host: HTMLElement): () => void {
+/**
+ * Puts `presenter` in charge of the pause overlay until the returned function
+ * runs. Every game surface rebuilds its host menu on mount, so registration
+ * follows the surface lifetime rather than the page's.
+ */
+export function registerProgramPausePresenter(presenter: ProgramPausePresenter): () => void {
   installProgramPause();
-  const group = document.createElement("div");
-  group.className = "program-pause-trigger";
-  group.innerHTML = `<button type="button" data-testid="program-pause-toggle"
-    title="凍結遊戲時間、畫面與聲音（P／Pause）">暫停</button>`;
-  const button = group.querySelector<HTMLButtonElement>("button");
-  if (!button) return () => undefined;
-  const render = (paused: boolean) => {
-    button.textContent = paused ? "繼續" : "暫停";
-    button.setAttribute("aria-pressed", String(paused));
-  };
-  const click = () => toggleProgramPaused();
-  button.addEventListener("click", click);
-  // Host chrome keys must never reach the surface-specific window handlers.
-  group.addEventListener("keydown", (event) => event.stopPropagation());
-  host.prepend(group);
-  const unsubscribe = onProgramPauseChange(render);
-  render(isProgramPaused());
+  const previous = activePresenter();
+  if (isProgramPaused()) previous?.hide();
+  presenters.push(presenter);
+  overlay?.append(presenter.element);
+  syncMode();
+  if (isProgramPaused()) presenter.show();
   return () => {
-    unsubscribe();
-    button.removeEventListener("click", click);
-    group.remove();
+    const index = presenters.indexOf(presenter);
+    if (index < 0) return;
+    const wasActive = index === presenters.length - 1;
+    if (wasActive && isProgramPaused()) presenter.hide();
+    presenters.splice(index, 1);
+    presenter.element.remove();
+    syncMode();
+    if (!wasActive || !isProgramPaused()) return;
+    const next = activePresenter();
+    if (next) next.show();
+    else dialog?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
   };
 }

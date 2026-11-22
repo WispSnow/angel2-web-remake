@@ -5,6 +5,7 @@ import {
   decodeScreenshot,
   rowMeanLuminance,
 } from "./screenshot-pixels";
+import { hostMenu, openHostMenu, resumeFromHostMenu, setImageScaling } from "./host-menu-helpers";
 import { captureVisualAudit } from "./visual-audit";
 
 const screenMetrics = (page: Page) => page.locator(".logical-screen").evaluate((element) => {
@@ -20,16 +21,31 @@ const screenMetrics = (page: Page) => page.locator(".logical-screen").evaluate((
   };
 });
 
-test("the scaling picker lives outside the logical screen and defaults to sharp", async ({ page }) => {
+test("the page shows only the game and the scaling choice lives in the corner menu", async ({ page }) => {
   await page.goto("/");
-  const panel = page.getByTestId("display-settings");
-  await expect(panel).toBeVisible();
+  await expect(page.getByTestId("startup-screen")).toBeVisible();
+  // 頁面上沒有畫面外的宿主列：畫面縮放、暫停與參考面板都收進右下角的入口。
+  await expect(page.getByTestId("display-settings")).toHaveCount(0);
+  const trigger = page.getByTestId("host-menu-trigger");
+  await expect(trigger.locator("xpath=ancestor::*[contains(@class,'logical-screen')]")).toHaveCount(1);
+  await expect.poll(() => trigger.evaluate((element) => getComputedStyle(element).opacity)).toBe("0.3");
+  await trigger.hover();
+  await expect.poll(() => trigger.evaluate((element) => getComputedStyle(element).opacity)).toBe("1");
+  await expect(page.getByTestId("host-menu-trigger-tip")).toBeVisible();
 
-  // The picker is host chrome, not an original menu entry: it must never be
-  // inside the 640x350 logical screen the original UI evidence describes.
-  await expect(panel.locator("xpath=ancestor::*[@data-testid='startup-screen']")).toHaveCount(0);
-  await expect(panel.getByRole("radio")).toHaveText(["銳利", "平滑", "整數倍"]);
-  await expect(page.getByTestId("image-scaling-sharp")).toHaveAttribute("aria-checked", "true");
+  await openHostMenu(page);
+  await expect(hostMenu(page).locator("[data-host-menu-row]")).toHaveText([
+    "繼續遊戲", "畫面縮放", "復刻說明", "圖鑑", "RoadMap", "原版Debug",
+  ].map((label) => new RegExp(`^\\s*${label}`)));
+  await page.getByTestId("host-menu-row-image-scaling").click();
+  await expect(page.getByTestId("host-menu-submenu").getByRole("menuitemradio")).toHaveText(
+    ["銳利", "平滑", "整數倍"].map((label) => new RegExp(`^\\s*${label}`)),
+  );
+  await expect(page.getByTestId("host-menu-option-sharp")).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("host-menu-description")).toContainText("最近鄰取樣");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("host-menu-submenu")).toBeHidden();
+  await resumeFromHostMenu(page);
   await expect(await screenMetrics(page)).toMatchObject({
     imageRendering: "pixelated",
     scale: 1,
@@ -39,8 +55,9 @@ test("the scaling picker lives outside the logical screen and defaults to sharp"
 
 test("smooth swaps the filter without moving the screen", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByTestId("startup-screen")).toBeVisible();
   const before = await screenMetrics(page);
-  await page.getByTestId("image-scaling-smooth").click();
+  await setImageScaling(page, "smooth");
 
   const after = await screenMetrics(page);
   expect(after.imageRendering).toBe("auto");
@@ -50,8 +67,13 @@ test("smooth swaps the filter without moving the screen", async ({ page }) => {
 
   // The choice is a device preference, so it has to survive a reload without a save.
   await page.reload();
-  await expect(page.getByTestId("image-scaling-smooth")).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("startup-screen")).toBeVisible();
   expect((await screenMetrics(page)).imageRendering).toBe("auto");
+  await openHostMenu(page);
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("host-menu-description")).toContainText("平滑");
+  await page.getByTestId("host-menu-row-image-scaling").click();
+  await expect(page.getByTestId("host-menu-option-smooth")).toHaveAttribute("aria-checked", "true");
 });
 
 test.describe("fractional device pixel ratio", () => {
@@ -59,13 +81,14 @@ test.describe("fractional device pixel ratio", () => {
 
   test("integer snaps the scale to whole device pixels and letterboxes the slack", async ({ page }) => {
     await page.goto("/");
+    await expect(page.getByTestId("startup-screen")).toBeVisible();
     const fitted = await screenMetrics(page);
     // 500px viewport, 640px logical screen: the default fit is fractional.
     expect(fitted.scale).toBeGreaterThan(.5);
     expect(fitted.scale).toBeLessThan(1);
     expect(fitted.scale * 640 * 2 % 1).toBeCloseTo(0, 6);
 
-    await page.getByTestId("image-scaling-integer").click();
+    await setImageScaling(page, "integer");
     const snapped = await screenMetrics(page);
     expect(snapped.documentMode).toBe("integer");
     expect(snapped.imageRendering).toBe("pixelated");
@@ -78,6 +101,22 @@ test.describe("fractional device pixel ratio", () => {
       (snapped.viewportWidth - snapped.screenWidth) / 2,
       1,
     );
+
+    // 0.5 倍的畫面上選單仍放大到 1 倍，必須讓開入口位置上的紅寶石，玩家才點得到它回到遊戲。
+    await openHostMenu(page);
+    await expect(hostMenu(page)).toHaveAttribute("data-scale", "1");
+    const [gem, group] = await Promise.all([
+      page.getByTestId("host-menu-close").boundingBox(),
+      page.locator(".host-menu-group").boundingBox(),
+    ]);
+    expect(gem).not.toBeNull();
+    expect(group).not.toBeNull();
+    if (gem && group) {
+      const clear = gem.y >= group.y + group.height || gem.x >= group.x + group.width
+        || gem.y + gem.height <= group.y || gem.x + gem.width <= group.x;
+      expect(clear).toBe(true);
+    }
+    await resumeFromHostMenu(page);
   });
 });
 
@@ -90,7 +129,7 @@ test.describe("smooth scaling on a HiDPI panel", () => {
     // 在画布之上才挡得住，否则左右雕像中间会出现一条战场颜色的细纹。
     await page.goto("/?debugScenario=stage-02-player&difficulty=0&test=1");
     await expect(page.getByTestId("battle-canvas")).toBeVisible();
-    await page.getByTestId("image-scaling-smooth").click();
+    await setImageScaling(page, "smooth");
     await expect.poll(() => page.evaluate(() =>
       getComputedStyle(document.documentElement).getPropertyValue("--image-rendering").trim(),
     )).toBe("auto");
@@ -245,7 +284,7 @@ test.describe("a non-integer desktop scale", () => {
   });
 });
 
-test("keyboard focus inside the picker never reaches the battlefield", async ({ page }) => {
+test("keys inside the corner menu never reach the battlefield", async ({ page }) => {
   await page.goto("/?debugScenario=stage-31-player&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
 
@@ -254,14 +293,24 @@ test("keyboard focus inside the picker never reaches the battlefield", async ({ 
   const before = await cursor();
   expect(before).toBeDefined();
 
-  // `ui.ts` binds keydown on `window`, so an unstopped press in the host chrome
+  // `ui.ts` binds keydown on `window`, so an unstopped press in the host menu
   // would drive the battle cursor while the player is only picking a filter.
-  await page.getByTestId("image-scaling-sharp").focus();
+  await openHostMenu(page);
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("host-menu-row-image-scaling")).toBeFocused();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByTestId("image-scaling-smooth")).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator("html")).toHaveAttribute("data-image-scaling", "smooth");
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByTestId("image-scaling-integer")).toHaveAttribute("aria-checked", "true");
-  for (const key of ["ArrowUp", "ArrowDown", "Enter", " ", "w", "a", "s", "z"]) {
+  await expect(page.locator("html")).toHaveAttribute("data-image-scaling", "integer");
+  for (const key of ["ArrowUp", "ArrowDown", "w", "s", "z", "g"]) {
+    await page.keyboard.press(key);
+  }
+  await resumeFromHostMenu(page);
+  expect(await cursor()).toEqual(before);
+
+  // 鍵盤停在入口按鈕上時，方向鍵同樣停在按鈕這裡。
+  await page.getByTestId("host-menu-trigger").focus();
+  for (const key of ["ArrowUp", "ArrowRight", "w", "d"]) {
     await page.keyboard.press(key);
   }
   expect(await cursor()).toEqual(before);
@@ -324,19 +373,15 @@ test.describe("Tauri desktop window scaling", () => {
     await page.goto("/?debugScenario=stage-02-player&difficulty=0&test=1");
     await expect(page.getByTestId("battle-canvas")).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-desktop-runtime", "true");
-    await page.getByTestId("image-scaling-sharp").click();
     await expect.poll(() => screenMetrics(page)).toMatchObject({
       scale: 2,
       screenWidth: 1280,
       viewportWidth: 1280,
     });
-    const panelBounds = await page.getByTestId("display-settings").evaluate((panel) => {
-      const rect = panel.getBoundingClientRect();
-      return { top: rect.top, bottom: rect.bottom };
-    });
-    expect(panelBounds.top).toBe(700);
-    expect(panelBounds.bottom).toBeGreaterThan(panelBounds.top);
-    expect(panelBounds.bottom).toBeLessThanOrEqual(800);
+    // 沒有預留的宿主列：入口就在畫面右下角，跟著遊戲放大。
+    await expect(page.getByTestId("display-settings")).toHaveCount(0);
+    expect(await page.getByTestId("host-menu-trigger").boundingBox())
+      .toEqual({ x: 618 * 2, y: 327 * 2, width: 40, height: 40 });
     await captureVisualAudit(page, {
       path: "artifacts/playwright/tauri-desktop-1280x800.png",
     });
@@ -351,7 +396,7 @@ test.describe("Tauri desktop window scaling", () => {
         .__TAURI_TEST_RESIZE_CALLS__;
       calls?.splice(0);
     });
-    await page.getByTestId("image-scaling-integer").click();
+    await setImageScaling(page, "integer");
     await expect.poll(() => page.evaluate(() => {
       const calls = (window as Window & { __TAURI_TEST_RESIZE_CALLS__?: unknown[] })
         .__TAURI_TEST_RESIZE_CALLS__ ?? [];
@@ -364,8 +409,8 @@ test.describe("Tauri desktop window scaling", () => {
       return calls.at(-1)?.Logical;
     });
     expect(logical?.width).toBe(1280);
-    expect(logical?.height).toBeGreaterThan(700);
-    expect(logical?.height).toBeLessThan(800);
+    // 畫面下方不再預留宿主列，視窗剛好包住 2 倍畫面。
+    expect(logical?.height).toBe(700);
   });
 
   // 原版鼠标是画进画面的软件光标，和游戏像素同倍率；宿主游标不随逻辑画面的 transform
@@ -374,7 +419,6 @@ test.describe("Tauri desktop window scaling", () => {
     await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
     const canvas = page.getByTestId("battle-canvas");
     await expect(canvas).toBeVisible();
-    await page.getByTestId("image-scaling-sharp").click();
     await expect.poll(async () => (await screenMetrics(page)).scale).toBe(2);
     await page.addStyleTag({ content: ".debug-toolbar { display: none !important; }" });
 
@@ -414,7 +458,9 @@ test.describe("Tauri desktop window scaling", () => {
     });
 
     // 精灵跟随「畫面縮放」：平滑模式下和游戏画面一样双线性插值。
-    await page.getByTestId("image-scaling-smooth").click();
+    await setImageScaling(page, "smooth");
+    // 指针离开画面（移到画面下方的空白）就交还宿主游标。
+    await page.mouse.move(640, 760);
     await expect(sprite).toBeHidden();
     await expect(screen).not.toHaveAttribute("data-native-pointer", "sprite");
     expect((await pointAt({ x: 200, y: 150 })).rendering).toBe("auto");
@@ -422,7 +468,7 @@ test.describe("Tauri desktop window scaling", () => {
 });
 
 /**
- * 桌面版的「介面縮放」。遊戲畫面在桌面版會放大填滿視窗，宿主工具列與三個參考面板卻是
+ * 桌面版的「介面縮放」。遊戲畫面在桌面版會放大填滿視窗，三個參考面板卻是
  * 固定 px 的 DOM，大螢幕上因此比原版自己的點陣字小上數倍。控制項走的是 WebView 真頁面
  * 縮放（和 `Ctrl +/-` 同一條路徑），所以這裡驗的是「有沒有把倍率交給 WebView」與
  * 「選擇有沒有留下來」，不是 CSS 有沒有變——真縮放不改任何一條 CSS。
@@ -453,38 +499,45 @@ test.describe("Tauri host interface zoom", () => {
   const zoomCalls = (page: Page): Promise<number[]> => page.evaluate(() =>
     [...((window as Window & { __TAURI_TEST_ZOOM_CALLS__?: number[] }).__TAURI_TEST_ZOOM_CALLS__ ?? [])]);
 
-  test("the picker is desktop-only, hands the factor to the WebView and is remembered", async ({ page }) => {
+  test("the menu row is desktop-only, hands the factor to the WebView and is remembered", async ({ page }) => {
     await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
     await expect(page.getByTestId("battle-canvas")).toBeVisible();
-    // 網頁版沒有這一組：瀏覽器自己的縮放已經做同一件事。
-    await expect(page.getByTestId("interface-zoom-150")).toHaveCount(0);
-    await expect(page.getByTestId("image-scaling-sharp")).toBeVisible();
+    // 網頁版沒有這一列：瀏覽器自己的縮放已經做同一件事。
+    await openHostMenu(page);
+    await expect(page.getByTestId("host-menu-row-interface-zoom")).toHaveCount(0);
+    await expect(page.getByTestId("host-menu-row-image-scaling")).toBeVisible();
 
     await installTauri(page);
     await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
     await expect(page.locator("html")).toHaveAttribute("data-desktop-runtime", "true");
-    const option = page.getByTestId("interface-zoom-150");
-    await expect(option).toBeVisible();
-    await expect(page.getByTestId("interface-zoom-100")).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByTestId("battle-canvas")).toBeVisible();
+    await openHostMenu(page);
+    const row = page.getByTestId("host-menu-row-interface-zoom");
+    await row.click();
+    await expect(page.getByTestId("host-menu-option-100")).toHaveAttribute("aria-checked", "true");
     // 預設 100% 不必為了「還原」多發一次呼叫：新開的 WebView 本來就是 100%。
     expect(await zoomCalls(page)).toEqual([]);
 
-    await option.click();
-    await expect(option).toHaveAttribute("aria-checked", "true");
-    expect(await zoomCalls(page)).toEqual([1.5]);
-    // 說明行是兩個控制項共用的，玩家動過之後換成介面縮放這一條。
-    await expect(page.getByTestId("image-scaling-hint")).toContainText("遊戲畫面仍會填滿視窗");
+    await page.getByTestId("host-menu-option-150").click();
+    // 交給 WebView 是非同步的（動態載入 Tauri 介面），等它真的發出去。
+    await expect.poll(() => zoomCalls(page)).toEqual([1.5]);
+    await expect(row).toBeFocused();
+    await expect(page.getByTestId("host-menu-description")).toContainText("150%");
+    await expect(page.getByTestId("host-menu-description")).toContainText("說明視窗");
 
     // 兩個宿主顯示偏好共用同一筆記錄，互相不得覆寫。
-    await page.getByTestId("image-scaling-smooth").click();
+    await page.getByTestId("host-menu-row-image-scaling").click();
+    await page.getByTestId("host-menu-option-smooth").click();
     expect(await page.evaluate(() =>
       JSON.parse(localStorage.getItem("angel2.preferences.display.v1") ?? "null")))
       .toEqual({ imageScaling: "smooth", interfaceZoom: 150, portraitStyle: "original" });
 
     await page.reload();
     await expect(page.getByTestId("battle-canvas")).toBeVisible();
-    await expect(page.getByTestId("interface-zoom-150")).toHaveAttribute("aria-checked", "true");
-    // 還原只發一次：表面切換會重建工具列，但頁面縮放屬於整個 WebView，
+    await openHostMenu(page);
+    await page.getByTestId("host-menu-row-interface-zoom").click();
+    await expect(page.getByTestId("host-menu-option-150")).toHaveAttribute("aria-checked", "true");
+    // 還原只發一次：表面切換會重建宿主選單，但頁面縮放屬於整個 WebView，
     // 重複套用會把玩家用 `Ctrl +/-` 調過的倍率蓋回去。
     expect(await zoomCalls(page)).toEqual([1.5]);
   });
@@ -516,7 +569,7 @@ test.describe("Tauri host interface zoom", () => {
     await page.goto("/?debugScenario=stage-02-player&difficulty=0&test=1");
     await expect(page.getByTestId("battle-canvas")).toBeVisible();
 
-    await page.getByTestId("image-scaling-integer").click();
+    await setImageScaling(page, "integer");
     await expect.poll(() => page.evaluate(() => {
       const calls = (window as Window & { __TAURI_TEST_RESIZE_CALLS__?: unknown[] })
         .__TAURI_TEST_RESIZE_CALLS__ ?? [];
