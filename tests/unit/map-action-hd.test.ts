@@ -28,17 +28,25 @@ import {
 } from "../../src/game/map-action-hd";
 
 const assetRoot = path.resolve(__dirname, "../../public/assets/original");
+/**
+ * `reverse/parsed/native` 被 gitignore，干净检出（含 GitHub CI）上没有。只有命中、阵亡与射击三段片段的
+ * 原版时间轴读它，所以延后到用到时才读，并让那三段单独成一条 `it.skipIf`；其余用例在 CI 照常运行。
+ */
+const PARSED_NATIVE_DIRECTORY = path.resolve(__dirname, "../../reverse/parsed/native");
+const PARSED_NATIVE_AVAILABLE = fs.existsSync(PARSED_NATIVE_DIRECTORY);
 const parsedNative = (name: string): Record<string, unknown> =>
-  JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../reverse/parsed/native", name), "utf8")) as Record<string, unknown>;
-const combatEvidence = parsedNative("combat-presentations.json") as {
+  JSON.parse(fs.readFileSync(path.join(PARSED_NATIVE_DIRECTORY, name), "utf8")) as Record<string, unknown>;
+const combatEvidence = () => parsedNative("combat-presentations.json") as {
   mapPresentation: {
     hit: { totalGraphicFrames: number; fixedGraphicWaitNativeTicks: number };
     death: { descriptorCount: number; waitPerDescriptorNativeTicks: number };
   };
 };
-const shootingEvidence = parsedNative("shooting-presentations.json") as {
+const shootingEvidence = () => parsedNative("shooting-presentations.json") as {
   commonImpact: { timeline: { tileCodes: number[]; waitPerDrawNativeTicks: number } };
 };
+/** Clips whose original timeline is read from `reverse/parsed/native` rather than generated content. */
+const PARSED_EVIDENCE_CLIPS = new Set(["hit", "death", "shoot"]);
 
 type Phase = { readonly draws: number; readonly wait: number };
 
@@ -103,19 +111,19 @@ const ORIGINAL: Record<string, () => readonly Phase[]> = {
   }],
   ice: () => descriptorPhases([STAGE1_ACTION_PRESENTATION.ice1.cycle]),
   // `REMAKE-207`: the map-combat strike (UN/62, nine draws) and each death (MAGIC/12), as the parsed evidence records them
-  hit: () => [{
-    draws: combatEvidence.mapPresentation.hit.totalGraphicFrames,
-    wait: combatEvidence.mapPresentation.hit.fixedGraphicWaitNativeTicks / combatEvidence.mapPresentation.hit.totalGraphicFrames,
-  }],
-  death: () => [{
-    draws: combatEvidence.mapPresentation.death.descriptorCount,
-    wait: combatEvidence.mapPresentation.death.waitPerDescriptorNativeTicks,
-  }],
+  hit: () => {
+    const { hit } = combatEvidence().mapPresentation;
+    return [{ draws: hit.totalGraphicFrames, wait: hit.fixedGraphicWaitNativeTicks / hit.totalGraphicFrames }];
+  },
+  death: () => {
+    const { death } = combatEvidence().mapPresentation;
+    return [{ draws: death.descriptorCount, wait: death.waitPerDescriptorNativeTicks }];
+  },
   // `REMAKE-208`: UN/60's eight frames between the archer's two blank draws, and WD's ten growth frames
-  shoot: () => [{
-    draws: shootingEvidence.commonImpact.timeline.tileCodes.length - 2,
-    wait: shootingEvidence.commonImpact.timeline.waitPerDrawNativeTicks,
-  }],
+  shoot: () => {
+    const { timeline: impact } = shootingEvidence().commonImpact;
+    return [{ draws: impact.tileCodes.length - 2, wait: impact.waitPerDrawNativeTicks }];
+  },
   wd: () => [{ draws: STAGE1_ACTION_PRESENTATION.wd.finishSteps, wait: STAGE1_ACTION_PRESENTATION.wd.waitPerGrowthOrFinishStepNativeTicks }],
   // `REMAKE-210`: each tier's main phases, its sweep (codes 1..sweepWidth) at the wave pace, and the MAGIC/6 finish all
   // four tiers share; `REMAKE-211`: the marker covers every wave draw (its two frames alternating)
@@ -131,6 +139,17 @@ const ORIGINAL: Record<string, () => readonly Phase[]> = {
   "lightning-cleanup": () => descriptorPhases([STAGE1_ACTION_PRESENTATION.lightning1.commonHit.cleanup]),
 };
 
+function expectOnOriginalTimeline(clip: ReturnType<typeof mapActionHdClips>[number]): void {
+  const phases = ORIGINAL[clip.clipId];
+  if (!phases) throw new Error(`no original timeline for ${clip.clipId}`);
+  const original = timeline(phases());
+  expect(clip.durationTicks, clip.clipId).toBe(original.duration);
+  expect(clip.frameStartTicks, clip.clipId).toEqual(original.starts);
+  // one video frame per native tick, through the afterglow
+  expect(clip.video.frames, clip.clipId).toBe(clip.durationTicks + clip.afterglowTicks);
+  expect(clip.video.fps, clip.clipId).toBe(100);
+}
+
 describe("HD map effects (REMAKE-203 fire, REMAKE-204 heal and rest, REMAKE-205..210 the rest, REMAKE-211 refinements, REMAKE-213 ice shell)", () => {
   it("keeps every clip on its original graphics timeline, with any afterglow after it", () => {
     const ids = mapActionHdClips().map(({ clipId }) => clipId);
@@ -142,14 +161,9 @@ describe("HD map effects (REMAKE-203 fire, REMAKE-204 heal and rest, REMAKE-205.
           .toEqual([0, 0, 1, [0]]);
         continue;
       }
-      const phases = ORIGINAL[clip.clipId];
-      if (!phases) throw new Error(`no original timeline for ${clip.clipId}`);
-      const original = timeline(phases());
-      expect(clip.durationTicks, clip.clipId).toBe(original.duration);
-      expect(clip.frameStartTicks, clip.clipId).toEqual(original.starts);
-      // one video frame per native tick, through the afterglow
-      expect(clip.video.frames, clip.clipId).toBe(clip.durationTicks + clip.afterglowTicks);
-      expect(clip.video.fps, clip.clipId).toBe(100);
+      // checked in the next case, which needs the parsed evidence
+      if (PARSED_EVIDENCE_CLIPS.has(clip.clipId)) continue;
+      expectOnOriginalTimeline(clip);
     }
     // fire keeps ending with the original; the shared heal finish fades out after it
     expect(mapActionHdClip("fire-1")?.afterglowTicks).toBe(0);
@@ -161,6 +175,12 @@ describe("HD map effects (REMAKE-203 fire, REMAKE-204 heal and rest, REMAKE-205.
     }
     expect(timeline(descriptorPhases(STAGE1_ACTION_PRESENTATION.heal2.phases.slice(0, -1))).duration)
       .toBe(timeline(ORIGINAL["heal-2"]?.() ?? []).duration);
+  });
+
+  it.skipIf(!PARSED_NATIVE_AVAILABLE)("keeps the strike, death and shot clips on the parsed evidence's timeline (REMAKE-207, REMAKE-208)", () => {
+    const clips = mapActionHdClips().filter(({ clipId }) => PARSED_EVIDENCE_CLIPS.has(clipId));
+    expect(clips.map(({ clipId }) => clipId).sort()).toEqual([...PARSED_EVIDENCE_CLIPS].sort());
+    for (const clip of clips) expectOnOriginalTimeline(clip);
   });
 
   it("ships every clip in the asset pack with a stacked layout that fits the video", () => {
