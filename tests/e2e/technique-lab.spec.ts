@@ -556,6 +556,60 @@ test("REMAKE-209/210: HD art style moves the stomp's leg and shadow stills on th
   expect(pageErrors).toEqual([]);
 });
 
+test("HD art style keeps drawing the HD clip through the catch-up seek when playback restarts off the clip's position", async ({ page }) => {
+  // 「從頭」(and switching technique) starts playing at 0 while the video still sits where the timeline was. Before the
+  // fix every catch-up seek dropped the video's readyState: the lab drew the original for that frame and stopped the
+  // clip, the next frame seeked again, and the effect kept alternating between the original tiles and the HD clip
+  // while the video never actually played.
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/technique-lab.html?art=hd");
+  const hd = page.getByTestId("map-action-hd-canvas");
+  expect(await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("3F"))).toBe(true);
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
+  // load and decode the clip while paused far from where playback will start
+  await expect.poll(async () => {
+    await seek(page, 1500);
+    return hd.getAttribute("data-map-action-hd-action");
+  }, { timeout: 15_000 }).toBe("fire-3");
+  await page.evaluate(() => {
+    const record = { samples: [] as { phase: string; tiles: number; hd: string }[], seeks: 0, stop: false };
+    (window as unknown as { __hdPlayback: typeof record }).__hdPlayback = record;
+    document.addEventListener("seeking", (event) => {
+      if (event.target instanceof HTMLVideoElement) record.seeks += 1;
+    }, true);
+    const canvas = document.querySelector<HTMLCanvasElement>("#technique-lab-canvas canvas");
+    const layer = document.querySelector<HTMLCanvasElement>('[data-testid="map-action-hd-canvas"]');
+    const sample = () => {
+      if (record.stop) return;
+      record.samples.push({
+        phase: canvas?.dataset.techniquePhase ?? "",
+        tiles: Number(canvas?.dataset.effectTileCount ?? 0),
+        hd: layer?.dataset.mapActionHdAction ?? "",
+      });
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  await page.getByTestId("technique-lab-restart").click();
+  // 3F lasts 1950 ms; stop sampling before its last frame
+  await page.waitForTimeout(1600);
+  const record = await page.evaluate(() => {
+    const value = (window as unknown as { __hdPlayback: { samples: { phase: string; tiles: number; hd: string }[];
+      seeks: number; stop: boolean } }).__hdPlayback;
+    value.stop = true;
+    return value;
+  });
+  const during = record.samples.filter((sample) => sample.phase !== "none");
+  expect(during.length).toBeGreaterThan(20);
+  // every frame of the effect is the HD clip: no original tiles, no frame without the clip
+  expect(during.filter((sample) => sample.tiles > 0).length).toBe(0);
+  expect(during.filter((sample) => sample.hd !== "fire-3").length).toBe(0);
+  // one catch-up seek to the clock, not one per frame
+  expect(record.seeks).toBeLessThanOrEqual(2);
+  expect(pageErrors).toEqual([]);
+});
+
 test("intermediate fire composes 21 source tiles into twelve native draws", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));

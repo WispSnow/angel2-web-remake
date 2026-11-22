@@ -72,6 +72,14 @@ const END_FADE_TICKS = 6;
 const DONE_EPSILON_TICKS = 0.01;
 /** 視訊與時鐘相差超過這麼多 tick 才校正，免得每幀都 seek。 */
 const RESYNC_TICKS = 1.5;
+/**
+ * 播放中的視訊另以播放倍率放寬校正門檻、並往前多跳一點：一次 seek 本身要幾十毫秒，期間時鐘照走，門檻若比 seek 的耗時還小，
+ * 每次 seek 完都已落後到要再 seek，視訊就一直停在 seek 裡（技術實驗室從頭播放時正是如此）。
+ */
+const RESYNC_PLAYING_TICKS_PER_RATE = 5;
+const SEEK_LEAD_TICKS_PER_RATE = 3;
+/** seek 期間沿用這支視訊上一幀的畫面，只要它離要畫的那一幀不超過這麼多 tick；更遠（換了位置重播）就寧可空一兩幀。 */
+const HOLD_TICKS = 8;
 
 const VERTEX_SHADER = `
 attribute vec2 corner;
@@ -98,11 +106,23 @@ void main() {
 
 interface GlState {
   readonly gl: WebGLRenderingContext;
-  readonly texture: WebGLTexture;
   readonly destination: WebGLUniformLocation | null;
   readonly colourRect: WebGLUniformLocation | null;
   readonly alphaRect: WebGLUniformLocation | null;
   readonly visible: WebGLUniformLocation | null;
+}
+
+/** One texture per playing position: it keeps that video's last decoded frame while the video seeks. */
+function createTexture(gl: WebGLRenderingContext): WebGLTexture | null {
+  const texture = gl.createTexture();
+  if (!texture) return null;
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  // video frames are not powers of two: no mipmaps, clamped edges
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return texture;
 }
 
 function createGl(canvas: HTMLCanvasElement): GlState | undefined {
@@ -118,9 +138,8 @@ function createGl(canvas: HTMLCanvasElement): GlState | undefined {
   const vertex = compile(gl.VERTEX_SHADER, VERTEX_SHADER);
   const fragment = compile(gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
   const program = gl.createProgram();
-  const texture = gl.createTexture();
   const buffer = gl.createBuffer();
-  if (!vertex || !fragment || !program || !texture || !buffer) return undefined;
+  if (!vertex || !fragment || !program || !buffer) return undefined;
   gl.attachShader(program, vertex);
   gl.attachShader(program, fragment);
   gl.linkProgram(program);
@@ -131,12 +150,6 @@ function createGl(canvas: HTMLCanvasElement): GlState | undefined {
   const corner = gl.getAttribLocation(program, "corner");
   gl.enableVertexAttribArray(corner);
   gl.vertexAttribPointer(corner, 2, gl.FLOAT, false, 0, 0);
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  // video frames are not powers of two: no mipmaps, clamped edges
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
   // several clips can overlap (an afterglow under the next clip): premultiplied "over"
@@ -144,7 +157,6 @@ function createGl(canvas: HTMLCanvasElement): GlState | undefined {
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   return {
     gl,
-    texture,
     destination: gl.getUniformLocation(program, "destination"),
     colourRect: gl.getUniformLocation(program, "colourRect"),
     alphaRect: gl.getUniformLocation(program, "alphaRect"),
@@ -158,6 +170,10 @@ export class MapActionHdLayer {
   private readonly videos = new Map<string, HTMLVideoElement>();
   /** 靜態片段（`REMAKE-209`）的圖。 */
   private readonly images = new Map<string, HTMLImageElement>();
+  /** 每個播放位置的紋理與它上傳時的視訊時間（秒）：視訊 seek 時沿用。 */
+  private readonly textures = new Map<string, { readonly texture: WebGLTexture; mediaTime: number }>();
+  /** 解碼出過一幀的視訊：之後 seek 時 `readyState` 會暫時掉到 1，仍算可畫（見 `ready`）。 */
+  private readonly decoded = new WeakSet<HTMLVideoElement>();
   /** 正在跟隨控制器的片段（通常一段；逐格錯開的片段每個播放位置一段）。 */
   private active: MapActionHdShow[] = [];
   /** 已被換下、還在播餘韻的片段，依開始順序。 */
@@ -229,6 +245,7 @@ export class MapActionHdLayer {
     video.preload = "auto";
     video.disablePictureInPicture = true;
     video.dataset.sourceUrl = clip.video.source;
+    video.addEventListener("loadeddata", () => this.decoded.add(video));
     video.addEventListener("error", () => {
       this.onFailure(clip.clipId, video.error?.message || `media error ${video.error?.code ?? "unknown"}`);
       if (this.active.some((show) => show.clip.clipId === clip.clipId)) this.setShow(undefined);
@@ -246,12 +263,16 @@ export class MapActionHdLayer {
     this.videos.set(key, video);
   }
 
-  /** 這段片段的每支視訊都已解碼出可畫的一幀（靜態片段：圖已解碼）。 */
+  /**
+   * 這段片段的每支視訊都已解碼出可畫的一幀（靜態片段：圖已解碼）。解碼過就一直算數：播放中校正位置的 seek 會讓
+   * `readyState` 暫時掉到 1，若因此判成「沒準備好」，技術實驗室會每隔一幀改畫原版並暫停視訊，視訊再也播不起來。
+   */
   ready(clipId: string): boolean {
     const image = this.images.get(clipId);
     if (image) return Boolean(this.glState) && image.complete && image.naturalWidth > 0;
     return Boolean(this.glState) && Array.from({ length: mapActionHdInstanceCount(clipId) }, (_, instance) =>
-      this.videos.get(videoKey(clipId, instance))).every((video) => video && !video.error && video.readyState >= 2);
+      this.videos.get(videoKey(clipId, instance))).every((video) => video && !video.error
+        && (video.readyState >= 2 || this.decoded.has(video)));
   }
 
   /**
@@ -320,6 +341,8 @@ export class MapActionHdLayer {
     }
     this.videos.clear();
     this.images.clear();
+    for (const { texture } of this.textures.values()) this.glState?.gl.deleteTexture(texture);
+    this.textures.clear();
     this.glState?.gl.getExtension("WEBGL_lose_context")?.loseContext();
     this.canvas.remove();
   }
@@ -403,8 +426,13 @@ export class MapActionHdLayer {
       if (Math.abs(video.currentTime - frameTime) > 0.5 / fps && !video.seeking) video.currentTime = frameTime;
       return;
     }
-    video.playbackRate = Math.min(16, Math.max(0.25, show.rate));
-    if (Math.abs(video.currentTime - tick / fps) > RESYNC_TICKS / fps && !video.seeking) video.currentTime = frameTime;
+    const rate = Math.min(16, Math.max(0.25, show.rate));
+    video.playbackRate = rate;
+    const tolerance = Math.max(RESYNC_TICKS, RESYNC_PLAYING_TICKS_PER_RATE * rate);
+    if (Math.abs(video.currentTime - tick / fps) > tolerance / fps && !video.seeking) {
+      // aim a little ahead: the clock keeps running while the seek completes
+      video.currentTime = (Math.min(Math.floor(tick + SEEK_LEAD_TICKS_PER_RATE * rate), frames - 1) + 0.5) / fps;
+    }
     if (video.paused && tick < frames) void video.play().catch(() => undefined);
   }
 
@@ -438,10 +466,30 @@ export class MapActionHdLayer {
     const { gl } = state;
     const clip = show.clip;
     const end = mapActionHdClipEnd(clip);
-    const loaded = source instanceof HTMLImageElement ? source.complete && source.naturalWidth > 0 : source.readyState >= 2;
-    if (!loaded || (!clip.still && tick >= end)) return;
-    gl.bindTexture(gl.TEXTURE_2D, state.texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, source);
+    if (!clip.still && tick >= end) return;
+    // a frame is uploaded only when the source has it; while a video seeks, its own last frame is drawn again if it is
+    // close to the wanted one (a resync during playback), otherwise nothing (the video was parked elsewhere)
+    const key = showKey(show);
+    const fresh = source instanceof HTMLImageElement
+      ? source.complete && source.naturalWidth > 0
+      : source.readyState >= 2 && !source.seeking;
+    let entry = this.textures.get(key);
+    if (fresh) {
+      if (!entry) {
+        const texture = createTexture(gl);
+        if (!texture) return;
+        entry = { texture, mediaTime: 0 };
+        this.textures.set(key, entry);
+      }
+      gl.bindTexture(gl.TEXTURE_2D, entry.texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, source);
+      entry.mediaTime = source instanceof HTMLVideoElement ? source.currentTime : 0;
+    } else if (!entry || (source instanceof HTMLVideoElement
+      && Math.abs(entry.mediaTime - tick / clip.video.fps) > HOLD_TICKS / clip.video.fps)) {
+      return;
+    } else {
+      gl.bindTexture(gl.TEXTURE_2D, entry.texture);
+    }
     const vw = clip.video.width;
     const vh = clip.video.height;
     gl.uniform4f(state.colourRect, 0, 0, clip.frameWidth / vw, clip.frameHeight / vh);
