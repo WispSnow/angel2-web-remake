@@ -54,6 +54,7 @@ import {
 } from "../content/map-action-hd";
 import {
   activeMapActionHdCast,
+  activeMapActionHdIceShell,
   mapActionHdCastFailed,
   mapActionHdFailed,
   mapActionHdFrameSpan,
@@ -63,7 +64,7 @@ import {
 } from "../map-action-hd";
 import { portraitStyle } from "../portrait-style";
 import { programNow } from "../program-clock";
-import { MapActionHdLayer, type MapActionHdPoint } from "./map-action-hd-layer";
+import { MapActionHdLayer, type MapActionHdOccluder, type MapActionHdPoint } from "./map-action-hd-layer";
 import { lightningHdCells, type MapActionHdCell } from "./map-action-hd-cells";
 
 const TILE_WIDTH = BATTLE_TILE_WIDTH;
@@ -290,6 +291,8 @@ interface UnitView {
   container: Phaser.GameObjects.Container;
   sprite: Phaser.GameObjects.Image;
   iceDisabledOverlay?: Phaser.GameObjects.Image;
+  /** 這名單位此刻該不該顯示冰殼（冰封且棋子已載入）；原版圖還是高清圖在 Phaser 每次繪製前決定（`REMAKE-213`）。 */
+  iceShellShown?: boolean;
   lifeDigits: Phaser.GameObjects.Graphics;
   actedBadge: Phaser.GameObjects.Graphics;
   npcAllyBadge: Phaser.GameObjects.Graphics;
@@ -413,6 +416,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       clocks: Map<string, MapActionHdFrameClock>;
     } | undefined;
     private turnTransitionEffects: Phaser.GameObjects.Image[] = [];
+    /** 此刻畫著的游標框左上角（世界座標）；施法、戰鬥與換回合時游標隱藏，為 `undefined`。 */
+    private cursorFrame: { readonly x: number; readonly y: number } | undefined;
     private terrainOverrideImages: Phaser.GameObjects.Image[] = [];
     private turnTransitionMask?: Phaser.Display.Masks.GeometryMask;
     private turnTransitionMaskShape?: Phaser.GameObjects.Graphics;
@@ -575,12 +580,14 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.input.on("pointerupoutside", this.handlePointerRelease, this);
       this.unsubscribe = controller.onChange(() => this.sync());
       this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.publishMovementFrame, this);
+      this.events.on(Phaser.Scenes.Events.PRE_RENDER, this.syncMapActionHdOverlays, this);
       this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
         this.unsubscribe?.();
         this.input.off("pointermove", this.handlePointerMove, this);
         this.input.off("pointerup", this.handlePointerRelease, this);
         this.input.off("pointerupoutside", this.handlePointerRelease, this);
         this.events.off(Phaser.Scenes.Events.POST_UPDATE, this.publishMovementFrame, this);
+        this.events.off(Phaser.Scenes.Events.PRE_RENDER, this.syncMapActionHdOverlays, this);
         this.game.canvas.removeEventListener("pointerleave", this.handleCanvasPointerLeave);
         for (const tile of this.rangeMaskTiles) tile.destroy();
         this.rangeMaskTiles = [];
@@ -1351,7 +1358,9 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         if (!this.drawLifeDigits(view, { ...unit, life: displayedLife })) concealedLifeUnitIds.push(unit.id);
         // Frozen units are state-driven and untargetable; keep the shell visible
         // while unrelated area techniques play until dispel or phase cleanup.
-        view.iceDisabledOverlay?.setVisible(unit.actionDisabled && !figurePending);
+        // `syncMapActionHdOverlays` swaps it for the HD still before each render (REMAKE-213).
+        view.iceShellShown = unit.actionDisabled && !figurePending;
+        view.iceDisabledOverlay?.setVisible(view.iceShellShown);
         // `0000:822B` 先测棋盘格的 `80h` 行动位，命中就画 `E` 并返回；
         // 只有未行动的自动友军才继续走到 `825B` 的 `N` 分支。
         const showActed = unit.acted && !mapPresentation;
@@ -1522,6 +1531,82 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           : []).join(",");
       }
       return true;
+    }
+
+    /**
+     * 凍結單位的冰殼（`REMAKE-213`）：高清可用且圖已解碼時，原版冰殼換成高清畫布上疊在全部片段之上的靜態圖。在
+     * Phaser 每次繪製前（深度排序之後）決定並交給畫布層，兩塊畫布在同一幀更新：鏡頭捲動、冰殼出現或消失都不會
+     * 差一幀。原版深度高於冰殼的游標（10）與換回合的奔跑者、塵土（11–13）列成擦除區，照舊蓋在冰殼上。
+     */
+    private syncMapActionHdOverlays(): void {
+      const layer = this.mapActionHd;
+      const shell = layer && hasIcePresentation ? activeMapActionHdIceShell() : undefined;
+      if (layer && shell) layer.prepare([shell]);
+      const hd = Boolean(layer && shell && !mapActionHdFailed(shell.clipId) && layer.ready(shell.clipId));
+      const camera = this.cameras.main;
+      const points: MapActionHdPoint[] = [];
+      let originals = 0;
+      for (const view of this.unitViews.values()) {
+        const overlay = view.iceDisabledOverlay;
+        if (!overlay) continue;
+        const shown = view.iceShellShown === true;
+        overlay.setVisible(shown && !hd);
+        if (shown && !hd) originals += 1;
+        if (!shown || !hd) continue;
+        // the still's origin is the original shell picture's top-left
+        const corner = overlay.getTopLeft();
+        points.push({ x: corner.x - camera.scrollX, y: corner.y - camera.scrollY });
+      }
+      layer?.setOverlays(shell && points.length > 0 ? [{ clip: shell, points }] : [], this.mapActionHdOccluders());
+      if (controller.isTestMode) {
+        const canvas = this.game.canvas;
+        canvas.dataset.iceShellStyle = hd ? "hd" : "original";
+        canvas.dataset.iceShellHdCount = String(points.length);
+        canvas.dataset.iceShellOriginalCount = String(originals);
+      }
+    }
+
+    /** 原版深度高於冰殼的 Phaser 物件在高清畫布座標裡的位置：游標的四條實心框線，換回合的每張圖（只在那條橫帶裡）。 */
+    private mapActionHdOccluders(): MapActionHdOccluder[] {
+      const camera = this.cameras.main;
+      const occluders: MapActionHdOccluder[] = [];
+      if (this.cursorFrame) {
+        const x = this.cursorFrame.x - camera.scrollX;
+        const y = this.cursorFrame.y - camera.scrollY;
+        occluders.push(
+          { x, y, w: TILE_WIDTH, h: 2 },
+          { x, y: y + TILE_HEIGHT - 2, w: TILE_WIDTH, h: 2 },
+          { x, y: y + 2, w: 2, h: TILE_HEIGHT - 4 },
+          { x: x + TILE_WIDTH - 2, y: y + 2, w: 2, h: TILE_HEIGHT - 4 },
+        );
+      }
+      // the turn transition's pictures ignore the scroll; `addFixedImage` already placed them in viewport px
+      const strip = {
+        x: BATTLE_INPUT_LEFT - camera.x,
+        y: TURN_TRANSITION_SCREEN_Y - camera.y,
+        w: 400,
+        h: TURN_TRANSITION_BUFFER_HEIGHT,
+      };
+      for (const image of this.turnTransitionEffects) {
+        if (!image.visible) continue;
+        const { frame } = image;
+        const corner = image.getTopLeft();
+        occluders.push({
+          x: corner.x,
+          y: corner.y,
+          w: image.displayWidth,
+          h: image.displayHeight,
+          image: {
+            source: frame.source.image as TexImageSource,
+            sx: frame.cutX,
+            sy: frame.cutY,
+            sw: frame.cutWidth,
+            sh: frame.cutHeight,
+          },
+          clip: strip,
+        });
+      }
+      return occluders;
     }
 
     /**
@@ -2549,6 +2634,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
 
     private drawCursor(): void {
       this.cursorGraphics.clear();
+      this.cursorFrame = undefined;
       if (controller.isTestMode) {
         const canvas = this.game.canvas;
         canvas.dataset.cursorFrameStyle = "native-bevel";
@@ -2565,7 +2651,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       // 原版只用这一层 40×44 斜面框标记当前格（INPUT-004），棋子本身没有
       // 任何敌我色环，所以这里不再叠加额外的悬浮/选中圆圈。
       const focus = controller.cursor;
-      this.drawNativeCursorFrame(focus.x * TILE_WIDTH, focus.y * TILE_HEIGHT);
+      this.cursorFrame = { x: focus.x * TILE_WIDTH, y: focus.y * TILE_HEIGHT };
+      this.drawNativeCursorFrame(this.cursorFrame.x, this.cursorFrame.y);
     }
 
     private drawNativeCursorFrame(x: number, y: number): void {

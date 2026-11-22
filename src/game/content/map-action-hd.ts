@@ -147,6 +147,20 @@ const MAP_ACTION_HD_STAGGERED_CLIPS: ReadonlySet<string> = new Set([
   "shoot", "wd", "lightning-1-hit", "lightning-2-hit", "lightning-3-hit", "lightning-4-hit",
 ]);
 
+/**
+ * `REMAKE-213`：凍結單位身上的冰殼。原版冰雪結束後，每個被冰封的單位上一直留著 `MAGIC/10` 的最後一幀，直到解凍或破邪；
+ * 它不屬於施法表現，所以由戰場另外擺。高清版是一張靜態圖（冰雪片段在那一幀的畫面），四檔冰雪共用，跟著冰雪一起下載。
+ */
+export const MAP_ACTION_HD_ICE_SHELL = "ice-shell";
+
+/** 施法後留在地圖上的高清靜態圖，跟著施放它的動作一起下載。 */
+const MAP_ACTION_HD_LEFT_BEHIND: Readonly<Record<string, readonly string[]>> = {
+  "ice-1": [MAP_ACTION_HD_ICE_SHELL],
+  "ice-2": [MAP_ACTION_HD_ICE_SHELL],
+  "ice-3": [MAP_ACTION_HD_ICE_SHELL],
+  "ice-4": [MAP_ACTION_HD_ICE_SHELL],
+};
+
 /** 每個關卡都可能用到的高清動作：所有單位都能休息，地圖戰鬥的命中與死亡（`REMAKE-207`）也不分職業。 */
 export const MAP_ACTION_HD_EVERY_STAGE: readonly string[] = ["rest", "map-hit", "map-death"];
 
@@ -189,11 +203,12 @@ export function mapActionHdClipFrame(segment: MapActionHdSegment, phase: string,
   return frames ? local % frames : local;
 }
 
-/** 這些動作用到的高清視訊網址（沒有高清版的動作略過）。 */
+/** 這些動作用到的高清視訊網址（沒有高清版的動作略過；冰雪連同它留下的冰殼）。 */
 export function mapActionHdAssetUrlsForActions(actionIds: Iterable<string>): readonly string[] {
   const urls = new Set<string>();
   for (const actionId of actionIds) {
-    for (const { clipId } of mapActionHdCast(actionId) ?? []) {
+    const left = Object.hasOwn(MAP_ACTION_HD_LEFT_BEHIND, actionId) ? MAP_ACTION_HD_LEFT_BEHIND[actionId] : [];
+    for (const clipId of [...(mapActionHdCast(actionId) ?? []).map((segment) => segment.clipId), ...left]) {
       const clip = mapActionHdClip(clipId);
       if (clip) urls.add(clip.video.source);
     }

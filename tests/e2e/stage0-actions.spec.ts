@@ -964,6 +964,95 @@ test("REMAKE-206: in 高清 1I draws one heart clip on every healed ally and 1C 
     .toEqual(Array.from({ length: 12 }, (_, index) => `${(index % 6) * 10},${(index % 6) * 10 + 10}`));
 });
 
+test("REMAKE-213: in 高清 a frozen unit keeps the HD ice shell, under the cursor and the turn handoff", async ({ page }) => {
+  await useHdArtStyle(page);
+  await page.goto("/?test=1&skipStartup=1");
+  // the magician's neighbour is pushed to the 1C ring and frozen there
+  await forceSetup(page, "magician");
+  await expect.poll(() => hdVideosReady(page, [ICE_HD]), { timeout: 15_000 }).toBe(true);
+  const canvas = page.getByTestId("battle-canvas");
+  const hd = page.getByTestId("map-action-hd-canvas");
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-ice-1").click();
+  await page.keyboard.press(" ");
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState;
+    return current.lastSpecialAction?.actionId === "ice-1" && current.specialActionPresentation === undefined;
+  });
+  await expect(canvas).toHaveAttribute("data-ice-disabled-count", "1");
+  // the original shell gives way to the HD still on the HD canvas, where the original picture stood: the 40x37 tile
+  // centred in the frozen unit's cell
+  await expect(canvas).toHaveAttribute("data-ice-shell-style", "hd", { timeout: 15_000 });
+  await expect(canvas).toHaveAttribute("data-ice-shell-hd-count", "1");
+  await expect(canvas).toHaveAttribute("data-ice-shell-original-count", "0");
+  const frozen = await page.evaluate(() => {
+    const current = window.__ANGEL2__?.getState() as unknown as {
+      cameraOrigin: { x: number; y: number };
+      units: Array<{ id: string; x: number; y: number; actionDisabled: boolean }>;
+    };
+    const unit = current.units.find(({ actionDisabled }) => actionDisabled);
+    return unit && { x: unit.x, y: unit.y, camera: current.cameraOrigin };
+  });
+  if (!frozen) throw new Error("no frozen unit after 1C");
+  const shellX = (frozen.x - frozen.camera.x) * 40;
+  const shellY = (frozen.y - frozen.camera.y) * 44 + 3.5;
+  await expect(hd).toHaveAttribute("data-map-action-hd-overlays", `ice-shell@${shellX},${shellY}`);
+  // the cast's afterglow has finished; the shell alone keeps the canvas, and nothing above it is cut out yet
+  await expect(hd).not.toHaveAttribute("data-map-action-hd-action", /./u, { timeout: 5_000 });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-ice-shell-hd.png" });
+
+  // the cursor's 40x44 frame (depth 10) stays above the shell (depth 9): its four borders are cut out of the HD canvas
+  const cursor = async () => (await state(page) as unknown as { cursor: { x: number; y: number } }).cursor;
+  const start = await cursor();
+  expect(start.y).toBe(frozen.y);
+  for (let step = start.x; step < frozen.x; step += 1) await page.keyboard.press("ArrowRight");
+  await expect.poll(cursor).toEqual({ x: frozen.x, y: frozen.y });
+  await expect(hd).toHaveAttribute("data-map-action-hd-occluders", "4");
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-ice-shell-hd-cursor.png" });
+
+  // the turn handoff's runner, shadow and edge dust (depths 11-13) also cut through it; the shell stays all the while
+  await page.keyboard.press("g");
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  await page.getByTestId("group-command-allRest").click();
+  const layer = page.getByTestId("dialogue-layer");
+  await expect(layer).toBeVisible();
+  await expect.poll(async () => {
+    if (await layer.isVisible()) await layer.click({ timeout: 500 }).catch(() => undefined);
+    return layer.isVisible();
+  }, { timeout: 10_000 }).toBe(false);
+  await page.waitForFunction(() => {
+    const transition = window.__ANGEL2__?.getState().turnTransitionPresentation as { phase?: string } | undefined;
+    return transition?.phase === "motion";
+  }, undefined, { polling: 10 });
+  // the handoff may scroll the camera: the shell keeps to the frozen unit's cell
+  await expect.poll(() => page.evaluate(({ x, y }) => {
+    const current = window.__ANGEL2__?.getState() as unknown as { cameraOrigin: { x: number; y: number } };
+    const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=map-action-hd-canvas]");
+    const expected = `ice-shell@${(x - current.cameraOrigin.x) * 40},${(y - current.cameraOrigin.y) * 44 + 3.5}`;
+    return canvas?.dataset.mapActionHdOccluders === "8" && canvas.dataset.mapActionHdOverlays === expected;
+  }, frozen), { timeout: 5_000 }).toBe(true);
+
+  // in the original art style the original shell is back (this init script runs after the HD one)
+  await page.addInitScript(([key, value]) => localStorage.setItem(key, value), [
+    DISPLAY_KEY,
+    JSON.stringify({ imageScaling: "sharp", interfaceZoom: 100, portraitStyle: "original" }),
+  ] as const);
+  await page.reload();
+  await forceSetup(page, "magician");
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-ice-1").click();
+  await page.keyboard.press(" ");
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState;
+    return current.lastSpecialAction?.actionId === "ice-1" && current.specialActionPresentation === undefined;
+  });
+  await expect(canvas).toHaveAttribute("data-ice-shell-style", "original");
+  await expect(canvas).toHaveAttribute("data-ice-shell-original-count", "1");
+  await expect(hd).not.toHaveAttribute("data-map-action-hd-overlays", /./u);
+});
+
 test("REMAKE-207: in 高清 a map-presentation strike and the kill's death play their HD clips on the defender", async ({ page }) => {
   await useHdArtStyle(page);
   await page.goto("/?test=1&skipStartup=1&slowMap=1");

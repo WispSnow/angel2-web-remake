@@ -13,8 +13,9 @@ import { stagedRenderAssetSource } from "../staged-render-asset-cache";
  * 改用一個 WebGL 片段著色器把兩半拆回真正的透明度：顏色取前半、alpha = 1 − 後半，輸出預乘 alpha，
  * 再由瀏覽器照一般透明圖片疊到 Phaser 畫布上。沒有 WebGL 時整個動作回退原版。
  *
- * 層次：原版特效在 Phaser 深度 8，這塊畫布蓋在整塊 Phaser 畫布上。施法時游標本來就隱藏，唯一被蓋住的是
- * 凍結標記（深度 9）與特效重疊的部分。
+ * 層次：原版特效在 Phaser 深度 8，這塊畫布蓋在整塊 Phaser 畫布上。凍結單位的冰殼（原版深度 9）在高清時是疊在全部
+ * 片段之上的靜態圖（`setOverlays`，`REMAKE-213`）；原版深度更高、本該蓋住冰殼與特效的 Phaser 物件（游標、換回合的
+ * 奔跑者與塵土）由宿主列成擦除區，這塊畫布在它們不透明的地方挖空，讓底下的 Phaser 畫面露出來。
  *
  * 同時可以有幾個正在跟隨控制器的片段，加上幾段還在播餘韻的片段（例如 `2H` 的光環還在散、收尾星芒已經
  * 開始）：每段各用自己的視訊，依序畫在同一塊畫布上。同一段片段要在不同格上同時停在不同幀時（魔弓的直線
@@ -35,6 +36,35 @@ export interface MapActionHdViewport {
 export interface MapActionHdPoint {
   readonly x: number;
   readonly y: number;
+}
+
+/**
+ * 疊在全部片段之上的靜態圖（`REMAKE-213` 凍結單位的冰殼）：持續的狀態投影，沒有時鐘。位置由宿主在 Phaser 每次繪製前
+ * 算好給定（不是閉包），畫布層在同一幀重畫，鏡頭捲動時才不會晚一幀。
+ */
+export interface MapActionHdOverlay {
+  /** 靜態片段。 */
+  readonly clip: MapActionHdClip;
+  /** 每個要畫的位置：原版圖左上角在畫布邏輯座標裡的位置（靜態片段的原點）。 */
+  readonly points: readonly MapActionHdPoint[];
+}
+
+/** Phaser 裡原版深度高於冰殼與特效的物件：這塊畫布在它不透明的地方挖空（畫布邏輯座標）。 */
+export interface MapActionHdOccluder {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+  /** 一張圖時只挖掉它不透明的像素（`source` 裡的子矩形）；沒有時挖掉整個矩形（游標的實心框線）。 */
+  readonly image?: {
+    readonly source: TexImageSource;
+    readonly sx: number;
+    readonly sy: number;
+    readonly sw: number;
+    readonly sh: number;
+  };
+  /** 只在這個矩形裡挖（換回合只畫在一條橫帶裡）。 */
+  readonly clip?: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
 }
 
 export interface MapActionHdShow {
@@ -104,12 +134,28 @@ void main() {
   gl_FragColor = vec4(colour, alpha) * visible;
 }`;
 
+/** 擦除：輸出來源圖的透明度，搭配 `ZERO, ONE_MINUS_SRC_ALPHA` 把底下已畫的高清畫面按它挖空。 */
+const ERASE_FRAGMENT_SHADER = `
+precision mediump float;
+uniform sampler2D sprite;
+uniform vec4 spriteRect;    // u, v, width, height of the occluding picture in texture space
+varying vec2 uv;
+void main() {
+  gl_FragColor = vec4(0.0, 0.0, 0.0, texture2D(sprite, spriteRect.xy + uv * spriteRect.zw).a);
+}`;
+
 interface GlState {
   readonly gl: WebGLRenderingContext;
+  readonly program: WebGLProgram;
   readonly destination: WebGLUniformLocation | null;
   readonly colourRect: WebGLUniformLocation | null;
   readonly alphaRect: WebGLUniformLocation | null;
   readonly visible: WebGLUniformLocation | null;
+  readonly erase: {
+    readonly program: WebGLProgram;
+    readonly destination: WebGLUniformLocation | null;
+    readonly spriteRect: WebGLUniformLocation | null;
+  } | undefined;
 }
 
 /** One texture per playing position: it keeps that video's last decoded frame while the video seeks. */
@@ -136,20 +182,26 @@ function createGl(canvas: HTMLCanvasElement): GlState | undefined {
     return gl.getShaderParameter(shader, gl.COMPILE_STATUS) ? shader : undefined;
   };
   const vertex = compile(gl.VERTEX_SHADER, VERTEX_SHADER);
-  const fragment = compile(gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
-  const program = gl.createProgram();
+  // both programs read the quad's corners from attribute 0, so the one buffer binding serves them both
+  const link = (fragmentSource: string): WebGLProgram | undefined => {
+    const fragment = compile(gl.FRAGMENT_SHADER, fragmentSource);
+    const linked = gl.createProgram();
+    if (!vertex || !fragment || !linked) return undefined;
+    gl.attachShader(linked, vertex);
+    gl.attachShader(linked, fragment);
+    gl.bindAttribLocation(linked, 0, "corner");
+    gl.linkProgram(linked);
+    return gl.getProgramParameter(linked, gl.LINK_STATUS) ? linked : undefined;
+  };
+  const program = link(FRAGMENT_SHADER);
+  const eraseProgram = link(ERASE_FRAGMENT_SHADER);
   const buffer = gl.createBuffer();
-  if (!vertex || !fragment || !program || !buffer) return undefined;
-  gl.attachShader(program, vertex);
-  gl.attachShader(program, fragment);
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return undefined;
+  if (!program || !buffer) return undefined;
   gl.useProgram(program);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
-  const corner = gl.getAttribLocation(program, "corner");
-  gl.enableVertexAttribArray(corner);
-  gl.vertexAttribPointer(corner, 2, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
   // several clips can overlap (an afterglow under the next clip): premultiplied "over"
@@ -157,11 +209,54 @@ function createGl(canvas: HTMLCanvasElement): GlState | undefined {
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   return {
     gl,
+    program,
     destination: gl.getUniformLocation(program, "destination"),
     colourRect: gl.getUniformLocation(program, "colourRect"),
     alphaRect: gl.getUniformLocation(program, "alphaRect"),
     visible: gl.getUniformLocation(program, "visible"),
+    // without the erase program an occluding picture falls back to clearing its whole rectangle
+    erase: eraseProgram ? {
+      program: eraseProgram,
+      destination: gl.getUniformLocation(eraseProgram, "destination"),
+      spriteRect: gl.getUniformLocation(eraseProgram, "spriteRect"),
+    } : undefined,
   };
+}
+
+/** 兩個矩形的交集；沒有交集時回傳 `undefined`。 */
+function intersect(
+  a: { x: number; y: number; w: number; h: number },
+  b: { readonly x: number; readonly y: number; readonly w: number; readonly h: number },
+): { x: number; y: number; w: number; h: number } | undefined {
+  const x = Math.max(a.x, b.x);
+  const y = Math.max(a.y, b.y);
+  const w = Math.min(a.x + a.w, b.x + b.w) - x;
+  const h = Math.min(a.y + a.h, b.y + b.h) - y;
+  return w > 0 && h > 0 ? { x, y, w, h } : undefined;
+}
+
+/** 擦除用的圖各給一個編號，比對擦除區有沒有變時用。 */
+const occluderSourceIds = new WeakMap<object, number>();
+let nextOccluderSourceId = 1;
+
+function occluderSourceId(source: TexImageSource): number {
+  let id = occluderSourceIds.get(source);
+  if (id === undefined) {
+    id = nextOccluderSourceId;
+    nextOccluderSourceId += 1;
+    occluderSourceIds.set(source, id);
+  }
+  return id;
+}
+
+const roundTenth = (value: number): number => Math.round(value * 10) / 10;
+
+/** 一張擦除用圖的像素尺寸（圖片取原始尺寸，不管它在頁面上被縮放成多大）。 */
+function sourceSize(source: TexImageSource): { width: number; height: number } {
+  if (source instanceof HTMLImageElement) return { width: source.naturalWidth, height: source.naturalHeight };
+  if (source instanceof HTMLVideoElement) return { width: source.videoWidth, height: source.videoHeight };
+  if ("displayWidth" in source) return { width: source.displayWidth, height: source.displayHeight };
+  return { width: source.width, height: source.height };
 }
 
 export class MapActionHdLayer {
@@ -178,6 +273,14 @@ export class MapActionHdLayer {
   private active: MapActionHdShow[] = [];
   /** 已被換下、還在播餘韻的片段，依開始順序。 */
   private lingering: MapActionHdShow[] = [];
+  /** 疊在全部片段之上的靜態圖（冰殼）與要挖空的區域，以及比對它們有沒有變的鍵。 */
+  private overlays: readonly MapActionHdOverlay[] = [];
+  private occluders: readonly MapActionHdOccluder[] = [];
+  private overlayKey = "";
+  /** 擦除用的圖各自的紋理（最近鄰取樣，邊緣與 Phaser 的像素一致）。 */
+  private readonly eraseTextures = new Map<TexImageSource, WebGLTexture>();
+  /** 已上傳過的靜態圖：圖不會變，之後每幀直接沿用紋理。 */
+  private readonly uploadedImages = new WeakSet<HTMLImageElement>();
   private animationFrame: number | undefined;
   private drawn = false;
 
@@ -296,11 +399,7 @@ export class MapActionHdLayer {
     }
     this.lingering = this.lingering.filter((other) => !keep.has(showKey(other)));
     this.active = [...shows];
-    if (this.shows().length > 0) {
-      if (this.animationFrame === undefined) this.animationFrame = requestAnimationFrame(this.frame);
-    } else {
-      this.clear();
-    }
+    this.refresh();
   }
 
   /**
@@ -314,14 +413,34 @@ export class MapActionHdLayer {
     }
     this.lingering = [];
     this.active = [...shows];
-    if (this.shows().length > 0) {
-      if (this.animationFrame === undefined) this.animationFrame = requestAnimationFrame(this.frame);
-    } else {
-      this.clear();
-    }
+    this.refresh();
   }
 
-  /** 連餘韻一起立刻清掉（離開戰場、讀檔、實驗室換動作）。 */
+  /**
+   * 換上疊在全部片段之上的靜態圖與要挖空的區域（`REMAKE-213`）。宿主在 Phaser 每次繪製前呼叫；有變時立刻重畫，
+   * 高清畫布與 Phaser 畫布才會在同一幀更新（鏡頭捲動、冰殼出現或消失、游標移動、換回合的奔跑者每一步）。
+   * 靜態圖要先 `prepare`、`ready` 了才給。
+   */
+  setOverlays(overlays: readonly MapActionHdOverlay[], occluders: readonly MapActionHdOccluder[] = []): void {
+    const drawn = overlays.filter(({ points }) => points.length > 0);
+    const key = [
+      ...drawn.map(({ clip, points }) => `${clip.clipId}@${points.map(({ x, y }) => `${roundTenth(x)},${roundTenth(y)}`).join(" ")}`),
+      ...(drawn.length > 0 ? occluders : []).map(({ x, y, w, h, image, clip }) => [
+        x, y, w, h, image ? [occluderSourceId(image.source), image.sx, image.sy, image.sw, image.sh].join(":") : "",
+        clip ? [clip.x, clip.y, clip.w, clip.h].join(":") : "",
+      ].map(String).join(",")),
+    ].join(";");
+    if (key === this.overlayKey) return;
+    this.overlayKey = key;
+    this.overlays = drawn;
+    // nothing to erase when there is nothing above the clips: a clip alone never needs it (the cursor is hidden during
+    // a cast) and the rest of the battle keeps its own drawing
+    this.occluders = drawn.length > 0 ? [...occluders] : [];
+    this.render();
+    if (this.shows().length > 0 && this.animationFrame === undefined) this.animationFrame = requestAnimationFrame(this.frame);
+  }
+
+  /** 連餘韻一起立刻清掉（離開戰場、讀檔、實驗室換動作）。冰殼是狀態投影，由宿主另外給，不在這裡清。 */
   clearAll(): void {
     this.lingering = [];
     this.setShow(undefined);
@@ -333,6 +452,8 @@ export class MapActionHdLayer {
     this.animationFrame = undefined;
     this.active = [];
     this.lingering = [];
+    this.overlays = [];
+    this.occluders = [];
     for (const video of this.videos.values()) {
       video.pause();
       video.removeAttribute("src");
@@ -343,6 +464,8 @@ export class MapActionHdLayer {
     this.images.clear();
     for (const { texture } of this.textures.values()) this.glState?.gl.deleteTexture(texture);
     this.textures.clear();
+    for (const texture of this.eraseTextures.values()) this.glState?.gl.deleteTexture(texture);
+    this.eraseTextures.clear();
     this.glState?.gl.getExtension("WEBGL_lose_context")?.loseContext();
     this.canvas.remove();
   }
@@ -366,10 +489,26 @@ export class MapActionHdLayer {
     delete this.canvas.dataset.mapActionHdTick;
     delete this.canvas.dataset.mapActionHdShows;
     delete this.canvas.dataset.mapActionHdRects;
+    delete this.canvas.dataset.mapActionHdOverlays;
+    delete this.canvas.dataset.mapActionHdOccluders;
+  }
+
+  /** 片段在播時讓迴圈接著跑；沒有片段時立刻重畫一次（只剩冰殼就只畫冰殼，什麼都沒有就清空）。 */
+  private refresh(): void {
+    if (this.shows().length > 0) {
+      if (this.animationFrame === undefined) this.animationFrame = requestAnimationFrame(this.frame);
+    } else {
+      this.render();
+    }
   }
 
   private readonly frame = (): void => {
     this.animationFrame = undefined;
+    if (this.render()) this.animationFrame = requestAnimationFrame(this.frame);
+  };
+
+  /** 立刻畫出此刻的全部片段、上面的冰殼，再挖空擦除區；回傳還有沒有片段在播（迴圈要不要接著跑）。 */
+  private render(): boolean {
     // 播完的餘韻退場
     this.lingering = this.lingering.filter((show) => {
       const done = this.finished(show);
@@ -377,9 +516,9 @@ export class MapActionHdLayer {
       return !done;
     });
     const shows = this.shows();
-    if (shows.length === 0) {
+    if (shows.length === 0 && this.overlays.length === 0) {
       this.clear();
-      return;
+      return false;
     }
     const state = this.glState;
     if (state) {
@@ -412,11 +551,90 @@ export class MapActionHdLayer {
     if (newest) {
       this.canvas.dataset.mapActionHdAction = newest[0];
       this.canvas.dataset.mapActionHdTick = newest[1];
+      this.canvas.dataset.mapActionHdShows = labels.join(";");
+      this.canvas.dataset.mapActionHdRects = rects.join(";");
+    } else {
+      delete this.canvas.dataset.mapActionHdAction;
+      delete this.canvas.dataset.mapActionHdTick;
+      delete this.canvas.dataset.mapActionHdShows;
+      delete this.canvas.dataset.mapActionHdRects;
     }
-    this.canvas.dataset.mapActionHdShows = labels.join(";");
-    this.canvas.dataset.mapActionHdRects = rects.join(";");
-    this.animationFrame = requestAnimationFrame(this.frame);
-  };
+    // the still overlays above every clip (REMAKE-213 ice shells), then the higher-depth Phaser objects cut out of it all
+    const overlayLabels: string[] = [];
+    for (const { clip, points } of this.overlays) {
+      const image = this.images.get(videoKey(clip.clipId));
+      if (!image) continue;
+      this.draw(image, { clip, target: () => points, tick: () => 0, rate: 0, playing: false }, 0);
+      overlayLabels.push(`${clip.clipId}@${points.map(({ x, y }) => `${roundTenth(x)},${roundTenth(y)}`).join(" ")}`);
+    }
+    if (overlayLabels.length > 0) this.canvas.dataset.mapActionHdOverlays = overlayLabels.join(";");
+    else delete this.canvas.dataset.mapActionHdOverlays;
+    this.erase();
+    if (this.occluders.length > 0) this.canvas.dataset.mapActionHdOccluders = String(this.occluders.length);
+    else delete this.canvas.dataset.mapActionHdOccluders;
+    return shows.length > 0;
+  }
+
+  /** 在原版深度更高的 Phaser 物件不透明的地方把畫布挖空（游標框線整塊、圖片按它的透明度）。 */
+  private erase(): void {
+    const state = this.glState;
+    if (!state || this.occluders.length === 0) return;
+    const { gl } = state;
+    const scaleX = this.canvas.width / this.viewport.width;
+    const scaleY = this.canvas.height / this.viewport.height;
+    const whole = { x: 0, y: 0, w: this.viewport.width, h: this.viewport.height };
+    gl.enable(gl.SCISSOR_TEST);
+    gl.clearColor(0, 0, 0, 0);
+    for (const occluder of this.occluders) {
+      const area = intersect(intersect(occluder, whole) ?? { x: 0, y: 0, w: 0, h: 0 }, occluder.clip ?? whole);
+      if (!area) continue;
+      // scissor boxes are device px from the bottom-left; logical px edges land on the nearest device px
+      const left = Math.round(area.x * scaleX);
+      const right = Math.round((area.x + area.w) * scaleX);
+      const top = Math.round(area.y * scaleY);
+      const bottom = Math.round((area.y + area.h) * scaleY);
+      if (right <= left || bottom <= top) continue;
+      gl.scissor(left, this.canvas.height - bottom, right - left, bottom - top);
+      const texture = occluder.image && state.erase ? this.eraseTexture(occluder.image.source) : undefined;
+      if (!occluder.image || !state.erase || !texture) {
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        continue;
+      }
+      const { source, sx, sy, sw, sh } = occluder.image;
+      const { width, height } = sourceSize(source);
+      if (!(width > 0 && height > 0)) continue;
+      gl.useProgram(state.erase.program);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+      gl.uniform4f(state.erase.spriteRect, sx / width, sy / height, sw / width, sh / height);
+      gl.uniform4f(
+        state.erase.destination,
+        (occluder.x / this.viewport.width) * 2 - 1,
+        1 - (occluder.y / this.viewport.height) * 2,
+        (occluder.w / this.viewport.width) * 2,
+        -(occluder.h / this.viewport.height) * 2,
+      );
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.useProgram(state.program);
+    }
+    gl.disable(gl.SCISSOR_TEST);
+  }
+
+  private eraseTexture(source: TexImageSource): WebGLTexture | undefined {
+    const state = this.glState;
+    if (!state) return undefined;
+    const existing = this.eraseTextures.get(source);
+    if (existing) return existing;
+    const { gl } = state;
+    const texture = createTexture(gl);
+    if (!texture) return undefined;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    this.eraseTextures.set(source, texture);
+    return texture;
+  }
 
   private sync(video: HTMLVideoElement, show: MapActionHdShow, tick: number): void {
     const { fps, frames } = show.clip.video;
@@ -474,7 +692,10 @@ export class MapActionHdLayer {
       ? source.complete && source.naturalWidth > 0
       : source.readyState >= 2 && !source.seeking;
     let entry = this.textures.get(key);
-    if (fresh) {
+    if (fresh && entry && source instanceof HTMLImageElement && this.uploadedImages.has(source)) {
+      // a still never changes: its texture is reused as uploaded
+      gl.bindTexture(gl.TEXTURE_2D, entry.texture);
+    } else if (fresh) {
       if (!entry) {
         const texture = createTexture(gl);
         if (!texture) return;
@@ -484,6 +705,7 @@ export class MapActionHdLayer {
       gl.bindTexture(gl.TEXTURE_2D, entry.texture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, source);
       entry.mediaTime = source instanceof HTMLVideoElement ? source.currentTime : 0;
+      if (source instanceof HTMLImageElement) this.uploadedImages.add(source);
     } else if (!entry || (source instanceof HTMLVideoElement
       && Math.abs(entry.mediaTime - tick / clip.video.fps) > HOLD_TICKS / clip.video.fps)) {
       return;

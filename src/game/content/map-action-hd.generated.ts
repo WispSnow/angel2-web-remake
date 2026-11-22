@@ -138,6 +138,14 @@ export const MAP_ACTION_HD_CLIPS: Readonly<Record<string, MapActionHdClip>> = {
     durationTicks: 60, afterglowTicks: 20,
     frameStartTicks: [0,10,20,30,40,50],
   },
+  "ice-shell": {
+    clipId: "ice-shell", still: true,
+    video: { source: "/assets/original/map-actions/hd/ice-shell/hd.png", width: 174, height: 344, frames: 1, fps: 100 },
+    scale: 4, frameWidth: 174, frameHeight: 168,
+    originX: 4, originY: 9, alphaX: 0, alphaY: 176,
+    durationTicks: 0, afterglowTicks: 0,
+    frameStartTicks: [0],
+  },
   "lightning-1-hit": {
     clipId: "lightning-1-hit",
     video: { source: "/assets/original/map-actions/hd/lightning-1-hit/hd.mp4", width: 256, height: 488, frames: 18, fps: 100 },

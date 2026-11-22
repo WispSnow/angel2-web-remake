@@ -53,6 +53,7 @@ import { renderPrayerPresentation } from "./PrayerRenderer";
 import { MapActionHdLayer, type MapActionHdShow } from "./map-action-hd-layer";
 import { lightningHdCells } from "./map-action-hd-cells";
 import {
+  MAP_ACTION_HD_ICE_SHELL,
   mapActionHdCast,
   mapActionHdCastTimeline,
   mapActionHdClip,
@@ -256,6 +257,10 @@ export function startTechniqueLabPhaser(
         hostWidth: WIDTH, hostHeight: HEIGHT, left: 0, top: 0, width: WIDTH, height: HEIGHT,
       }, markMapActionHdFailed);
       this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.mapActionHd?.destroy());
+      this.events.on(Phaser.Scenes.Events.PRE_RENDER, this.syncHdIceShells, this);
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        this.events.off(Phaser.Scenes.Events.PRE_RENDER, this.syncHdIceShells, this);
+      });
       this.unsubscribe = session.subscribe((state) => {
         this.state = state;
         this.drawState();
@@ -829,6 +834,27 @@ export function startTechniqueLabPhaser(
         .filter(({ id }) => frozenIds.has(id))
         .map(({ id }) => id)
         .join(",");
+    }
+
+    /**
+     * 凍結單位的冰殼（`REMAKE-213`，與戰場同一套規則）：高清風格且圖已解碼時，原版冰殼換成高清畫布上疊在全部片段之上的
+     * 靜態圖，在 Phaser 每次繪製前決定，兩塊畫布同一幀更新。實驗室裡冰殼是最上層，沒有要擦除的物件。
+     */
+    private syncHdIceShells(): void {
+      const layer = this.mapActionHd;
+      const shell = artStyle === "hd" ? mapActionHdClip(MAP_ACTION_HD_ICE_SHELL) : undefined;
+      if (layer && shell) layer.prepare([shell]);
+      const hd = Boolean(layer && shell && !mapActionHdFailed(shell.clipId) && layer.ready(shell.clipId));
+      const camera = this.cameras.main;
+      const points = this.frozenObjects.flatMap((object) => {
+        object.setVisible(!hd);
+        if (!hd) return [];
+        // the still's origin is the original shell picture's top-left
+        const corner = object.getTopLeft();
+        return [{ x: corner.x - camera.scrollX, y: corner.y - camera.scrollY }];
+      });
+      layer?.setOverlays(shell && points.length > 0 ? [{ clip: shell, points }] : []);
+      this.game.canvas.dataset.frozenShellStyle = hd ? "hd" : "original";
     }
 
     private updateCanvasDataset(

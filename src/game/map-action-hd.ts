@@ -1,5 +1,6 @@
 import {
   MAP_ACTION_HD_EVERY_STAGE,
+  MAP_ACTION_HD_ICE_SHELL,
   mapActionHdAssetUrlsForActions,
   mapActionHdCast,
   mapActionHdClip,
@@ -37,6 +38,16 @@ export function activeMapActionHdCast(
     if (!clips.includes(clip)) clips.push(clip);
   }
   return { segments, clips };
+}
+
+/**
+ * 凍結單位的高清冰殼（`REMAKE-213`）此刻能不能用：偏好為高清、圖在資源租約裡且本次執行沒有失敗過（圖是否已解碼由畫布層
+ * 另外判斷）。冰殼是持續的狀態投影，不像施法那樣整次決定：哪一幀起可以畫高清，就從那一幀起換掉原版。
+ */
+export function activeMapActionHdIceShell(style: PortraitStyle = portraitStyle()): MapActionHdClip | undefined {
+  const clip = mapActionHdClip(MAP_ACTION_HD_ICE_SHELL);
+  if (style !== "hd" || !clip || failed.has(clip.clipId) || !stagedRenderAssetAvailable(clip.video.source)) return undefined;
+  return clip;
 }
 
 /** 這個動作用到的片段裡有一段本次執行已失敗過。 */

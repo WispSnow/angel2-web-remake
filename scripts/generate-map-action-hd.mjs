@@ -2,7 +2,7 @@
 
 // Optional HD map-technique effects (REMAKE-203 fire, REMAKE-204 heal and rest, REMAKE-205 single-target status
 // techniques, REMAKE-206 recovery and ice, REMAKE-207 the map-combat strike and death, REMAKE-208 shooting and WD,
-// REMAKE-209 the stomp's leg and shadow stills, REMAKE-210 lightning). The asset pack's map-actions/hd/hd-manifest.json is the source of truth; this script turns it into
+// REMAKE-209 the stomp's leg and shadow stills, REMAKE-210 lightning, REMAKE-213 the frozen units' ice shell still). The asset pack's map-actions/hd/hd-manifest.json is the source of truth; this script turns it into
 // src/game/content/map-action-hd.generated.ts after checking every file:
 //
 // - every entry is a clip with an original graphics timeline here (TECHNIQUE_LAB_FIRE for 1F-4F, the parsed 1H
@@ -18,8 +18,9 @@
 // - every MP4 matches its hash, holds one video track and no audio, has moov before mdat, and its size fits the
 //   stacked layout (colour at 0,0 and 1 - alpha at alphaX,alphaY, not overlapping); no stray file ships under
 //   map-actions/hd/;
-// - a still (REMAKE-209: 1D-3D's leg and shadow, which the battle moves by code) is one stacked RGB PNG with no
-//   timeline: 0 ticks, one frame start at 0, no afterglow, and its origin at the original picture's top-left.
+// - a still (REMAKE-209: 1D-3D's leg and shadow, which the battle moves by code; REMAKE-213: the shell the battle keeps
+//   on a frozen unit) is one stacked RGB PNG with no timeline: 0 ticks, one frame start at 0, no afterglow, and its
+//   origin at the original picture's top-left.
 //
 // `--import <workbench export>` first copies the files from the git-ignored workbench (tmp/fx-hd/export-pack, made by
 // its tools/export_hd.py) into the asset pack and rewrites the manifest. The workbench never ships.
@@ -47,6 +48,8 @@ const MAX_ORIGIN_OUTSIDE = 44;
 /** Clips drawn from another action's atlas (the shared healing finish lives in the 1H atlas). */
 const ATLAS = {
   "heal-tail": "heal-1", recovery: "recovery-1", ice: "ice-1",
+  // REMAKE-213: the frozen units' shell is MAGIC/10's last frame, from the ice atlas
+  "ice-shell": "ice-1",
   // REMAKE-210: the shared MAGIC/6 finish is exported from 1L's atlas
   "lightning-cleanup": "lightning-1",
   // the map-combat strike and death are battle sprites, not technique atlases
@@ -197,8 +200,11 @@ function atlasFor(clipId) {
     ?? /^(lightning-[1234])-(?:main|hit|marker)$/u.exec(clipId)?.[1] ?? clipId;
 }
 
-/** `REMAKE-209`: the stomp's leg and shadow are stills the battle moves, one per tier, target side and part. */
-const isStill = (clipId) => /^stomp-[123]-side[12]-(?:leg|shadow)$/u.test(clipId);
+/**
+ * `REMAKE-209`: the stomp's leg and shadow are stills the battle moves, one per tier, target side and part;
+ * `REMAKE-213`: the shell a frozen unit keeps until the freeze ends.
+ */
+const isStill = (clipId) => clipId === "ice-shell" || /^stomp-[123]-side[12]-(?:leg|shadow)$/u.test(clipId);
 
 /** Width, height and colour type of a PNG (the IHDR chunk right after the signature). */
 function pngHeader(buffer) {
@@ -292,11 +298,14 @@ async function importWorkbench(workbench) {
   const manifest = {
     format: FORMAT,
     version: VERSION,
-    decisions: ["REMAKE-203", "REMAKE-204", "REMAKE-205", "REMAKE-206", "REMAKE-207", "REMAKE-208", "REMAKE-209"],
+    decisions: [
+      "REMAKE-203", "REMAKE-204", "REMAKE-205", "REMAKE-206", "REMAKE-207", "REMAKE-208", "REMAKE-209", "REMAKE-210",
+      "REMAKE-211", "REMAKE-212", "REMAKE-213",
+    ],
     video: "H.264 yuv420p CRF 14, 100 fps (one frame per native tick, the original timeline plus the afterglow), "
       + "faststart, no audio; stacked colour x alpha and 1 - alpha halves with an 8 px gap, side by side when the frame "
       + "is taller than wide",
-    still: "RGB PNG in the same stacked layout, one picture the battle moves by code (REMAKE-209)",
+    still: "RGB PNG in the same stacked layout, one picture the battle places by code (REMAKE-209 stomp, REMAKE-213 ice shell)",
     clips,
   };
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);

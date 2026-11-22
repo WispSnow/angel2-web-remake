@@ -258,7 +258,7 @@ pnpm exec playwright install ffmpeg
   只播一次的视频，长度至少是该段停留时间（`max(等待, 打字)`，旁白更长时取旁白），生成器按尾声计时与旁白时长核对，工作台 `tools/epilogue.py`；
   旁白变长就要重出视频。清单第 6 版另带高清「The end」（`REMAKE-201`，`the-end-hd.ts`）：製作人員表后 `UN/54` 第 0 幀里 320×200
   插图的一段无缝循环，原版四帧手臂动作也演在里面，手写字与爱心照原版像素；第 0 幀与四帧叠加图一变就拒绝生成，工作台 `tools/the_end.py`。
-- 可选高清地图技术特效（`REMAKE-203` 火系、`REMAKE-204` 治疗与休息、`REMAKE-205`–`REMAKE-210` 其余地图特效、`REMAKE-211` 细节优化、`REMAKE-212` 攻击下降与防御提升重新生成，跟随「美術風格　高清」）的 `map-action-hd.generated.ts` 由
+- 可选高清地图技术特效（`REMAKE-203` 火系、`REMAKE-204` 治疗与休息、`REMAKE-205`–`REMAKE-210` 其余地图特效、`REMAKE-211` 细节优化、`REMAKE-212` 攻击下降与防御提升重新生成、`REMAKE-213` 冰封单位的冰壳，跟随「美術風格　高清」）的 `map-action-hd.generated.ts` 由
   `scripts/generate-map-action-hd.mjs` 从素材包 `map-actions/hd/hd-manifest.json` 生成（`pnpm content:map-action-hd`，
   从 git 忽略的工作台导入用 `-- --import tmp/fx-hd/export-pack`，工作台见 `tmp/fx-hd/tools/`）。每段片段一支堆叠视频，
   每 native tick 一帧，原版时间线之后可带余韵（`afterglowTicks`）；原版图集一变、时长或帧起点与原版时间线不符就拒绝生成。
@@ -266,7 +266,8 @@ pnpm exec playwright install ffmpeg
   片段画在哪些格上与战场原版同一套规则（回復画在每个受治疗单位上、冰雪画在当前一圈、`3V`／`WD` 与落雷命中波逐格错开、
   每个播放位置一支视频；唯一例外是落雷的受击标记，高清从波到达起留到命中波结束，`REMAKE-211`）；落雷的格子规则由战场与
   技能实验室共用 `src/game/phaser/map-action-hd-cells.ts`。踩踏的腿与影子是
-  静帧（`still`，堆叠 PNG），照原版每一步的位置摆，没有时钟。
+  静帧（`still`，堆叠 PNG），照原版每一步的位置摆，没有时钟。冰封单位的冰壳（`REMAKE-213`）也是静帧，是持续的状态投影：
+  画在高清画布最上层，原版深度更高的光标与换回合的图在它们不透明处挖空高清画布；在 Phaser 每次绘制前与它同一帧更新。
   高清特效只换表现：控制器照原版逐帧 emit 与等待，高清画布层在每帧的原版时段内连续前进，余韵在控制器离开后由画布层
   自己播完、不让控制器多等；一次施法在第一帧决定走高清或原版。
 - `src/game/content/character-catalog.generated.ts` 由 `scripts/generate-character-catalog.mjs`

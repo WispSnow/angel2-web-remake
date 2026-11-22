@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { stagePresentationActionIds } from "../../src/game/content/class-presentation-assets";
 import {
+  MAP_ACTION_HD_ICE_SHELL,
   mapActionHdAssetUrlsForActions,
   mapActionHdCast,
   mapActionHdCastTimeline,
@@ -19,6 +20,7 @@ import { TECHNIQUE_LAB_FIRE, TECHNIQUE_LAB_HEAL } from "../../src/game/content/t
 import { lightningHdCells } from "../../src/game/phaser/map-action-hd-cells";
 import {
   activeMapActionHdCast,
+  activeMapActionHdIceShell,
   mapActionHdClipEnd,
   mapActionHdFrameSpan,
   mapActionHdTick,
@@ -129,7 +131,7 @@ const ORIGINAL: Record<string, () => readonly Phase[]> = {
   "lightning-cleanup": () => descriptorPhases([STAGE1_ACTION_PRESENTATION.lightning1.commonHit.cleanup]),
 };
 
-describe("HD map effects (REMAKE-203 fire, REMAKE-204 heal and rest, REMAKE-205..210 the rest, REMAKE-211 refinements)", () => {
+describe("HD map effects (REMAKE-203 fire, REMAKE-204 heal and rest, REMAKE-205..210 the rest, REMAKE-211 refinements, REMAKE-213 ice shell)", () => {
   it("keeps every clip on its original graphics timeline, with any afterglow after it", () => {
     const ids = mapActionHdClips().map(({ clipId }) => clipId);
     expect(ids).toEqual(expect.arrayContaining(["fire-1", "fire-2", "fire-3", "fire-4", "heal-1", "heal-tail"]));
@@ -379,6 +381,33 @@ describe("HD map effects (REMAKE-203 fire, REMAKE-204 heal and rest, REMAKE-205.
       expect(mapActionHdSegmentFor(`stomp-${tier}`, "stompEffect")).toBeDefined();
       expect(mapActionHdSegmentFor(`stomp-${tier}`, "stompPageToggle")).toBeDefined();
     }
+  });
+
+  it("keeps the frozen units' shell as an HD still, fetched with the ice techniques (REMAKE-213)", () => {
+    const shell = mapActionHdClip(MAP_ACTION_HD_ICE_SHELL);
+    const ice = mapActionHdClip("ice");
+    if (!shell || !ice) throw new Error("no HD ice shell or ice clip");
+    expect(shell.still).toBe(true);
+    expect(shell.scale).toBe(ice.scale);
+    // the origin is where the original 40x37 shell tile's top-left lands; the whole tile lies inside the still
+    expect(shell.originX).toBeGreaterThanOrEqual(0);
+    expect(shell.originY).toBeGreaterThanOrEqual(0);
+    expect(shell.originX + 40 * shell.scale).toBeLessThanOrEqual(shell.frameWidth);
+    expect(shell.originY + 37 * shell.scale).toBeLessThanOrEqual(shell.frameHeight);
+    // every ice tier fetches it with its ring clip; nothing else does
+    for (const actionId of ["ice-1", "ice-2", "ice-3", "ice-4"]) {
+      expect(mapActionHdAssetUrlsForActions([actionId]), actionId).toEqual([
+        "/assets/original/map-actions/hd/ice-shell/hd.png",
+        "/assets/original/map-actions/hd/ice/hd.mp4",
+      ]);
+      // the shell is a state the battle keeps on the map, not part of the cast
+      expect(activeMapActionHdCast(actionId, "hd")?.clips.map(({ clipId }) => clipId), actionId).toEqual(["ice"]);
+    }
+    expect(mapActionHdUrlsForStyle(["fire-1", "recovery-1"], "hd")).not.toContain(shell.video.source);
+    expect(mapActionHdUrlsForStyle(["ice-1"], "original")).toEqual([]);
+    expect(activeMapActionHdIceShell("original")).toBeUndefined();
+    // outside a resource lease every URL counts as available
+    expect(activeMapActionHdIceShell("hd")?.clipId).toBe(MAP_ACTION_HD_ICE_SHELL);
   });
 
   it("plays lightning as a main clip, a staggered sweep, the struck units' marker and the shared finish (REMAKE-210)", () => {
