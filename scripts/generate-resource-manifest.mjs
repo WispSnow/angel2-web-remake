@@ -245,8 +245,14 @@ for (const { relative } of allFiles) {
 // cover falls back to the raw URL and the browser fetches it again on a surface
 // that has no loading page left. They are already downloaded with `battle:core`,
 // so joining these packs only keeps them inside the lease.
+// `boot` needs them too: the host menu's corner gem is drawn from the command
+// menu frame on the opening and title screens, and the menu it opens wears the
+// command-menu and objective-panel frames there — before any battle pack exists,
+// so without them the title pulls raw URLs outside Cache Storage on every load.
+// This runs after the implicit `battle:core` assignment, so it adds, never steals.
 const nativeUiSource = await readFile(path.join(root, "src/game/native-ui-assets.ts"), "utf8");
 for (const url of sourceAssetUrls(nativeUiSource)) {
+  addToPack("boot", url);
   addToPack("ending", url);
   addToPack("credits", url);
 }

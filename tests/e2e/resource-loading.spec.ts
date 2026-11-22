@@ -5,6 +5,7 @@ import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { STARTUP_IMAGE_URLS } from "../../src/game/startup-screen";
 import type { CompletedSaveData } from "../../src/game/types";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { openHostMenu, resumeFromHostMenu } from "./host-menu-helpers";
 import { activateStartup, skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -406,7 +407,8 @@ test("stage music finishes before the scene mounts and playback reuses the stage
   releaseMusic();
   await expect(page.getByTestId("resource-loading-overlay")).toBeHidden({ timeout: 15_000 });
   await expect(page.getByTestId("game-screen")).toBeVisible({ timeout: 15_000 });
-  await page.getByTestId("game-screen").click({ position: { x: 620, y: 340 } });
+  // 回合框上、宿主選單入口（618,327）左邊的一下：只給瀏覽器使用者手勢，不會暫停遊戲。
+  await page.getByTestId("game-screen").click({ position: { x: 600, y: 340 } });
   await expect(page.locator("#app")).toHaveAttribute("data-music-playing", "true", {
     timeout: 15_000,
   });
@@ -655,6 +657,13 @@ test("the plain entry never pulls a raw asset URL through the title", async ({ p
 
   await skipOpeningToTitle(page);
   await expect(page.getByTestId("title-menu")).toBeVisible({ timeout: 30_000 });
+
+  // 右下角入口的寶石與選單外框（指令選單、勝利條件面板的邊）在標題上就畫得出來，
+  // 這時只有 `boot` 租約；打開子選單才會用到劍形選中條以外的整套外框。
+  await openHostMenu(page);
+  await page.getByTestId("host-menu-row-image-scaling").click();
+  await expect(page.getByTestId("host-menu-submenu")).toBeVisible();
+  await resumeFromHostMenu(page);
 
   await page.getByTestId("continue-game").click();
   await expect(page.getByTestId("title-record-menu")).toBeVisible();

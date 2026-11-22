@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { hideHostMenuTrigger } from "./host-menu-helpers";
 import { parkPointerOutsideScreen } from "./pointer-controls";
 import { decodeScreenshot, type ScreenshotPixels } from "./screenshot-pixels";
 import { captureVisualAudit } from "./visual-audit";
@@ -24,9 +25,14 @@ const rgb = (shot: ScreenshotPixels, x: number, y: number) => {
   return `${shot.pixels[index]},${shot.pixels[index + 1]},${shot.pixels[index + 2]}`;
 };
 
-/** 除錯工具列在遊戲畫面右緣投下的陰影是宿主外觀，不屬於邏輯螢幕，逐像素比對前先關掉。 */
-const hideDebugChrome = (page: Page) =>
-  page.addStyleTag({ content: ".debug-toolbar { display: none !important; }" });
+/**
+ * 除錯工具列在遊戲畫面右緣投下的陰影、右下角的宿主選單入口都是宿主外觀，不屬於原版
+ * 合成，逐像素比對前先關掉。
+ */
+const hideDebugChrome = async (page: Page) => {
+  await page.addStyleTag({ content: ".debug-toolbar { display: none !important; }" });
+  await hideHostMenuTrigger(page);
+};
 
 const advanceToPortraitPage = async (page: Page) => {
   const portrait = page.locator("#dialogue-portrait-upper");

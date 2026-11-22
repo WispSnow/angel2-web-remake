@@ -117,6 +117,12 @@ const applyPausedUi = (paused: boolean) => {
   } else {
     presenter?.hide();
     restoreBodyChildren();
+    // Chrome only drops focus from a `display:none` element at its next rendering
+    // update. Until then the hidden menu row, close gem or panel control keeps
+    // focus, and a key pressed right after resuming lands in the overlay's own
+    // handlers instead of the game — under load that window spans whole frames.
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && isPauseInteractive(active)) active.blur();
     if (returnFocusTo?.isConnected) returnFocusTo.focus({ preventScroll: true });
     returnFocusTo = undefined;
   }

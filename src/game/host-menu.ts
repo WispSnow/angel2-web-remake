@@ -1,4 +1,5 @@
-import "../host-menu.css";
+// 樣式由 `styles.css` 以 @import 帶入：本模組經 `scaling.ts` 被 e2e 規格間接載入，
+// Playwright 的 TS 載入器無法解析 CSS import（見 `program-pause.css` 的同一做法）。
 import {
   IMAGE_SCALING_OPTIONS,
   imageScalingMode,
@@ -501,6 +502,8 @@ export function mountHostMenu(screen: HTMLElement, options: HostMenuOptions): ()
 
   // ---- 選單事件 ----
   layer.addEventListener("keydown", (event) => {
+    // 收起後不再攔鍵：恢復遊戲時暫停層會先放掉焦點，這裡只是第二道保險。
+    if (!open) return;
     // 暫停層只放行目標在可操作表面內的按鍵；這裡全部停下，不讓它們冒到綁在 window 的戰場。
     event.stopPropagation();
     const nextCaps = capsLockStateAfter(event);

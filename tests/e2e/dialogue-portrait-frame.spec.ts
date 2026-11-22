@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { hideHostMenuTrigger } from "./host-menu-helpers";
 import { parkPointerOutsideScreen } from "./pointer-controls";
 import { decodeScreenshot, type ScreenshotPixels } from "./screenshot-pixels";
 import { captureVisualAudit } from "./visual-audit";
@@ -78,9 +79,13 @@ const compositeGeometry = (portrait: Locator) => portrait.evaluate((element) => 
 });
 
 /** 眨眼與口型由 rAF 驅動，投影不受影響，但逐像素比對要一個穩定的表現時點。 */
-const freezePresentation = (page: Page) => page.addStyleTag({
-  content: ".portrait-eye, .portrait-mouth { visibility: hidden !important; }",
-});
+/** 凍結眨眼與口型，並藏起右下角的宿主選單入口：下方肖像的投影正好伸進那一角。 */
+const freezePresentation = async (page: Page) => {
+  await page.addStyleTag({
+    content: ".portrait-eye, .portrait-mouth { visibility: hidden !important; }",
+  });
+  await hideHostMenuTrigger(page);
+};
 
 const expectNativePortraitComposite = async (
   page: Page,

@@ -4474,7 +4474,8 @@ test("S00-P: stage zero uses native entry-to-loop music pairs and preserves them
   await expect(app).toHaveAttribute("data-music-volume", "0.32");
 
   // A neutral click supplies the browser user gesture without advancing SAY/0000.
-  await page.getByTestId("game-screen").click({ position: { x: 620, y: 340 } });
+  // It lands on the round box left of the host-menu gem at (618,327), which would pause the game.
+  await page.getByTestId("game-screen").click({ position: { x: 600, y: 340 } });
   await expect(app).toHaveAttribute("data-music-playing", "true");
   await expect(app).toHaveAttribute("data-music-loop", "true");
   await expect(app).toHaveAttribute("data-music-seamless-loop", "true");
@@ -4601,7 +4602,7 @@ test("REMAKE-181: 交響 swaps stage zero music for single-file remixes and pers
   await page.reload();
   await waitForPhase(page, "prebattleStory");
   expect(remixRequests).toContain("MAGIC-73.ogg");
-  await page.getByTestId("game-screen").click({ position: { x: 620, y: 340 } });
+  await page.getByTestId("game-screen").click({ position: { x: 600, y: 340 } });
   await expect(app).toHaveAttribute("data-music-style", "orchestral");
   await expect(app).toHaveAttribute("data-music-source", "remix");
   await expect(app).toHaveAttribute("data-music-track", "MAGIC/73");

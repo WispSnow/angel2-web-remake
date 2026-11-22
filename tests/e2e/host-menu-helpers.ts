@@ -15,6 +15,16 @@ export async function openHostMenu(page: Page): Promise<void> {
   await expect(page.locator("html")).toHaveAttribute("data-program-paused", "true");
 }
 
+/**
+ * 右下角 (618,327) 的入口是複刻加上的宿主控件，平時以 30% 疊在畫面上，不屬於原版合成。
+ * 逐像素比對原版畫面（肖像投影、過場底紋等）之前先把它藏起來；只藏外觀，不卸下控件。
+ */
+export async function hideHostMenuTrigger(page: Page): Promise<void> {
+  await page.addStyleTag({
+    content: ".host-menu-trigger, .host-menu-trigger-tip { visibility: hidden !important; }",
+  });
+}
+
 /** 打開選單（若還沒打開）並選某個參考面板；回傳被選的那一列，關閉面板後焦點回到它。 */
 export async function openHostOverlay(page: Page, id: HostOverlayId) {
   if (!await hostMenu(page).isVisible()) await openHostMenu(page);

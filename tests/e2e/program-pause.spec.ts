@@ -121,6 +121,44 @@ test("the reference panels opened from the menu keep the game paused until the p
   await expect(canvas).toHaveAttribute("data-program-paused", "false");
 });
 
+/**
+ * Chrome 只在下一次繪製更新才把焦點從 `display:none` 的元素移走。恢復時若不主動放掉，
+ * 收起的紅寶石、選單列或面板控件會在那幾幀裡留著焦點，緊接著按的鍵落進暫停層自己的
+ * 處理器而不是戰場（負載下 Caps Lock＋F4 約四次掉一次）。這裡在恢復的同一個工作階段裡
+ * 讀焦點，中間沒有繪製更新，修正前必定失敗。
+ */
+test("resuming hands focus back at once, so the next key reaches the game", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  const focusInOverlayAfter = (resume: "close-gem" | "p-key" | "panel-p-key") => page.evaluate((how) => {
+    const target = how === "close-gem"
+      ? document.querySelector<HTMLElement>("[data-testid=host-menu-close]")
+      : document.activeElement;
+    if (!(target instanceof HTMLElement)) throw new Error(`nothing to resume from (${how})`);
+    target.focus();
+    if (how === "close-gem") target.click();
+    else target.dispatchEvent(new KeyboardEvent("keydown", { key: "p", code: "KeyP", bubbles: true }));
+    if (document.documentElement.dataset.programPaused !== "false") throw new Error(`${how} did not resume`);
+    const active = document.activeElement;
+    return active instanceof Element
+      && (active.closest(".program-pause-overlay") !== null || active.closest("[data-program-pause-exempt]") !== null);
+  }, resume);
+
+  await page.getByTestId("host-menu-trigger").click();
+  await expect(page.getByTestId("host-menu-close")).toBeVisible();
+  expect(await focusInOverlayAfter("close-gem")).toBe(false);
+
+  await page.getByTestId("host-menu-trigger").click();
+  await expect(page.getByTestId("host-menu-row-resume")).toBeFocused();
+  expect(await focusInOverlayAfter("p-key")).toBe(false);
+
+  await page.getByTestId("host-menu-trigger").click();
+  await page.getByTestId("host-menu-row-roadmap").click();
+  await page.getByTestId("roadmap-tab-story").click();
+  await expect(page.getByTestId("roadmap-tab-story")).toBeFocused();
+  expect(await focusInOverlayAfter("panel-p-key")).toBe(false);
+});
+
 test("dialogue typing and portrait presentation retain their exact pause point", async ({ page }) => {
   await page.goto("/?debugScenario=stage-00-prebattle&difficulty=0");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
