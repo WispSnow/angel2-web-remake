@@ -191,6 +191,53 @@ test("S20-E: demon dragon casts the native-timed WD path and defeats Nia", async
   expect((await state(page)).lastSpecialAction).toMatchObject({ actionId: "wd" });
 });
 
+test("REMAKE-208: in 高清 the demon dragon's WD path grows a cell at a time on the HD layer", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("angel2.preferences.display.v1",
+    JSON.stringify({ imageScaling: "sharp", interfaceZoom: 100, portraitStyle: "hd" })));
+  await page.goto("/?debugScenario=stage-20-near-defeat&difficulty=0&test=1&slowMap=1");
+  await waitForPhase(page, "player");
+  // every playing position of the WD clip has a decoded frame before the enemy phase
+  await expect.poll(() => page.evaluate(() => {
+    const videos = [...document.querySelectorAll<HTMLVideoElement>("video.map-action-hd-video")]
+      .filter((video) => (video.dataset.sourceUrl ?? "").includes("/map-actions/hd/wd/"));
+    return videos.length > 1 && videos.every((video) => video.readyState >= 2);
+  }), { timeout: 20_000 }).toBe(true);
+  await page.keyboard.press("g");
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  const frames = await recordCanvasFrames(page, [...MAP_COMBAT_FRAME_KEYS, "mapActionHd", "mapActionHdGroups"]);
+  await page.getByTestId("group-command-allRest").click();
+  for (let input = 0; input < 8; input += 1) {
+    if (await activeDialogueRecord(page) !== "battle-command") break;
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(20);
+  }
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "wdGrowth",
+    mapCombatFrame: "5",
+  }, { path: `${ARTIFACT_DIR}/stage20-wd-growth-hd.png` });
+  await waitForPhase(page, "defeat");
+  const drawn = await frames.stop();
+  const growth = drawnFrames(drawn, { mapCombatPhase: "wdGrowth" });
+  const finish = drawnFrames(drawn, { mapCombatPhase: "wdFinish" });
+  expect(growth.length).toBeGreaterThan(2);
+  expect(finish.length).toBeGreaterThan(0);
+  for (const frame of [...growth, ...finish]) {
+    expect(frame.mapActionHd, `${frame.mapCombatPhase} ${frame.mapCombatFrame}`).toBe("hd");
+    expect(frame.mapCombatEffectTileCount, `${frame.mapCombatPhase} ${frame.mapCombatFrame}`).toBe("0");
+  }
+  const groupsOf = (value: string | undefined) => (value ?? "").split(",").filter(Boolean);
+  // growing: every cell on its own frame, the newest on frame 0, one group per playing position
+  for (const frame of growth) {
+    const groups = groupsOf(frame.mapActionHdGroups);
+    expect(groups.every((group) => /^wd:\d+h?x\d+$/u.test(group)), frame.mapActionHdGroups).toBe(true);
+    expect(groups.some((group) => /^wd:0x/u.test(group)), frame.mapActionHdGroups).toBe(true);
+  }
+  expect(Math.max(...growth.map(({ mapActionHdGroups }) => groupsOf(mapActionHdGroups).length))).toBeGreaterThan(1);
+  // finishing: the whole path replays one frame together
+  for (const frame of finish) expect(groupsOf(frame.mapActionHdGroups)).toHaveLength(1);
+  expect((await state(page)).lastSpecialAction).toMatchObject({ actionId: "wd" });
+});
+
 test("S20-F/G: boss victory plays Kins and Dragon King, then enters stage 21", async ({ page }) => {
   await page.goto("/?debugScenario=stage-20-victory-ready&difficulty=0&test=1");
   await page.waitForFunction(() => {

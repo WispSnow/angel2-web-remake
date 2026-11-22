@@ -8,9 +8,12 @@ import {
 } from "../content/actions";
 import { allyMapUnitAsset, allyMapUnitAssetsForClasses } from "../content/map-unit-assets";
 import { mapUnitVerticalOffset, mapUnitVisualOffset } from "../content/map-unit-presentation";
-import type { GameController } from "../controller";
+import type { GameController, SpecialActionPresentation } from "../controller";
 import type { BattleUnit, Position } from "../types";
-import { iceFrameAtGlobalIndex, lightningFrameAtMainIndex } from "../map-technique-presentation";
+import {
+  iceFrameAtGlobalIndex,
+  lightningFrameAtMainIndex,
+} from "../map-technique-presentation";
 import { TURN_TRANSITION_DUST } from "../turn-transition-presentation";
 import { buildStompPresentationSteps } from "../stomp-presentation";
 import {
@@ -47,6 +50,7 @@ import {
   mapActionHdClipFrame,
   mapActionHdSegmentFor,
   type MapActionHdClip,
+  type MapActionHdSegment,
 } from "../content/map-action-hd";
 import {
   activeMapActionHdCast,
@@ -59,7 +63,8 @@ import {
 } from "../map-action-hd";
 import { portraitStyle } from "../portrait-style";
 import { programNow } from "../program-clock";
-import { MapActionHdLayer } from "./map-action-hd-layer";
+import { MapActionHdLayer, type MapActionHdPoint } from "./map-action-hd-layer";
+import { lightningHdCells, type MapActionHdCell } from "./map-action-hd-cells";
 
 const TILE_WIDTH = BATTLE_TILE_WIDTH;
 const TILE_HEIGHT = BATTLE_TILE_HEIGHT;
@@ -75,6 +80,101 @@ const TURN_TRANSITION_BUFFER_HEIGHT = 132;
 const EDGE_PAN_INTERVAL_MS = 110;
 const unitFigureTextureKey = (unitId: string): string => `unit-figure-${unitId}`;
 const MAP_HIT_FRAME_TIMELINE = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
+
+/**
+ * 高清片段這一幀要畫在哪些格上（`REMAKE-206`）：回復畫在每個未被擋下的受治療單位上，冰雪畫在當前這一圈的每一格
+ * （與原版同一圈同時顯示當前幀），其餘畫在效果中心。魔弓 `3V` 的直線與 `WD` 的路徑（`REMAKE-208`）照原版逐格
+ * 規則給每格自己的幀：長出時新的一格從第 0 幀開始、較早的格子每步往後一幀、到最後一幀就停著；收尾時全部格子
+ * 一起從第 0 幀重播。
+ */
+function mapActionHdCells(special: SpecialActionPresentation): readonly MapActionHdCell[] {
+  if (special.phase === "recoveryEffect") {
+    return special.result.affectedUnits.filter(({ blocked }) => !blocked).map(({ positionBefore }) => positionBefore);
+  }
+  if (special.phase === "iceExpansion") {
+    const catalog = actionPresentationCatalog();
+    const presentation = special.result.actionId === "ice-4" ? catalog.ice4
+      : special.result.actionId === "ice-3" ? catalog.ice3
+        : special.result.actionId === "ice-2" ? catalog.ice2
+          : catalog.ice1;
+    const rangeValue = iceFrameAtGlobalIndex(presentation, special.frame)?.rangeValue;
+    return special.result.effectCells.filter(({ value }) => value === rangeValue).map(({ position }) => position);
+  }
+  // the same per-cell frames the original branches below draw (`map-shoot-*`, `map-wd-*`)
+  if (special.phase === "shootLineGrow") {
+    const cells = special.result.effectCells.slice(0, special.frame + 1);
+    return cells.map(({ position }, index) => {
+      const age = cells.length - index - 1;
+      return { ...position, frame: Math.min(7, age), held: age > 7 };
+    });
+  }
+  if (special.phase === "wdGrowth") {
+    const path = special.result.effectCells;
+    const visible = path.slice(Math.max(0, path.length - special.frame - 1));
+    return visible.map(({ position }, index) => {
+      const age = visible.length - index - 1;
+      return { ...position, frame: Math.min(9, age), held: age > 9 };
+    });
+  }
+  if (special.phase === "shootLineFinish" || special.phase === "wdFinish") {
+    const frame = special.phase === "wdFinish" ? Math.min(9, special.frame) : special.frame;
+    return special.result.effectCells.map(({ position }) => ({ ...position, frame }));
+  }
+  if (special.phase === "lightningMain" || special.phase === "lightningHit" || special.phase === "lightningCleanup") {
+    return battleLightningHdCells(special);
+  }
+  if (special.phase === "specialDeath" && special.target) return [special.target];
+  return [special.center];
+}
+
+/** 落雷這一幀的高清格子（`REMAKE-210`，規則與技能實驗室共用 `map-action-hd-cells.ts`）。 */
+function battleLightningHdCells(special: SpecialActionPresentation): readonly MapActionHdCell[] {
+  const catalog = actionPresentationCatalog();
+  const tier = special.result.actionId === "lightning-4" ? 4
+    : special.result.actionId === "lightning-3" ? 3 : special.result.actionId === "lightning-2" ? 2 : 1;
+  return lightningHdCells({
+    tier,
+    definition: tier === 4 ? catalog.lightning4 : tier === 3 ? catalog.lightning3
+      : tier === 2 ? catalog.lightning2 : catalog.lightning1,
+    phase: special.phase === "lightningMain" ? "main" : special.phase === "lightningCleanup" ? "cleanup" : "wave",
+    frame: special.frame,
+    center: special.center,
+    effectCells: special.result.effectCells,
+    hitPositions: special.result.affectedUnits.map(({ positionBefore }) => positionBefore),
+  });
+}
+
+/**
+ * 踩踏這一步的腿與影子畫在哪裡（世界座標的左上角）：腿照原版步驟的 y 升起、震動、落下，影子固定在地面。
+ * 原版圖塊與高清靜態片段（`REMAKE-209`）共用這一份位置。
+ */
+function stompPlacement(special: SpecialActionPresentation): {
+  readonly actionId: "stomp-1" | "stomp-2" | "stomp-3";
+  readonly side: 1 | 2;
+  readonly x: number;
+  readonly legY: number;
+  readonly shadowY: number;
+} | undefined {
+  if (special.phase !== "stompEffect" && special.phase !== "stompPageToggle") return undefined;
+  const catalog = actionPresentationCatalog();
+  const actionId = special.result.actionId === "stomp-3" ? "stomp-3"
+    : special.result.actionId === "stomp-2" ? "stomp-2" : "stomp-1";
+  const stomp = actionId === "stomp-3" ? catalog.stomp3 : actionId === "stomp-2" ? catalog.stomp2 : catalog.stomp1;
+  const step = buildStompPresentationSteps(stomp.presentation)[special.frame];
+  if (!step) return undefined;
+  const target = special.target;
+  const side = target?.side ?? (special.actor.side === 1 ? 2 : 1);
+  const targetGroundX = (target?.x ?? special.center.x) * TILE_WIDTH + TILE_WIDTH / 2;
+  const targetGroundY = (target?.y ?? special.center.y) * TILE_HEIGHT + 43;
+  const { targetImpactAnchor } = stomp.presentation;
+  return {
+    actionId,
+    side,
+    x: targetGroundX + stomp.action.drawXCoordinate - targetImpactAnchor.x,
+    legY: targetGroundY + step.y - targetImpactAnchor.y,
+    shadowY: targetGroundY + stomp.action.shadowDrawYCoordinate - targetImpactAnchor.y,
+  };
+}
 const NATIVE_CURSOR_SHADOW = 0x000000;
 const NATIVE_CURSOR_HIGHLIGHT = 0xffffff;
 const OBJECTIVE_DESTINATION_FILL = 0xc08bc5;
@@ -309,7 +409,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       hd: boolean;
       reason: string;
       emit: string;
-      clock: MapActionHdFrameClock | undefined;
+      /** 這一幀每個播放位置的時鐘（逐格錯開的片段同時有好幾個）。 */
+      clocks: Map<string, MapActionHdFrameClock>;
     } | undefined;
     private turnTransitionEffects: Phaser.GameObjects.Image[] = [];
     private terrainOverrideImages: Phaser.GameObjects.Image[] = [];
@@ -1324,23 +1425,14 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       if (portraitStyle() === "hd") {
         layer.prepare(mapActionHdActionIds().flatMap((actionId) => activeMapActionHdCast(actionId)?.clips ?? []));
       }
-      const special = controller.specialActionPresentation;
-      const rest = controller.restPresentation;
-      const context = special && mapActionHdSegmentFor(special.result.actionId, special.phase)
-        ? {
-          key: special.result as object, actionId: special.result.actionId, phase: special.phase as string,
-          frame: special.frame, center: special.center, delayMs: () => controller.mapCombatFrameDelay(special.nativeTicks),
-        }
-        : !special && rest && mapActionHdSegmentFor("rest", rest.phase)
-          ? {
-            key: rest.unit as object, actionId: "rest", phase: rest.phase as string, frame: rest.frame,
-            center: { x: rest.unit.x, y: rest.unit.y }, delayMs: () => controller.restFrameDelay(rest.nativeTicks),
-          }
-          : undefined;
+      const context = this.mapActionHdContext();
       if (!context) {
         this.mapActionHdCast = undefined;
         layer.setShow(undefined);   // an afterglow on the last clip keeps playing by itself
-        if (controller.isTestMode) delete canvas.dataset.mapActionHd;
+        if (controller.isTestMode) {
+          delete canvas.dataset.mapActionHd;
+          delete canvas.dataset.mapActionHdStills;
+        }
         return false;
       }
       if (this.mapActionHdCast?.key !== context.key) {
@@ -1349,44 +1441,190 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           : mapActionHdCastFailed(context.actionId) ? "failed"
             : !cast ? "unavailable"
               : cast.clips.every(({ clipId }) => layer.ready(clipId)) ? "" : "not-ready";
-        this.mapActionHdCast = { key: context.key, hd: !reason, reason, emit: "", clock: undefined };
+        this.mapActionHdCast = { key: context.key, hd: !reason, reason, emit: "", clocks: new Map() };
       }
       const cast = this.mapActionHdCast;
-      const segment = mapActionHdSegmentFor(context.actionId, context.phase);
-      const clip: MapActionHdClip | undefined = cast.hd && segment ? activeMapActionHdCast(context.actionId)?.clips
-        .find(({ clipId }) => clipId === segment.clipId) : undefined;
-      const clipFrame = segment ? mapActionHdClipFrame(segment, context.phase, context.frame) : undefined;
-      const span = clip && clipFrame !== undefined ? mapActionHdFrameSpan(clip, clipFrame) : undefined;
-      if (!cast.hd || !clip || !span || mapActionHdFailed(clip.clipId)) {
-        if (cast.hd) cast.reason = clip && mapActionHdFailed(clip.clipId) ? "failed" : "frame";
+      if (context.stills) return this.syncMapActionHdStills(cast, context.actionId, context.stills);
+      // one group per playing position: the cells of one clip on one frame share a video. A cell may name its own
+      // clip (lightning's wave draws the sweep and the struck units' markers at once, `REMAKE-210`); a staggered clip
+      // (`REMAKE-208`) gives each cell its own frame, and the cells parked on its last frame form a group of their own
+      const active = cast.hd ? activeMapActionHdCast(context.actionId) : undefined;
+      const segments = active?.segments.filter((candidate) => Object.hasOwn(candidate.phases, context.phase)) ?? [];
+      const groups = new Map<string, {
+        segment: MapActionHdSegment; clip: MapActionHdClip; frame: number; held: boolean; cells: MapActionHdCell[];
+      }>();
+      let missing = !active || segments.length === 0;
+      for (const cell of context.cells) {
+        const segment = cell.clipId ? segments.find(({ clipId }) => clipId === cell.clipId) : segments[0];
+        const clip = segment && active?.clips.find(({ clipId }) => clipId === segment.clipId);
+        if (!segment || !clip) {
+          missing = true;
+          continue;
+        }
+        const frame = cell.frame ?? context.frame;
+        const held = Boolean(segment.staggered && cell.held);
+        const key = `${clip.clipId}:${frame}:${held ? "held" : "new"}`;
+        const group = groups.get(key) ?? { segment, clip, frame, held, cells: [] };
+        group.cells.push(cell);
+        groups.set(key, group);
+      }
+      // a growing line's cell on the last frame waits for the finish: it never runs into the afterglow
+      const growing = context.cells.some((cell) => cell.held !== undefined);
+      const spans = [...groups.entries()].map(([key, group]) => {
+        const clipFrame = mapActionHdClipFrame(group.segment, context.phase, group.frame);
+        const span = clipFrame !== undefined ? mapActionHdFrameSpan(group.clip, clipFrame) : undefined;
+        return span && { key, group, clipFrame: clipFrame ?? 0, span: growing ? { ...span, limitTick: undefined } : span };
+      });
+      const failed = [...groups.values()].find(({ clip }) => mapActionHdFailed(clip.clipId));
+      if (!cast.hd || missing || spans.some((entry) => !entry) || failed) {
+        if (cast.hd) cast.reason = failed ? "failed" : "frame";
         cast.hd = false;
         layer.setShow(undefined);
         if (controller.isTestMode) canvas.dataset.mapActionHd = `original:${cast.reason}`;
         return false;
       }
-      const emit = `${context.phase}:${context.frame}`;
-      if (cast.emit !== emit || !cast.clock) {
-        cast.emit = emit;
-        cast.clock = { ...span, delayMs: context.delayMs(), emittedAt: programNow() };
+      if (cast.emit !== context.emit) {
+        cast.emit = context.emit;
+        const emittedAt = programNow();
+        const delayMs = context.delayMs();
+        cast.clocks = new Map(spans.flatMap((entry) => entry
+          ? [[entry.key, { ...entry.span, delayMs, emittedAt }] as const] : []));
       }
-      const clock = cast.clock;
-      const center = context.center;
       const camera = this.cameras.main;
-      layer.setShow({
-        clip,
-        tick: () => mapActionHdTick(clock, programNow()),
-        target: () => ({
-          x: center.x * TILE_WIDTH + TILE_WIDTH / 2 - camera.scrollX,
-          y: (center.y + 1) * TILE_HEIGHT - camera.scrollY,
-        }),
-        rate: ((clock.endTick - clock.startTick) * 10) / clock.delayMs,
-        linger: clock.limitTick !== undefined,
+      const shows = spans.flatMap((entry) => {
+        const clock = entry && cast.clocks.get(entry.key);
+        if (!entry || !clock) return [];
+        const { cells, clip, segment, held } = entry.group;
+        const target = (): MapActionHdPoint[] => cells.map((cell) => ({
+          x: cell.x * TILE_WIDTH + TILE_WIDTH / 2 - camera.scrollX,
+          y: (cell.y + 1) * TILE_HEIGHT - camera.scrollY,
+        }));
+        // a parked cell holds the end of its frame; each other position plays its own frame on its own video
+        const instance = segment.staggered ? (held ? clip.frameStartTicks.length : entry.clipFrame) : 0;
+        return [held
+          ? { clip, instance, target, tick: () => clock.endTick - 1e-3, rate: 0, playing: false }
+          : {
+            clip,
+            instance,
+            target,
+            tick: () => mapActionHdTick(clock, programNow()),
+            rate: ((clock.endTick - clock.startTick) * 10) / clock.delayMs,
+            linger: clock.limitTick !== undefined,
+          }];
       });
+      layer.setActive(shows);
       if (controller.isTestMode) {
+        const first = cast.clocks.values().next().value;
         canvas.dataset.mapActionHd = "hd";
-        canvas.dataset.mapActionHdFrameTicks = `${clock.startTick},${clock.endTick}`;
+        canvas.dataset.mapActionHdFrameTicks = first ? `${first.startTick},${first.endTick}` : "";
+        canvas.dataset.mapActionHdGroups = spans.flatMap((entry) => entry
+          ? [`${entry.group.clip.clipId}:${entry.clipFrame}${entry.group.held ? "h" : ""}x${entry.group.cells.length}`]
+          : []).join(",");
       }
       return true;
+    }
+
+    /**
+     * 踩踏（`REMAKE-209`）：靜態片段沒有時鐘，只照原版這一步的位置擺；`stills` 是片段與原版圖左上角的世界座標。
+     */
+    private syncMapActionHdStills(
+      cast: NonNullable<BattleScene["mapActionHdCast"]>,
+      actionId: string,
+      stills: readonly { readonly clipId: string; readonly x: number; readonly y: number }[],
+    ): boolean {
+      const layer = this.mapActionHd;
+      const canvas = this.game.canvas;
+      const clips = cast.hd ? activeMapActionHdCast(actionId)?.clips : undefined;
+      const placed = stills.map((still) => ({ ...still, clip: clips?.find(({ clipId }) => clipId === still.clipId) }));
+      if (!layer || !cast.hd || placed.some(({ clip }) => !clip || mapActionHdFailed(clip.clipId))) {
+        if (cast.hd) cast.reason = placed.some(({ clip }) => clip && mapActionHdFailed(clip.clipId)) ? "failed" : "frame";
+        cast.hd = false;
+        layer?.setShow(undefined);
+        if (controller.isTestMode) canvas.dataset.mapActionHd = `original:${cast.reason}`;
+        return false;
+      }
+      const camera = this.cameras.main;
+      layer.setActive(placed.flatMap(({ clip, x, y }) => clip ? [{
+        clip,
+        // a still's origin is the original picture's top-left
+        target: () => ({ x: x - camera.scrollX, y: y - camera.scrollY }),
+        tick: () => 0,
+        rate: 0,
+        playing: false,
+      }] : []));
+      if (controller.isTestMode) {
+        canvas.dataset.mapActionHd = "hd";
+        canvas.dataset.mapActionHdStills = placed.map(({ clipId, x, y }) => `${clipId}@${x},${y}`).join(";");
+      }
+      return true;
+    }
+
+    /**
+     * 這一幀有沒有高清片段可以畫，以及畫在哪裡：技術（擊殺照地圖戰鬥播死亡，`REMAKE-207`）、休息，或地圖
+     * 戰鬥的命中與死亡（全螢幕戰鬥的畫面蓋住戰場，不算）。`key` 是一次施法的判定單位：技術是結果物件，
+     * 死亡是那名死者（每名死者各播一次），休息是休息的單位。
+     */
+    private mapActionHdContext(): {
+      readonly key: object;
+      readonly actionId: string;
+      readonly phase: string;
+      readonly frame: number;
+      readonly emit: string;
+      readonly cells: readonly MapActionHdCell[];
+      readonly delayMs: () => number;
+      /** 靜態片段與原版圖左上角的世界座標（踩踏，`REMAKE-209`）。 */
+      readonly stills?: readonly { readonly clipId: string; readonly x: number; readonly y: number }[];
+    } | undefined {
+      const special = controller.specialActionPresentation;
+      if (special) {
+        const death = special.phase === "specialDeath";
+        const actionId = death ? "map-death" : special.result.actionId;
+        if (!mapActionHdSegmentFor(actionId, special.phase)) return undefined;
+        const stomp = stompPlacement(special);
+        return {
+          ...(stomp ? {
+            stills: [
+              { clipId: `${stomp.actionId}-side${stomp.side}-leg`, x: stomp.x, y: stomp.legY },
+              { clipId: `${stomp.actionId}-side${stomp.side}-shadow`, x: stomp.x, y: stomp.shadowY },
+            ],
+          } : {}),
+          key: death && special.target ? special.target : special.result,
+          actionId,
+          phase: special.phase,
+          frame: special.frame,
+          emit: `${special.phase}:${special.frame}`,
+          cells: mapActionHdCells(special),
+          delayMs: () => controller.mapCombatFrameDelay(special.nativeTicks),
+        };
+      }
+      const rest = controller.restPresentation;
+      if (rest) {
+        if (!mapActionHdSegmentFor("rest", rest.phase)) return undefined;
+        return {
+          key: rest.unit, actionId: "rest", phase: rest.phase, frame: rest.frame, emit: `${rest.phase}:${rest.frame}`,
+          cells: [{ x: rest.unit.x, y: rest.unit.y }], delayMs: () => controller.restFrameDelay(rest.nativeTicks),
+        };
+      }
+      const combat = controller.combatPresentation;
+      if (!combat || combat.fullScene) return undefined;
+      const death = combat.phase === "defenderDeath" || combat.phase === "attackerDeath";
+      const actionId = death ? "map-death" : "map-hit";
+      if (!mapActionHdSegmentFor(actionId, combat.phase)) return undefined;
+      const index = combat.deathTargetIndex ?? 0;
+      const unit = combat.phase === "attackerDeath" ? combat.attackerDeathUnits?.[index] ?? combat.attacker
+        : combat.phase === "defenderDeath" ? combat.defenderDeathUnits?.[index] ?? combat.defender
+          : combat.phase === "counterHit" ? combat.attacker
+            : combat.defender;
+      return {
+        key: death ? unit : combat.result,
+        actionId,
+        phase: combat.phase,
+        frame: combat.frame,
+        emit: `${combat.phase}:${index}:${combat.frame}`,
+        cells: [{ x: unit.x, y: unit.y }],
+        // both the strike's nine frames and each death's fifteen wait 10 ticks (`presentMapCombatDeaths`)
+        delayMs: () => controller.mapCombatFrameDelay(10),
+      };
     }
 
     private drawCombatEffects(): void {
@@ -1572,8 +1810,9 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         let iceRangeValue: number | undefined;
         let iceDistanceFromCenter: number | undefined;
         let texture: string | undefined;
-        if (special.phase === "shootHit") texture = `map-shoot-${special.frame}`;
-        else if (special.phase === "shootLineGrow" || special.phase === "shootLineFinish") {
+        // shooting, 3V's line and WD's path go to the HD layer as a whole (`REMAKE-208`)
+        if (special.phase === "shootHit" && !hdEffect) texture = `map-shoot-${special.frame}`;
+        else if ((special.phase === "shootLineGrow" || special.phase === "shootLineFinish") && !hdEffect) {
           const cells = special.phase === "shootLineGrow"
             ? special.result.effectCells.slice(0, special.frame + 1)
             : special.result.effectCells;
@@ -1592,7 +1831,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             );
           }
         }
-        else if (special.phase === "wdGrowth" || special.phase === "wdFinish") {
+        else if ((special.phase === "wdGrowth" || special.phase === "wdFinish") && !hdEffect) {
           const path = special.result.effectCells;
           const visible = special.phase === "wdGrowth"
             ? path.slice(Math.max(0, path.length - special.frame - 1))
@@ -1646,7 +1885,9 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               texture,
             ).setOrigin(.5, 1).setDepth(8),
           );
-        } else if (special.phase === "fireEffect" && !hdEffect
+        } else if (hdEffect) {
+          // the HD layer draws this frame (`REMAKE-203`..`REMAKE-208`, a technique's kill included): no original tiles
+        } else if (special.phase === "fireEffect"
           && (special.result.actionId === "fire-2" || special.result.actionId === "fire-3"
             || special.result.actionId === "fire-4")) {
           const fireId = special.result.actionId;
@@ -1682,7 +1923,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               ).setOrigin(0).setDepth(8),
             );
           });
-        } else if (special.phase === "healPrimary" && special.result.actionId === "heal-2" && !hdEffect) {
+        } else if (special.phase === "healPrimary" && special.result.actionId === "heal-2") {
           const descriptor = presentationCatalog!.heal2.phases[0]
             .descriptorSequence[special.frame];
           descriptor?.low7BitFrameIndices.forEach((sourceFrame, index) => {
@@ -1697,7 +1938,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               ).setOrigin(0).setDepth(8),
             );
           });
-        } else if (special.phase === "healPrimary" && special.result.actionId === "heal-3" && !hdEffect) {
+        } else if (special.phase === "healPrimary" && special.result.actionId === "heal-3") {
           let phaseFrame = special.frame;
           const phase = presentationCatalog!.heal3.phases.slice(0, -1).find((candidate) => {
             if (phaseFrame < candidate.descriptorSequence.length) return true;
@@ -1762,14 +2003,16 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           const sourceFrame = iceFrame?.sourceFrame;
           iceRangeValue = iceFrame?.rangeValue;
           iceDistanceFromCenter = iceFrame?.distanceFromCenter;
+          // `MAGIC/10` tiles (40x37) are tile codes drawn from each ring cell's top-left like every other
+          // descriptor; centring them in the 40x44 cell pushed every frame 3.5 px down (REMAKE-206)
           for (const { position, value } of special.result.effectCells) {
             if (sourceFrame === undefined || value !== iceRangeValue) continue;
             this.combatEffects.push(
               addMapActionImage(this,
-                position.x * TILE_WIDTH + TILE_WIDTH / 2,
-                position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+                position.x * TILE_WIDTH,
+                position.y * TILE_HEIGHT,
                 `map-ice-1-expansion-${sourceFrame}`,
-              ).setOrigin(.5).setDepth(8),
+              ).setOrigin(0).setDepth(8),
             );
           }
         } else if (special.phase === "recoveryEffect") {
@@ -1945,35 +2188,15 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             ));
           }
         } else if (special.phase === "stompEffect" || special.phase === "stompPageToggle") {
-          const stomp = special.result.actionId === "stomp-3"
-            ? presentationCatalog!.stomp3
-            : special.result.actionId === "stomp-2"
-              ? presentationCatalog!.stomp2
-              : presentationCatalog!.stomp1;
-          const step = buildStompPresentationSteps(stomp.presentation)[special.frame];
-          const targetSide = target?.side ?? (special.actor.side === 1 ? 2 : 1);
-          const resourceSide = targetSide === 1 ? "side1" : "side2";
-          if (step) {
-            const targetGroundX = (target?.x ?? center.x) * TILE_WIDTH + TILE_WIDTH / 2;
-            const targetGroundY = (target?.y ?? center.y) * TILE_HEIGHT + 43;
-            const { targetImpactAnchor } = stomp.presentation;
-            const drawX = targetGroundX
-              + stomp.action.drawXCoordinate
-              - targetImpactAnchor.x;
-            const addTargetedStompFrame = (
-              drawYCoordinate: number,
-              sourceFrame: number,
-            ): void => {
+          const placement = stompPlacement(special);
+          if (placement) {
+            const resourceSide = placement.side === 1 ? "side1" : "side2";
+            for (const [y, sourceFrame] of [[placement.legY, 0], [placement.shadowY, 1]] as const) {
               this.combatEffects.push(
-                addMapActionImage(this,
-                  drawX,
-                  targetGroundY + drawYCoordinate - targetImpactAnchor.y,
-                  `map-${special.result.actionId}-${resourceSide}-${sourceFrame}`,
-                ).setOrigin(0).setDepth(8),
+                addMapActionImage(this, placement.x, y, `map-${placement.actionId}-${resourceSide}-${sourceFrame}`)
+                  .setOrigin(0).setDepth(8),
               );
-            };
-            addTargetedStompFrame(step.y, 0);
-            addTargetedStompFrame(stomp.action.shadowDrawYCoordinate, 1);
+            }
           }
         } else if (special.phase === "specialDeath" && target) {
           const descriptor = MAP_DEATH_DESCRIPTORS[special.frame];
@@ -2142,7 +2365,9 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             ? presentation.attacker
             : presentation.defender;
 
-      if (presentation.phase === "primaryHit" || presentation.phase === "counterHit") {
+      if (hdEffect) {
+        // the HD layer draws the strike or the death (`REMAKE-207`): no original tiles
+      } else if (presentation.phase === "primaryHit" || presentation.phase === "counterHit") {
         const sourceFrame = MAP_HIT_FRAME_TIMELINE[presentation.frame] ?? 0;
         this.combatEffects.push(
           addBattleSpriteImageFromSource(

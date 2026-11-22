@@ -9,6 +9,7 @@ import {
   mapActionHdClip,
   mapActionHdClipFrame,
   mapActionHdClips,
+  mapActionHdInstanceCount,
   mapActionHdSegmentFor,
   mapActionHdVisibleAt,
 } from "../../src/game/content/map-action-hd";
@@ -24,8 +25,30 @@ import {
 } from "../../src/game/map-action-hd";
 
 const assetRoot = path.resolve(__dirname, "../../public/assets/original");
+const parsedNative = (name: string): Record<string, unknown> =>
+  JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../reverse/parsed/native", name), "utf8")) as Record<string, unknown>;
+const combatEvidence = parsedNative("combat-presentations.json") as {
+  mapPresentation: {
+    hit: { totalGraphicFrames: number; fixedGraphicWaitNativeTicks: number };
+    death: { descriptorCount: number; waitPerDescriptorNativeTicks: number };
+  };
+};
+const shootingEvidence = parsedNative("shooting-presentations.json") as {
+  commonImpact: { timeline: { tileCodes: number[]; waitPerDrawNativeTicks: number } };
+};
 
 type Phase = { readonly draws: number; readonly wait: number };
+
+const LIGHTNING_TIERS = [1, 2, 3, 4] as const;
+const LIGHTNING = {
+  1: STAGE1_ACTION_PRESENTATION.lightning1,
+  2: STAGE1_ACTION_PRESENTATION.lightning2,
+  3: STAGE1_ACTION_PRESENTATION.lightning3,
+  4: STAGE1_ACTION_PRESENTATION.lightning4,
+} as const;
+
+/** What every stage fetches in the HD art style: rest's finish, the map-combat strike and death (`REMAKE-207`). */
+const EVERY_STAGE_URLS = ["death", "heal-tail", "hit"].map((clipId) => `/assets/original/map-actions/hd/${clipId}/hd.mp4`);
 
 /** Start tick of every original frame in emit order, and the timeline's total. */
 function timeline(phases: readonly Phase[]): { starts: number[]; duration: number } {
@@ -55,13 +78,67 @@ const ORIGINAL: Record<string, () => readonly Phase[]> = {
   "heal-tail": () => [{ draws: STAGE0_REST_PRESENTATION.frameCount, wait: STAGE0_REST_PRESENTATION.waitPerFrameNativeTicks }],
   "heal-2": () => TECHNIQUE_LAB_HEAL["2H"].phases.slice(0, -1).map((p) => ({ draws: p.drawCount, wait: p.waitPerDrawNativeTicks })),
   "heal-3": () => TECHNIQUE_LAB_HEAL["3H"].phases.slice(0, -1).map((p) => ({ draws: p.drawCount, wait: p.waitPerDrawNativeTicks })),
+  // `REMAKE-205`: the status techniques as the battle controller plays them (runtime tile states or descriptors)
+  "attack-up": () => STAGE1_ACTION_PRESENTATION.attackUp.phases.map((p) => ({ draws: p.runtimeTileCodePairs.length, wait: p.waitPerDrawNativeTicks })),
+  "defense-up": () => descriptorPhases(STAGE1_ACTION_PRESENTATION.defenseUp.phases),
+  "attack-down": () => descriptorPhases(STAGE1_ACTION_PRESENTATION.attackDown.phases),
+  "defense-down": () => descriptorPhases(STAGE1_ACTION_PRESENTATION.defenseDown.phases),
+  confusion: () => descriptorPhases(STAGE1_ACTION_PRESENTATION.confusion.phases),
+  "spell-seal": () => descriptorPhases(STAGE1_ACTION_PRESENTATION.spellSeal.phases),
+  poison: () => {
+    const [rise, cloud] = STAGE1_ACTION_PRESENTATION.poison.phases;
+    return [
+      { draws: rise.runtimeTileCodeStates.length, wait: rise.waitPerDrawNativeTicks },
+      { draws: cloud.descriptorSequence.length, wait: cloud.waitPerDrawNativeTicks },
+    ];
+  },
+  dispel: () => STAGE1_ACTION_PRESENTATION.dispel.phases.map((p) => ({ draws: p.runtimeTileCodeStates.length, wait: p.waitPerDrawNativeTicks })),
+  // `REMAKE-206`: the recovery presentation 1I-3I share, and one ice cycle every tier replays per ring
+  recovery: () => [{
+    draws: STAGE1_ACTION_PRESENTATION.recovery1.presentation.descriptorSequence.length,
+    wait: STAGE1_ACTION_PRESENTATION.recovery1.presentation.waitPerDrawNativeTicks,
+  }],
+  ice: () => descriptorPhases([STAGE1_ACTION_PRESENTATION.ice1.cycle]),
+  // `REMAKE-207`: the map-combat strike (UN/62, nine draws) and each death (MAGIC/12), as the parsed evidence records them
+  hit: () => [{
+    draws: combatEvidence.mapPresentation.hit.totalGraphicFrames,
+    wait: combatEvidence.mapPresentation.hit.fixedGraphicWaitNativeTicks / combatEvidence.mapPresentation.hit.totalGraphicFrames,
+  }],
+  death: () => [{
+    draws: combatEvidence.mapPresentation.death.descriptorCount,
+    wait: combatEvidence.mapPresentation.death.waitPerDescriptorNativeTicks,
+  }],
+  // `REMAKE-208`: UN/60's eight frames between the archer's two blank draws, and WD's ten growth frames
+  shoot: () => [{
+    draws: shootingEvidence.commonImpact.timeline.tileCodes.length - 2,
+    wait: shootingEvidence.commonImpact.timeline.waitPerDrawNativeTicks,
+  }],
+  wd: () => [{ draws: STAGE1_ACTION_PRESENTATION.wd.finishSteps, wait: STAGE1_ACTION_PRESENTATION.wd.waitPerGrowthOrFinishStepNativeTicks }],
+  // `REMAKE-210`: each tier's main phases, its sweep (codes 1..sweepWidth) and two-frame marker at the wave pace, and the
+  // MAGIC/6 finish all four tiers share
+  ...Object.fromEntries(LIGHTNING_TIERS.flatMap((tier) => {
+    const { phases, commonHit } = LIGHTNING[tier];
+    const wait = commonHit.waitPerWaveDrawNativeTicks;
+    return [
+      [`lightning-${tier}-main`, () => descriptorPhases(phases)],
+      [`lightning-${tier}-hit`, () => [{ draws: commonHit.sweepWidth, wait }]],
+      [`lightning-${tier}-marker`, () => [{ draws: commonHit.runtimeTileCodes.length, wait }]],
+    ];
+  })),
+  "lightning-cleanup": () => descriptorPhases([STAGE1_ACTION_PRESENTATION.lightning1.commonHit.cleanup]),
 };
 
-describe("HD map-technique effects (REMAKE-203 fire, REMAKE-204 heal and rest)", () => {
+describe("HD map effects (REMAKE-203 fire, REMAKE-204 heal and rest, REMAKE-205..210 the rest)", () => {
   it("keeps every clip on its original graphics timeline, with any afterglow after it", () => {
     const ids = mapActionHdClips().map(({ clipId }) => clipId);
     expect(ids).toEqual(expect.arrayContaining(["fire-1", "fire-2", "fire-3", "fire-4", "heal-1", "heal-tail"]));
     for (const clip of mapActionHdClips()) {
+      if (clip.still) {
+        // `REMAKE-209`: a still has no timeline, the battle moves it like the original picture
+        expect([clip.durationTicks, clip.afterglowTicks, clip.video.frames, clip.frameStartTicks], clip.clipId)
+          .toEqual([0, 0, 1, [0]]);
+        continue;
+      }
       const phases = ORIGINAL[clip.clipId];
       if (!phases) throw new Error(`no original timeline for ${clip.clipId}`);
       const original = timeline(phases());
@@ -92,14 +169,19 @@ describe("HD map-technique effects (REMAKE-203 fire, REMAKE-204 heal and rest)",
       const shipped = manifest.clips.find(({ output }) => `/assets/original/${output}` === clip.video.source);
       expect(shipped, clip.clipId).toBeDefined();
       expect(fs.statSync(file).size, clip.clipId).toBe(shipped?.bytes);
+      expect(clip.video.source.endsWith(clip.still ? "/hd.png" : "/hd.mp4"), clip.clipId).toBe(true);
       const sideBySide = clip.alphaX > 0;
       expect(sideBySide ? clip.alphaX >= clip.frameWidth : clip.alphaY >= clip.frameHeight, clip.clipId).toBe(true);
       expect(clip.alphaX + clip.frameWidth, clip.clipId).toBeLessThanOrEqual(clip.video.width);
       expect(clip.alphaY + clip.frameHeight, clip.clipId).toBeLessThanOrEqual(clip.video.height);
       expect(clip.scale, clip.clipId).toBe(4);
       expect(clip.originX, clip.clipId).toBeGreaterThan(0);
-      expect(clip.originY, clip.clipId).toBeLessThanOrEqual(clip.frameHeight);
+      // 4L's pillar stops one tile above the struck unit, so its target point lies below the picture; never more
+      // than one native map tile (44 px) outside it
+      expect(clip.originY, clip.clipId).toBeLessThanOrEqual(clip.frameHeight + 44 * clip.scale);
     }
+    expect(mapActionHdClips().find(({ clipId }) => clipId === "lightning-4-main")?.originY)
+      .toBeGreaterThan(mapActionHdClips().find(({ clipId }) => clipId === "lightning-4-main")?.frameHeight ?? Infinity);
   });
 
   it("maps each presentation phase to its clip; all heals and rest share one finish", () => {
@@ -123,20 +205,23 @@ describe("HD map-technique effects (REMAKE-203 fire, REMAKE-204 heal and rest)",
 
   it("asks for HD files only when the art style is HD, for the stage's techniques and the rest everyone has", () => {
     expect(mapActionHdUrlsForStyle(["fire-1", "fire-4"], "original")).toEqual([]);
-    expect(mapActionHdUrlsForStyle(["fire-1", "fire-4", "lightning-1"], "hd")).toEqual([
+    // 2K builds terrain without a technique graphic: no HD version, nothing to fetch
+    expect(mapActionHdUrlsForStyle(["fire-1", "fire-4", "obstacle"], "hd")).toEqual([
+      "/assets/original/map-actions/hd/death/hd.mp4",
       "/assets/original/map-actions/hd/fire-1/hd.mp4",
       "/assets/original/map-actions/hd/fire-4/hd.mp4",
       "/assets/original/map-actions/hd/heal-tail/hd.mp4",
+      "/assets/original/map-actions/hd/hit/hd.mp4",
     ]);
-    // every unit can rest: the finish is fetched in every stage
-    expect(mapActionHdUrlsForStyle([], "hd")).toEqual(["/assets/original/map-actions/hd/heal-tail/hd.mp4"]);
+    // every unit can rest and fight on the map: the finish, the strike and the death are fetched in every stage
+    expect(mapActionHdUrlsForStyle([], "hd")).toEqual(EVERY_STAGE_URLS);
     expect(mapActionHdAssetUrlsForActions(["heal-1"])).toEqual([
       "/assets/original/map-actions/hd/heal-1/hd.mp4",
       "/assets/original/map-actions/hd/heal-tail/hd.mp4",
     ]);
-    expect(mapActionHdAssetUrlsForActions(["lightning-1"])).toEqual([]);
+    expect(mapActionHdAssetUrlsForActions(["obstacle"])).toEqual([]);
     expect(activeMapActionHdCast("fire-2", "original")).toBeUndefined();
-    expect(activeMapActionHdCast("lightning-1", "hd")).toBeUndefined();
+    expect(activeMapActionHdCast("obstacle", "hd")).toBeUndefined();
     // outside a resource lease every URL counts as available
     expect(activeMapActionHdCast("heal-1", "hd")?.clips.map(({ clipId }) => clipId)).toEqual(["heal-1", "heal-tail"]);
   });
@@ -150,7 +235,7 @@ describe("HD map-technique effects (REMAKE-203 fire, REMAKE-204 heal and rest)",
     expect(mapActionHdUrlsForStyle(stagePresentationActionIds({ allyClassIds: ["soldier"], encounterClassIds: [] }), "hd"))
       .toContain("/assets/original/map-actions/hd/fire-1/hd.mp4");
     expect(mapActionHdUrlsForStyle(stagePresentationActionIds({ allyClassIds: [], encounterClassIds: ["soldier"] }), "hd"))
-      .toEqual(["/assets/original/map-actions/hd/heal-tail/hd.mp4"]);
+      .toEqual(EVERY_STAGE_URLS);
   });
 
   it("moves the HD clock through each original frame at the controller's pace and never past its end", () => {
@@ -202,5 +287,112 @@ describe("HD map-technique effects (REMAKE-203 fire, REMAKE-204 heal and rest)",
     expect(mapActionHdVisibleAt(heal, heal.endTick)).toEqual([]);
     const fire = mapActionHdCastTimeline("fire-1");
     expect(fire && [fire.durationTicks, fire.endTick]).toEqual([70, 70]);
+  });
+
+  it("gives the status techniques one clip each; attack-up and magic guard share theirs (REMAKE-205)", () => {
+    const phases: Record<string, string> = {
+      "attack-up": "statusEffect", "magic-guard": "statusEffect", "defense-up": "statusEffect",
+      "attack-down": "statusEffect", "defense-down": "statusEffect", confusion: "statusEffect",
+      "spell-seal": "statusEffect", poison: "poisonEffect", dispel: "dispelEffect",
+    };
+    for (const [actionId, phase] of Object.entries(phases)) {
+      expect(mapActionHdSegmentFor(actionId, phase)?.clipId, actionId)
+        .toBe(actionId === "magic-guard" ? "attack-up" : actionId);
+      // a status technique has no shared finish: its whole cast is its own clip
+      expect(mapActionHdCast(actionId)?.length, actionId).toBe(1);
+    }
+    // the original calls the same presentation for both (`1000:7572`)
+    expect(STAGE1_ACTION_PRESENTATION.magicGuard.phases).toEqual(STAGE1_ACTION_PRESENTATION.attackUp.phases);
+  });
+
+  it("plays 1I-3I as one recovery clip and replays the ice cycle once per ring (REMAKE-206)", () => {
+    for (const actionId of ["recovery-1", "recovery-2", "recovery-3"]) {
+      expect(mapActionHdSegmentFor(actionId, "recoveryEffect")?.clipId, actionId).toBe("recovery");
+    }
+    const ice = mapActionHdClip("ice");
+    if (!ice) throw new Error("no HD clip for ice");
+    const cycle = ice.frameStartTicks.length;
+    for (const [actionId, key] of [["ice-1", "ice1"], ["ice-2", "ice2"], ["ice-3", "ice3"], ["ice-4", "ice4"]] as const) {
+      const [segment] = mapActionHdCast(actionId) ?? [];
+      // one replay per ring the controller draws (effect radius − 1)
+      expect(segment?.repeat, actionId).toBe(STAGE1_ACTION_PRESENTATION[key].cycles);
+      expect(STAGE1_ACTION_PRESENTATION[key].cycle, actionId).toEqual(STAGE1_ACTION_PRESENTATION.ice1.cycle);
+      if (!segment) continue;
+      // the controller's frame runs across every ring; the clip frame wraps at each new ring
+      expect(mapActionHdClipFrame(segment, "iceExpansion", 0), actionId).toBe(0);
+      expect(mapActionHdClipFrame(segment, "iceExpansion", cycle - 1), actionId).toBe(cycle - 1);
+      expect(mapActionHdClipFrame(segment, "iceExpansion", cycle), actionId).toBe(0);
+      expect(mapActionHdClipFrame(segment, "iceExpansion", cycle * 2 + 1), actionId).toBe(1);
+    }
+    const timeline = mapActionHdCastTimeline("ice-2");
+    if (!timeline) throw new Error("no ice-2 cast");
+    expect(timeline.segments.map(({ startTick, repeat }) => [startTick, repeat]))
+      .toEqual([[0, 0], [ice.durationTicks, 1], [ice.durationTicks * 2, 2]]);
+    expect(timeline.durationTicks).toBe(ice.durationTicks * 3);
+    expect(timeline.endTick).toBe(ice.durationTicks * 3 + ice.afterglowTicks);
+    // an earlier ring stops where the next one starts; only the last ring keeps the afterglow
+    expect(timeline.segments.map(({ endTick }) => endTick))
+      .toEqual([ice.durationTicks, ice.durationTicks * 2, ice.durationTicks * 3 + ice.afterglowTicks]);
+    expect(mapActionHdVisibleAt(timeline, ice.durationTicks + 5).map(({ tick, repeat }) => [tick, repeat]))
+      .toEqual([[5, 1]]);
+  });
+
+  it("plays one strike for the attack and the counter, and one death per dying unit (REMAKE-207)", () => {
+    for (const phase of ["primaryHit", "counterHit"]) expect(mapActionHdSegmentFor("map-hit", phase)?.clipId, phase).toBe("hit");
+    for (const phase of ["defenderDeath", "attackerDeath", "specialDeath"]) {
+      expect(mapActionHdSegmentFor("map-death", phase)?.clipId, phase).toBe("death");
+    }
+    // the damage drain between them has no HD frame: the strike's afterglow plays over it by itself
+    expect(mapActionHdSegmentFor("map-hit", "primaryDamage")).toBeUndefined();
+  });
+
+  it("grows 3V's line and WD's path a cell at a time, one video per playing position (REMAKE-208)", () => {
+    for (const actionId of ["archer-shot", "crossbow-shot", "water-warrior-shot"]) {
+      const segment = mapActionHdSegmentFor(actionId, "shootHit");
+      expect([segment?.clipId, segment?.staggered], actionId).toEqual(["shoot", undefined]);
+    }
+    for (const actionId of ["magic-archer-shot", "virt-a", "virt-b", "virt-c"]) {
+      for (const phase of ["shootLineGrow", "shootLineFinish"]) {
+        const segment = mapActionHdSegmentFor(actionId, phase);
+        expect([segment?.clipId, segment?.staggered], `${actionId} ${phase}`).toEqual(["shoot", true]);
+      }
+    }
+    for (const phase of ["wdGrowth", "wdFinish"]) expect(mapActionHdSegmentFor("wd", phase)?.staggered, phase).toBe(true);
+    // every frame can show at once while the line grows, plus the cells parked on the last frame
+    expect(mapActionHdInstanceCount("shoot")).toBe(9);
+    expect(mapActionHdInstanceCount("wd")).toBe(11);
+    expect(mapActionHdInstanceCount("fire-1")).toBe(1);
+  });
+
+  it("repaints the stomp's leg and shadow as stills the battle moves (REMAKE-209)", () => {
+    for (const tier of [1, 2, 3]) {
+      const clips = activeMapActionHdCast(`stomp-${tier}`, "hd")?.clips ?? [];
+      expect(clips.map(({ clipId }) => clipId), `stomp-${tier}`).toEqual([1, 2].flatMap((side) =>
+        [`stomp-${tier}-side${side}-leg`, `stomp-${tier}-side${side}-shadow`]));
+      for (const clip of clips) {
+        expect(clip.still, clip.clipId).toBe(true);
+        // the origin is the original picture's top-left, inside the frame's margin
+        expect(clip.originX % clip.scale, clip.clipId).toBe(0);
+        expect(clip.originX, clip.clipId).toBe(clip.originY);
+      }
+      expect(mapActionHdSegmentFor(`stomp-${tier}`, "stompEffect")).toBeDefined();
+      expect(mapActionHdSegmentFor(`stomp-${tier}`, "stompPageToggle")).toBeDefined();
+    }
+  });
+
+  it("plays lightning as a main clip, a staggered sweep, the struck units' marker and the shared finish (REMAKE-210)", () => {
+    for (const tier of LIGHTNING_TIERS) {
+      const actionId = `lightning-${tier}`;
+      expect(activeMapActionHdCast(actionId, "hd")?.clips.map(({ clipId }) => clipId), actionId).toEqual([
+        `lightning-${tier}-main`, `lightning-${tier}-hit`, `lightning-${tier}-marker`, "lightning-cleanup",
+      ]);
+      expect(mapActionHdSegmentFor(actionId, "lightningMain")?.clipId).toBe(`lightning-${tier}-main`);
+      const hit = mapActionHdSegmentFor(actionId, "lightningHit");
+      expect([hit?.clipId, hit?.staggered], actionId).toEqual([`lightning-${tier}-hit`, true]);
+      expect(mapActionHdSegmentFor(actionId, "lightningCleanup")?.clipId).toBe("lightning-cleanup");
+      // every sweep frame can show at once while the wave crosses the board, plus the cells parked on the last one
+      expect(mapActionHdInstanceCount(`lightning-${tier}-hit`), actionId).toBe(LIGHTNING[tier].commonHit.sweepWidth + 1);
+      expect(mapActionHdInstanceCount(`lightning-${tier}-marker`), actionId).toBe(1);
+    }
   });
 });

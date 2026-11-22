@@ -568,6 +568,12 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   });
   await expect(battleCanvas).toHaveAttribute("data-map-combat-ice-distance", "1");
   await expect(battleCanvas).toHaveAttribute("data-map-combat-effect-tile-count", "4");
+  // `REMAKE-206`: the 40x37 `MAGIC/10` tiles start at each ring cell's top-left like every other descriptor;
+  // centring them in the 40x44 cell pushed every frame 3.5 px down.
+  expect((await battleCanvas.getAttribute("data-map-combat-effect-top-lefts"))?.split(";").sort()).toEqual(
+    [[0, -1], [-1, 0], [1, 0], [0, 1]].map(([dx, dy]) =>
+      `${(magicianBeforeIce.x + dx) * 40},${(magicianBeforeIce.y + dy) * 44}`).sort(),
+  );
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-ice-inner-ring.png`,
   });

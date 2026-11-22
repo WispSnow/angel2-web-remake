@@ -172,7 +172,7 @@ root.innerHTML = `
         </p>
         <p class="technique-lab-boundary">
           未實現技能保留在原版清單中但不可選。龍、頭、手沒有原版我方地圖圖形，只能配置為敵方。
-          「高清」特效目前只有炎暴 1F–4F，其餘技能照畫原版；時間軸、音效與結算節點與原版完全相同。
+          「高清」時有高清版的技能改畫高清片段，其餘照畫原版；時間軸、音效與結算節點與原版完全相同，片段之後可帶不擋程序的餘韻。
         </p>
       </aside>
     </div>
@@ -375,7 +375,7 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
     const frame = lightningFrameAtTime(lightningTimeline, currentTimeMs / 10);
     phase = frame.kind;
     visibleFrame = frame.kind === "main" ? frame.globalDrawIndex : frame.frame;
-    return { kind: "lightning", frame };
+    return { kind: "lightning", frame, timeMs: currentTimeMs, rate: playing ? speed : 0 };
   }
   if (isStompCode(code)) {
     const step = stompPresentationStepAtTime(stompTimeline, currentTimeMs / 10);
@@ -440,7 +440,7 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
       Math.floor(currentTimeMs / (recovery.waitPerDrawNativeTicks * 10)),
     );
     phase = "recovery";
-    return { kind: "recovery", frame: visibleFrame };
+    return { kind: "recovery", frame: visibleFrame, timeMs: currentTimeMs, rate: playing ? speed : 0 };
   }
   if (code === "AA") {
     const statusPhase = TECHNIQUE_LAB_ATTACK_UP.phases[0];
@@ -449,7 +449,7 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
       Math.floor(currentTimeMs / (statusPhase.waitPerDrawNativeTicks * 10)),
     );
     phase = "status";
-    return { kind: "status", action: "attack-up", frame: visibleFrame };
+    return { kind: "status", action: "attack-up", frame: visibleFrame, timeMs: currentTimeMs, rate: playing ? speed : 0 };
   }
   if (code === "AD") {
     const statusPhase = TECHNIQUE_LAB_DEFENSE_UP.phases[0];
@@ -458,7 +458,7 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
       Math.floor(currentTimeMs / (statusPhase.waitPerDrawNativeTicks * 10)),
     );
     phase = "status";
-    return { kind: "status", action: "defense-up", frame: visibleFrame };
+    return { kind: "status", action: "defense-up", frame: visibleFrame, timeMs: currentTimeMs, rate: playing ? speed : 0 };
   }
   if (code === "FM") {
     const statusPhase = TECHNIQUE_LAB_MAGIC_GUARD.phases[0];
@@ -467,7 +467,7 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
       Math.floor(currentTimeMs / (statusPhase.waitPerDrawNativeTicks * 10)),
     );
     phase = "status";
-    return { kind: "status", action: "magic-guard", frame: visibleFrame };
+    return { kind: "status", action: "magic-guard", frame: visibleFrame, timeMs: currentTimeMs, rate: playing ? speed : 0 };
   }
   if (code === "IP") {
     let nativeTicks = currentTimeMs / 10;
@@ -479,7 +479,7 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
         Math.floor(nativeTicks / rise.waitPerDrawNativeTicks),
       );
       phase = "poison-rise";
-      return { kind: "poison", phase: 0, frame: visibleFrame };
+      return { kind: "poison", phase: 0, frame: visibleFrame, timeMs: currentTimeMs, rate: playing ? speed : 0 };
     }
     nativeTicks -= riseDuration;
     const cloud = TECHNIQUE_LAB_POISON.phases[1];
@@ -488,7 +488,7 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
       Math.floor(nativeTicks / cloud.waitPerDrawNativeTicks),
     );
     phase = "poison-cloud";
-    return { kind: "poison", phase: 1, frame: visibleFrame };
+    return { kind: "poison", phase: 1, frame: visibleFrame, timeMs: currentTimeMs, rate: playing ? speed : 0 };
   }
   if (code === "LA") {
     const statusPhase = TECHNIQUE_LAB_CONFUSION.phases[0];
@@ -497,7 +497,7 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
       Math.floor(currentTimeMs / (statusPhase.waitPerDrawNativeTicks * 10)),
     );
     phase = "status";
-    return { kind: "status", action: "confusion", frame: visibleFrame };
+    return { kind: "status", action: "confusion", frame: visibleFrame, timeMs: currentTimeMs, rate: playing ? speed : 0 };
   }
   if (code === "SA") {
     const statusPhase = TECHNIQUE_LAB_ATTACK_DOWN.phases[0];
@@ -506,7 +506,7 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
       Math.floor(currentTimeMs / (statusPhase.waitPerDrawNativeTicks * 10)),
     );
     phase = "status";
-    return { kind: "status", action: "attack-down", frame: visibleFrame };
+    return { kind: "status", action: "attack-down", frame: visibleFrame, timeMs: currentTimeMs, rate: playing ? speed : 0 };
   }
   if (code === "SD") {
     const statusPhase = TECHNIQUE_LAB_DEFENSE_DOWN.phases[0];
@@ -515,7 +515,7 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
       Math.floor(currentTimeMs / (statusPhase.waitPerDrawNativeTicks * 10)),
     );
     phase = "status";
-    return { kind: "status", action: "defense-down", frame: visibleFrame };
+    return { kind: "status", action: "defense-down", frame: visibleFrame, timeMs: currentTimeMs, rate: playing ? speed : 0 };
   }
   if (code === "SN") {
     const statusPhase = TECHNIQUE_LAB_SPELL_SEAL.phases[0];
@@ -524,7 +524,7 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
       Math.floor(currentTimeMs / (statusPhase.waitPerDrawNativeTicks * 10)),
     );
     phase = "status";
-    return { kind: "status", action: "spell-seal", frame: visibleFrame };
+    return { kind: "status", action: "spell-seal", frame: visibleFrame, timeMs: currentTimeMs, rate: playing ? speed : 0 };
   }
   if (code === "OJ") {
     const passed = session.prayerPreview().filter((candidate) =>
@@ -557,6 +557,8 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
     return {
       kind: "dispel",
       frame: visibleFrame,
+      timeMs: currentTimeMs,
+      rate: playing ? speed : 0,
       runtimeTileCodes: states[visibleFrame] ?? [],
     };
   }
@@ -571,6 +573,8 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
     frame: visibleFrame,
     rangeValue: iceFrame.rangeValue,
     distanceFromCenter: iceFrame.distanceFromCenter,
+    timeMs: currentTimeMs,
+    rate: playing ? speed : 0,
   };
 }
 

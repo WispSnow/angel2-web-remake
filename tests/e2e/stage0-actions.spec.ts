@@ -668,6 +668,11 @@ const DISPLAY_KEY = "angel2.preferences.display.v1";
 const FIRE_1_HD = "/assets/original/map-actions/hd/fire-1/hd.mp4";
 const HEAL_1_HD = "/assets/original/map-actions/hd/heal-1/hd.mp4";
 const HEAL_TAIL_HD = "/assets/original/map-actions/hd/heal-tail/hd.mp4";
+const RECOVERY_HD = "/assets/original/map-actions/hd/recovery/hd.mp4";
+const ICE_HD = "/assets/original/map-actions/hd/ice/hd.mp4";
+const HIT_HD = "/assets/original/map-actions/hd/hit/hd.mp4";
+const DEATH_HD = "/assets/original/map-actions/hd/death/hd.mp4";
+const SHOOT_HD = "/assets/original/map-actions/hd/shoot/hd.mp4";
 const useHdArtStyle = (page: Page) => page.addInitScript(([key, value]) => localStorage.setItem(key, value), [
   DISPLAY_KEY,
   JSON.stringify({ imageScaling: "sharp", interfaceZoom: 100, portraitStyle: "hd" }),
@@ -890,6 +895,204 @@ test("REMAKE-204: in 高清 resting plays the shared finish clip and lets its af
   expect(after.restPresentationTrace.map(({ phase, nativeTicks }) => `${phase}:${nativeTicks}`))
     .toEqual([...Array<string>(5).fill("restEffect:15"), "restBlank:15"]);
   expect(after.audioCueLog).not.toContainEqual(expect.objectContaining({ group: "e", record: 36 }));
+});
+
+/** The HD groups of one recorded frame as `clip:frame` → cell count (`recovery:5x2` is two cells on frame 5). */
+const hdGroups = (value: string | undefined): Record<string, number> => Object.fromEntries((value ?? "").split(",")
+  .filter(Boolean).map((entry) => {
+    const [clip, count] = entry.split("x");
+    return [clip ?? "", Number(count)];
+  }));
+
+test("REMAKE-206: in 高清 1I draws one heart clip on every healed ally and 1C replays the ice cycle ring by ring", async ({ page }) => {
+  await useHdArtStyle(page);
+  await page.goto("/?test=1&skipStartup=1&slowMap=1");
+  await forceSetup(page, "monk");
+  await expect.poll(() => hdVideosReady(page, [RECOVERY_HD, ICE_HD]), { timeout: 15_000 }).toBe(true);
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-recovery-1").click();
+  const keys = [...MAP_COMBAT_FRAME_KEYS, "mapActionHd", "mapActionHdFrameTicks", "mapActionHdGroups"];
+  let recorded = await recordCanvasFrames(page, keys);
+  await clickMapCell(page, 300, 177);
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState;
+    return current.lastSpecialAction?.actionId === "recovery-1" && current.specialActionPresentation === undefined;
+  });
+  const healed = await page.evaluate(() => ((window.__ANGEL2__?.getState() as {
+    lastSpecialAction?: { affectedUnits: Array<{ blocked: boolean }> };
+  }).lastSpecialAction?.affectedUnits ?? []).filter(({ blocked }) => !blocked).length);
+  expect(healed).toBeGreaterThan(0);
+  const recovery = (await recorded.stop()).filter(({ mapCombatPhase }) => mapCombatPhase === "recoveryEffect");
+  // the seventeen original stages, all drawn by the HD layer: one show over every healed ally, no original tile
+  expect(recovery.map(({ mapCombatFrame }) => mapCombatFrame)).toEqual(Array.from({ length: 17 }, (_, frame) => String(frame)));
+  for (const frame of recovery) {
+    expect(frame.mapActionHd, `recovery ${frame.mapCombatFrame}`).toBe("hd");
+    expect(frame.mapCombatEffectTileCount, `recovery ${frame.mapCombatFrame}`).toBe("0");
+    expect(hdGroups(frame.mapActionHdGroups), `recovery ${frame.mapCombatFrame}`)
+      .toEqual({ [`recovery:${frame.mapCombatFrame}`]: healed });
+  }
+
+  await forceSetup(page, "magician");
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-ice-1").click();
+  await expect(page.getByTestId("game-screen")).toHaveAttribute("data-action-mode", "selfAreaConfirm");
+  recorded = await recordCanvasFrames(page, keys);
+  await page.keyboard.press(" ");
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState;
+    return current.lastSpecialAction?.actionId === "ice-1" && current.specialActionPresentation === undefined;
+  });
+  // each ring's cells: the effect cells whose range value is that ring's (the original draws the same cells)
+  const ringCells = await page.evaluate(() => {
+    const result = (window.__ANGEL2__?.getState() as {
+      lastSpecialAction?: { effectCells: Array<{ value: number }> };
+    }).lastSpecialAction;
+    return [2, 1].map((value) => result?.effectCells.filter((cell) => cell.value === value).length ?? 0);
+  });
+  const ice = (await recorded.stop()).filter(({ mapCombatPhase }) => mapCombatPhase === "iceExpansion");
+  expect(ice).toHaveLength(12);
+  ice.forEach((frame, index) => {
+    const ring = Math.floor(index / 6);
+    expect(frame.mapActionHd, `ice ${index}`).toBe("hd");
+    expect(frame.mapCombatEffectTileCount, `ice ${index}`).toBe("0");
+    // the 60-tick cycle replays once per ring: the clip frame runs 0..5 on each ring's cells
+    expect(hdGroups(frame.mapActionHdGroups), `ice ${index}`).toEqual({ [`ice:${index % 6}`]: ringCells[ring] });
+  });
+  expect(ice.map(({ mapActionHdFrameTicks }) => mapActionHdFrameTicks))
+    .toEqual(Array.from({ length: 12 }, (_, index) => `${(index % 6) * 10},${(index % 6) * 10 + 10}`));
+});
+
+test("REMAKE-207: in 高清 a map-presentation strike and the kill's death play their HD clips on the defender", async ({ page }) => {
+  await useHdArtStyle(page);
+  await page.goto("/?test=1&skipStartup=1&slowMap=1");
+  // ordinary combat: the enemy stands next to the actor with 1 life, so the strike kills it
+  await forceSetup(page, "warrior", true);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("system-menu")).toBeVisible();
+  await page.getByTestId("system-command-settings").click();
+  await expect(page.getByTestId("settings-menu")).toBeVisible();
+  await page.getByTestId("presentation-button").click();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("system-menu")).toBeHidden();
+  expect((await state(page)).battlePresentation).toBe("map");
+  const enemy = (await state(page)).units.find(({ side }) => side === 2)!;
+  await expect.poll(() => hdVideosReady(page, [HIT_HD, DEATH_HD]), { timeout: 15_000 }).toBe(true);
+  const recorded = await recordCanvasFrames(page, [...MAP_COMBAT_FRAME_KEYS, "mapActionHd", "mapActionHdFrameTicks", "mapActionHdGroups"]);
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-attack").click();
+  await recorded.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "defenderDeath",
+    mapCombatFrame: "9",
+  }, { path: "artifacts/playwright/stage0-map-death-hd.png" });
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as {
+      combatPresentation?: object;
+      combatPresentationTrace: Array<{ phase: string; frame: number }>;
+    } | undefined;
+    return current !== undefined && current.combatPresentation === undefined
+      && current.combatPresentationTrace.some(({ phase, frame }) => phase === "defenderDeath" && frame === 14);
+  });
+  const frames = await recorded.stop();
+  const hit = frames.filter(({ mapCombatPhase }) => mapCombatPhase === "primaryHit");
+  const death = frames.filter(({ mapCombatPhase }) => mapCombatPhase === "defenderDeath");
+  // the nine strike frames (the last is the first again) and the fifteen death frames, all on the HD layer
+  expect(hit.map(({ mapCombatFrame }) => mapCombatFrame)).toEqual(Array.from({ length: 9 }, (_, frame) => String(frame)));
+  expect(death.map(({ mapCombatFrame }) => mapCombatFrame)).toEqual(Array.from({ length: 15 }, (_, frame) => String(frame)));
+  for (const [clip, list] of [["hit", hit], ["death", death]] as const) {
+    list.forEach((frame, index) => {
+      expect(frame.mapActionHd, `${clip} ${index}`).toBe("hd");
+      expect(frame.mapCombatEffectTileCount, `${clip} ${index}`).toBe("0");
+      expect(hdGroups(frame.mapActionHdGroups), `${clip} ${index}`).toEqual({ [`${clip}:${index}`]: 1 });
+      expect(frame.mapActionHdFrameTicks, `${clip} ${index}`).toBe(`${index * 10},${index * 10 + 10}`);
+    });
+  }
+  // the strike's result is that of the original presentation
+  expect((await state(page)).units.some(({ id }) => id === enemy.id)).toBe(false);
+});
+
+test("REMAKE-208: in 高清 the archer's shot plays the arrow-impact clip on the target through UN/60's frames", async ({ page }) => {
+  await useHdArtStyle(page);
+  await page.goto("/?test=1&skipStartup=1&slowMap=1");
+  await forceSetup(page, "archer");
+  const target = (await state(page)).units.find(({ id }) => id === "2:48")!;
+  await expect.poll(() => hdVideosReady(page, [SHOOT_HD]), { timeout: 15_000 }).toBe(true);
+  const recorded = await recordCanvasFrames(page, [...MAP_COMBAT_FRAME_KEYS, "mapActionHd", "mapActionHdFrameTicks", "mapActionHdGroups"]);
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-shoot").click();
+  await expect.poll(async () => (await state(page)).actionMode).toBe("specialTarget");
+  await clickMapCell(page, 380, 177);
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState;
+    return current.lastSpecialAction?.actionId === "archer-shot" && current.specialActionPresentation === undefined;
+  });
+  const frames = (await recorded.stop()).filter(({ mapCombatPhase }) => mapCombatPhase === "shootHit");
+  expect(frames.length).toBeGreaterThan(0);
+  for (const frame of frames) {
+    expect(frame.mapActionHd, `shootHit ${frame.mapCombatFrame}`).toBe("hd");
+    expect(frame.mapCombatEffectTileCount, `shootHit ${frame.mapCombatFrame}`).toBe("0");
+  }
+  // UN/60's eight frames on the target cell, each at its original 6-tick slot
+  const drawn = frames.filter(({ mapActionHdGroups }) => mapActionHdGroups);
+  expect(drawn.map(({ mapActionHdGroups }) => hdGroups(mapActionHdGroups)))
+    .toEqual(Array.from({ length: 8 }, (_, frame) => ({ [`shoot:${frame}`]: 1 })));
+  expect(drawn.map(({ mapActionHdFrameTicks }) => mapActionHdFrameTicks))
+    .toEqual(Array.from({ length: 8 }, (_, frame) => `${frame * 6},${frame * 6 + 6}`));
+  const after = await state(page);
+  expect(after.units.find(({ id }) => id === target.id)?.life ?? 0)
+    .toBe(Math.max(0, target.life - after.lastSpecialAction!.damage));
+});
+
+test("REMAKE-210: in 高清 the magician's 1L plays the storm cloud, the wave and the cleanup as HD clips", async ({ page }) => {
+  await useHdArtStyle(page);
+  await page.goto("/?test=1&skipStartup=1&slowMap=1");
+  await forceSetup(page, "magician");
+  const lightningClips = ["lightning-1-main", "lightning-1-hit", "lightning-1-marker", "lightning-cleanup"];
+  await expect.poll(() => hdVideosReady(page, lightningClips.map((clip) => `/assets/original/map-actions/hd/${clip}/hd.mp4`)),
+    { timeout: 15_000 }).toBe(true);
+  await recordHdShows(page);
+  const recorded = await recordCanvasFrames(page, [...MAP_COMBAT_FRAME_KEYS, "mapActionHd", "mapActionHdFrameTicks", "mapActionHdGroups"]);
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-lightning-1").click();
+  await expect.poll(async () => (await state(page)).actionMode).toBe("specialTarget");
+  await clickMapCell(page, 260, 177);
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState;
+    return current.lastSpecialAction?.actionId === "lightning-1" && current.specialActionPresentation === undefined;
+  });
+  const struck = await page.evaluate(() => ((window.__ANGEL2__?.getState() as {
+    lastSpecialAction?: { affectedUnits: unknown[] };
+  }).lastSpecialAction?.affectedUnits ?? []).length);
+  expect(struck).toBeGreaterThan(0);
+  const frames = (await recorded.stop()).filter(({ mapCombatPhase }) => mapCombatPhase?.startsWith("lightning"));
+  for (const frame of frames) {
+    expect(frame.mapActionHd, `${frame.mapCombatPhase} ${frame.mapCombatFrame}`).toBe("hd");
+    expect(frame.mapCombatEffectTileCount, `${frame.mapCombatPhase} ${frame.mapCombatFrame}`).toBe("0");
+  }
+  // the cloud follows its anchor as one show; the wave draws the sweep cells and the struck units' markers; the
+  // shared MAGIC/6 cleanup draws on every struck unit
+  const main = frames.filter(({ mapCombatPhase }) => mapCombatPhase === "lightningMain");
+  expect(main.length).toBeGreaterThan(10);
+  for (const frame of main) {
+    expect(hdGroups(frame.mapActionHdGroups)).toEqual({ [`lightning-1-main:${frame.mapCombatFrame}`]: 1 });
+  }
+  const wave = frames.filter(({ mapCombatPhase }) => mapCombatPhase === "lightningHit");
+  expect(wave.length).toBeGreaterThan(0);
+  const waveClips = new Set(wave.flatMap(({ mapActionHdGroups }) => Object.keys(hdGroups(mapActionHdGroups))
+    .map((key) => key.split(":")[0])));
+  expect([...waveClips].sort()).toEqual(["lightning-1-hit", "lightning-1-marker"]);
+  const cleanup = frames.filter(({ mapCombatPhase }) => mapCombatPhase === "lightningCleanup");
+  expect(cleanup.length).toBeGreaterThan(0);
+  for (const frame of cleanup) {
+    expect(hdGroups(frame.mapActionHdGroups)).toEqual({ [`lightning-cleanup:${frame.mapCombatFrame}`]: struck });
+  }
+  // the cloud's afterglow runs on under the wave without holding the controller
+  const mainEnd = await page.evaluate(async () => (await import("/src/game/content/map-action-hd.ts"))
+    .mapActionHdClip("lightning-1-main")?.durationTicks ?? 0);
+  expect(Math.max(...await recordedClipTicks(page, "lightning-1-main"))).toBeGreaterThan(mainEnd);
 });
 
 test("REMAKE-203: a 1F HD clip that cannot be decoded falls back to the original frames for the whole cast", async ({ page }) => {

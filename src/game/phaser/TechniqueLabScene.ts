@@ -17,6 +17,7 @@ import {
   TECHNIQUE_LAB_DISPEL,
   TECHNIQUE_LAB_FIRE,
   TECHNIQUE_LAB_HEAL,
+  TECHNIQUE_LAB_ICE,
   TECHNIQUE_LAB_IRON_PLATE,
   TECHNIQUE_LAB_LIGHTNING,
   TECHNIQUE_LAB_OBSTACLE,
@@ -24,7 +25,12 @@ import {
   TECHNIQUE_LAB_UNIT_ASSETS,
 } from "../content/technique-lab.generated";
 import { TECHNIQUE_LAB_FORMAL_GRAPHIC_ASSETS } from "../content/technique-lab-formal-assets";
-import type { LightningPresentationFrame } from "../map-technique-presentation";
+import {
+  buildLightningTimeline,
+  type LightningPresentationDefinition,
+  type LightningPresentationFrame,
+  type TimedLightningFrame,
+} from "../map-technique-presentation";
 import {
   TECHNIQUE_LAB_MAP,
   type TechniqueLabSession,
@@ -44,8 +50,15 @@ import {
 } from "./map-action-atlas";
 import type { StompPresentationStep } from "../stomp-presentation";
 import { renderPrayerPresentation } from "./PrayerRenderer";
-import { MapActionHdLayer } from "./map-action-hd-layer";
-import { mapActionHdCastTimeline, mapActionHdVisibleAt } from "../content/map-action-hd";
+import { MapActionHdLayer, type MapActionHdShow } from "./map-action-hd-layer";
+import { lightningHdCells } from "./map-action-hd-cells";
+import {
+  mapActionHdCast,
+  mapActionHdCastTimeline,
+  mapActionHdClip,
+  mapActionHdVisibleAt,
+  type MapActionHdClip,
+} from "../content/map-action-hd";
 import { mapActionHdFailed, markMapActionHdFailed } from "../map-action-hd";
 import type { PortraitStyle } from "../preferences";
 import type { PrayerOutcomeKind } from "../simulation/actions/types";
@@ -110,8 +123,20 @@ function addMapTechniqueImage(
 
 export type TechniqueLabVisualFrame =
   | { readonly kind: "none" }
-  | { readonly kind: "lightning"; readonly frame: LightningPresentationFrame }
-  | { readonly kind: "poison"; readonly phase: 0 | 1; readonly frame: number }
+  /** `timeMs`／`rate` 供高清落雷（`REMAKE-210`）在原版逐幀節點之間連續地動。 */
+  | {
+    readonly kind: "lightning";
+    readonly frame: LightningPresentationFrame;
+    readonly timeMs?: number;
+    readonly rate?: number;
+  }
+  | {
+    readonly kind: "poison";
+    readonly phase: 0 | 1;
+    readonly frame: number;
+    readonly timeMs?: number;
+    readonly rate?: number;
+  }
   | {
     readonly kind: "prayer";
     readonly outcome: PrayerOutcomeKind;
@@ -128,13 +153,21 @@ export type TechniqueLabVisualFrame =
   | { readonly kind: "heal-blank"; readonly timeMs: number; readonly rate: number }
   | { readonly kind: "heal-tail"; readonly frame: number; readonly timeMs: number; readonly rate: number }
   | { readonly kind: "hd-afterglow"; readonly timeMs: number; readonly rate: number }
-  | { readonly kind: "recovery"; readonly frame: number }
+  | { readonly kind: "recovery"; readonly frame: number; readonly timeMs?: number; readonly rate?: number }
   | {
     readonly kind: "status";
     readonly action: "attack-up" | "defense-up" | "magic-guard" | "confusion" | "attack-down" | "defense-down" | "spell-seal";
     readonly frame: number;
+    readonly timeMs?: number;
+    readonly rate?: number;
   }
-  | { readonly kind: "dispel"; readonly frame: number; readonly runtimeTileCodes: readonly number[] }
+  | {
+    readonly kind: "dispel";
+    readonly frame: number;
+    readonly runtimeTileCodes: readonly number[];
+    readonly timeMs?: number;
+    readonly rate?: number;
+  }
   | { readonly kind: "stomp"; readonly step: StompPresentationStep }
   | { readonly kind: "construction"; readonly completed: boolean }
   | {
@@ -142,6 +175,8 @@ export type TechniqueLabVisualFrame =
     readonly frame: number;
     readonly rangeValue: number;
     readonly distanceFromCenter: number;
+    readonly timeMs?: number;
+    readonly rate?: number;
   };
 
 export interface TechniqueLabSceneHandle {
@@ -153,10 +188,19 @@ export interface TechniqueLabSceneHandle {
 }
 
 /** 實驗室動作代碼對到有高清版的動作（`1F`→`fire-1`、`2H`→`heal-2`）；其餘沒有。 */
+/** 單格狀態技術的原版代碼對到動作（`REMAKE-205`）；攻擊提昇與防魔共用一段高清片段，但動作各自登記。 */
+const TECHNIQUE_LAB_HD_STATUS: Readonly<Record<string, string>> = {
+  AA: "attack-up", FM: "magic-guard", AD: "defense-up", SA: "attack-down", SD: "defense-down", LA: "confusion",
+  SN: "spell-seal", IP: "poison", TR: "dispel",
+};
+/** 分檔技術的原版代碼字母對到動作族（`1F` → `fire-1`；回復、冰雪見 `REMAKE-206`）。 */
+const TECHNIQUE_LAB_HD_TIERS: Readonly<Record<string, string>> = { F: "fire", H: "heal", I: "recovery", C: "ice" };
+
 export function techniqueLabHdActionId(actionCode: string): string | undefined {
-  const match = /^([1-4])([FH])$/u.exec(actionCode);
-  if (!match) return undefined;
-  return `${match[2] === "F" ? "fire" : "heal"}-${match[1]}`;
+  if (Object.hasOwn(TECHNIQUE_LAB_HD_STATUS, actionCode)) return TECHNIQUE_LAB_HD_STATUS[actionCode];
+  const match = /^([1-4])([FHIC])$/u.exec(actionCode);
+  const family = match ? TECHNIQUE_LAB_HD_TIERS[match[2]] : undefined;
+  return match && family ? `${family}-${match[1]}` : undefined;
 }
 
 export function startTechniqueLabPhaser(
@@ -253,18 +297,18 @@ export function startTechniqueLabPhaser(
         this.updateCanvasDataset(frame, 0);
         return;
       }
-      if ("timeMs" in frame && hdTimeline && hdReady) {
+      if ("timeMs" in frame && frame.timeMs !== undefined && hdTimeline && hdReady) {
         // every clip visible at this point of the timeline (an afterglow overlaps the next clip's start)
-        const rate = frame.rate;
+        const rate = frame.rate ?? 0;
         const camera = this.cameras.main;
-        this.mapActionHd?.setShows(mapActionHdVisibleAt(hdTimeline, frame.timeMs / 10).map(({ clip, tick }) => ({
+        this.mapActionHd?.setShows(mapActionHdVisibleAt(hdTimeline, frame.timeMs / 10).map(({ clip, tick, repeat }) => ({
           clip,
           tick: () => tick,
           // the HD canvas covers the lab viewport, not the scrolled world: take the camera scroll off
-          target: () => ({
-            x: center.x * TILE_WIDTH + TILE_WIDTH / 2 - camera.scrollX,
-            y: (center.y + 1) * TILE_HEIGHT - camera.scrollY,
-          }),
+          target: () => this.hdCells(clip.clipId, repeat, center, pendingFrozenUnitIds).map((cell) => ({
+            x: cell.x * TILE_WIDTH + TILE_WIDTH / 2 - camera.scrollX,
+            y: (cell.y + 1) * TILE_HEIGHT - camera.scrollY,
+          })),
           rate,
           playing: rate > 0,
         })));
@@ -272,6 +316,14 @@ export function startTechniqueLabPhaser(
         return;
       }
       if (frame.kind === "heal-blank" || frame.kind === "hd-afterglow") {
+        this.updateCanvasDataset(frame, 0);
+        return;
+      }
+      if (frame.kind === "stomp" && artStyle === "hd" && this.drawHdStomp(frame.step, center)) {
+        this.updateCanvasDataset(frame, 0);
+        return;
+      }
+      if (frame.kind === "lightning" && artStyle === "hd" && this.drawHdLightning(frame, center)) {
         this.updateCanvasDataset(frame, 0);
         return;
       }
@@ -474,35 +526,10 @@ export function startTechniqueLabPhaser(
           ).setOrigin(0).setDepth(8));
         });
       } else if (frame.kind === "stomp") {
-        const stomp = TECHNIQUE_LAB_STOMPS[
-          session.state.actionCode as keyof typeof TECHNIQUE_LAB_STOMPS
-        ];
-        if (!stomp) throw new Error(`${session.state.actionCode} has no stomp presentation`);
-        const targetSide = session.actor()?.side === 1 ? 2 : 1;
-        const resource = targetSide === 1
-          ? stomp.action.graphicByTargetSide.side1
-          : stomp.action.graphicByTargetSide.side2;
-        const targetGroundX = center.x * TILE_WIDTH + TILE_WIDTH / 2;
-        const targetGroundY = center.y * TILE_HEIGHT + TILE_HEIGHT;
-        const { targetImpactAnchor } = stomp.presentation;
-        const drawX = targetGroundX
-          + stomp.action.drawXCoordinate
-          - targetImpactAnchor.x;
+        const placement = this.stompPlacement(frame.step, center);
         this.effectObjects.push(
-          addMapTechniqueImage(
-            this,
-            drawX,
-            targetGroundY + frame.step.y - targetImpactAnchor.y,
-            resource,
-            0,
-          ).setOrigin(0).setDepth(8),
-          addMapTechniqueImage(
-            this,
-            drawX,
-            targetGroundY + stomp.action.shadowDrawYCoordinate - targetImpactAnchor.y,
-            resource,
-            1,
-          ).setOrigin(0).setDepth(8),
+          addMapTechniqueImage(this, placement.x, placement.legY, placement.resource, 0).setOrigin(0).setDepth(8),
+          addMapTechniqueImage(this, placement.x, placement.shadowY, placement.resource, 1).setOrigin(0).setDepth(8),
         );
       } else if (frame.kind === "construction") {
         if (frame.completed) {
@@ -542,14 +569,167 @@ export function startTechniqueLabPhaser(
         const sourceFrame = frame.frame % STAGE1_ACTION_PRESENTATION_ASSETS.ice1.expansion.length;
         for (const { position, value } of session.effectCells()) {
           if (value !== frame.rangeValue) continue;
+          // from each ring cell's top-left like the battle scene (`REMAKE-206`)
           this.effectObjects.push(addMapActionImageFromSource(this,
-            position.x * TILE_WIDTH + TILE_WIDTH / 2,
-            position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+            position.x * TILE_WIDTH,
+            position.y * TILE_HEIGHT,
             STAGE1_ACTION_PRESENTATION_ASSETS.ice1.expansion[sourceFrame],
-          ).setOrigin(.5).setDepth(8));
+          ).setOrigin(0).setDepth(8));
         }
       }
       this.updateCanvasDataset(frame, this.effectObjects.length, mapAnchorOffset);
+    }
+
+    /** 踩踏這一步的腿與影子（原版圖的左上角）：原版圖塊與高清靜態片段（`REMAKE-209`）共用。 */
+    private stompPlacement(
+      step: StompPresentationStep,
+      center: { readonly x: number; readonly y: number },
+    ): { readonly resource: string; readonly side: 1 | 2; readonly x: number; readonly legY: number; readonly shadowY: number } {
+      const stomp = TECHNIQUE_LAB_STOMPS[session.state.actionCode as keyof typeof TECHNIQUE_LAB_STOMPS];
+      if (!stomp) throw new Error(`${session.state.actionCode} has no stomp presentation`);
+      const side = session.actor()?.side === 1 ? 2 : 1;
+      const targetGroundX = center.x * TILE_WIDTH + TILE_WIDTH / 2;
+      const targetGroundY = center.y * TILE_HEIGHT + TILE_HEIGHT;
+      const { targetImpactAnchor } = stomp.presentation;
+      return {
+        resource: side === 1 ? stomp.action.graphicByTargetSide.side1 : stomp.action.graphicByTargetSide.side2,
+        side,
+        x: targetGroundX + stomp.action.drawXCoordinate - targetImpactAnchor.x,
+        legY: targetGroundY + step.y - targetImpactAnchor.y,
+        shadowY: targetGroundY + stomp.action.shadowDrawYCoordinate - targetImpactAnchor.y,
+      };
+    }
+
+    /** 高清踩踏（`REMAKE-209`）：兩段靜態片段照原版這一步的位置擺；片段不全或還沒解碼時回 `false`（照畫原版）。 */
+    private drawHdStomp(step: StompPresentationStep, center: { readonly x: number; readonly y: number }): boolean {
+      const tier = /^([123])D$/u.exec(session.state.actionCode)?.[1];
+      if (!tier || !this.mapActionHd) return false;
+      const placement = this.stompPlacement(step, center);
+      const parts = [["leg", placement.legY], ["shadow", placement.shadowY]] as const;
+      const clips = parts.map(([part]) => mapActionHdClip(`stomp-${tier}-side${placement.side}-${part}`));
+      if (!clips.every((clip): clip is MapActionHdClip => Boolean(clip))) return false;
+      this.mapActionHd.prepare(clips);
+      if (!clips.every(({ clipId }) => !mapActionHdFailed(clipId) && this.mapActionHd?.ready(clipId))) return false;
+      const camera = this.cameras.main;
+      this.mapActionHd.setShows(clips.map((clip, index) => ({
+        clip,
+        tick: () => 0,
+        target: () => ({ x: placement.x - camera.scrollX, y: (parts[index]?.[1] ?? 0) - camera.scrollY }),
+        rate: 0,
+        playing: false,
+      })));
+      return true;
+    }
+
+    /**
+     * 高清落雷（`REMAKE-210`）：與戰場同一套格子規則（`lightningHdCells`），每組「片段＋幀」一場放映；時鐘是那一幀的
+     * 原版起點加上在這一原版幀裡走過的比例。主段的餘韻照戰場一樣與命中波重疊；收尾的餘韻實驗室不畫（時間軸停在原版終點）。
+     * 片段不全或還沒解碼時回 `false`（照畫原版）。
+     */
+    private drawHdLightning(
+      frame: Extract<TechniqueLabVisualFrame, { kind: "lightning" }>,
+      center: { readonly x: number; readonly y: number },
+    ): boolean {
+      const tier = Number(/^([1-4])L$/u.exec(session.state.actionCode)?.[1] ?? 0);
+      const definition = TECHNIQUE_LAB_LIGHTNING[session.state.actionCode as keyof typeof TECHNIQUE_LAB_LIGHTNING];
+      const cast = tier ? mapActionHdCast(`lightning-${tier}`) : undefined;
+      if ((tier !== 1 && tier !== 2 && tier !== 3 && tier !== 4) || !definition || !cast || !this.mapActionHd) return false;
+      const clips = cast.flatMap(({ clipId }) => mapActionHdClip(clipId) ?? []);
+      const staggered = new Set(cast.filter((segment) => segment.staggered).map(({ clipId }) => clipId));
+      this.mapActionHd.prepare(clips);
+      if (!clips.every(({ clipId }) => !mapActionHdFailed(clipId) && this.mapActionHd?.ready(clipId))) return false;
+      const timeline = this.lightningTimeline(session.state.actionCode, definition);
+      const nativeTick = (frame.timeMs ?? 0) / 10;
+      const current = timeline.find(({ endNativeTicks }) => nativeTick < endNativeTicks) ?? timeline.at(-1);
+      if (!current) return false;
+      const span = current.endNativeTicks - current.startNativeTicks;
+      const progress = Math.min(Math.max(nativeTick - current.startNativeTicks, 0) / span, 1 - 1e-4);
+      const controllerFrame = frame.frame.kind === "main" ? frame.frame.globalDrawIndex : frame.frame.frame;
+      const input = {
+        tier,
+        definition,
+        center,
+        effectCells: session.effectCells(),
+        hitPositions: session.affectedUnits().map(({ x, y }) => ({ x, y })),
+      } as const;
+      const cells = lightningHdCells({ ...input, phase: frame.frame.kind, frame: controllerFrame });
+      const camera = this.cameras.main;
+      const point = ({ x, y }: { readonly x: number; readonly y: number }) => ({
+        x: x * TILE_WIDTH + TILE_WIDTH / 2 - camera.scrollX,
+        y: (y + 1) * TILE_HEIGHT - camera.scrollY,
+      });
+      const rate = frame.rate ?? 0;
+      const groups = new Map<string, { clip: MapActionHdClip; clipFrame: number; cells: { x: number; y: number }[] }>();
+      for (const cell of cells) {
+        const clip = cell.clipId ? mapActionHdClip(cell.clipId) : undefined;
+        if (!clip) continue;
+        const clipFrame = cell.frame ?? controllerFrame;
+        const key = `${clip.clipId}:${clipFrame}`;
+        const group = groups.get(key) ?? { clip, clipFrame, cells: [] };
+        group.cells.push({ x: cell.x, y: cell.y });
+        groups.set(key, group);
+      }
+      const shows: MapActionHdShow[] = [];
+      // the main part's afterglow runs on under the wave, where the last main draw left the cloud
+      const mainClip = mapActionHdClip(`lightning-${tier}-main`);
+      const mainEnd = timeline.filter(({ frame: timed }) => timed.kind === "main").at(-1);
+      if (frame.frame.kind !== "main" && mainClip && mainEnd?.frame.kind === "main"
+        && nativeTick - mainEnd.endNativeTicks < mainClip.afterglowTicks) {
+        const last = lightningHdCells({ ...input, phase: "main", frame: mainEnd.frame.globalDrawIndex });
+        const tick = mainClip.durationTicks + nativeTick - mainEnd.endNativeTicks;
+        shows.push({ clip: mainClip, tick: () => tick, target: () => last.map(point), rate, playing: rate > 0 });
+      }
+      for (const { clip, clipFrame, cells: targets } of groups.values()) {
+        const start = clip.frameStartTicks[clipFrame] ?? 0;
+        const end = clip.frameStartTicks[clipFrame + 1] ?? clip.durationTicks;
+        const tick = start + progress * (end - start);
+        shows.push({
+          clip,
+          tick: () => tick,
+          target: () => targets.map(point),
+          rate: rate * (end - start) / span,
+          playing: rate > 0,
+          instance: staggered.has(clip.clipId) ? clipFrame : 0,
+        });
+      }
+      this.mapActionHd.setShows(shows);
+      return true;
+    }
+
+    private lightningTimelines = new Map<string, readonly TimedLightningFrame[]>();
+
+    private lightningTimeline(
+      actionCode: string,
+      definition: LightningPresentationDefinition,
+    ): readonly TimedLightningFrame[] {
+      const cached = this.lightningTimelines.get(actionCode);
+      if (cached) return cached;
+      const timeline = buildLightningTimeline(definition);
+      this.lightningTimelines.set(actionCode, timeline);
+      return timeline;
+    }
+
+    /**
+     * 高清片段畫在哪些格上（`REMAKE-206`，與戰場同一套規則）：回復畫在每個未被凍結擋下的受影響單位上，冰雪第
+     * `repeat` 次重播畫在範圍值等於那一圈的每一格，其餘畫在效果中心。按片段而不是按這一幀的種類決定：最後一圈的
+     * 餘韻（`hd-afterglow` 幀）仍畫在那一圈上，與戰場上留著的那場放映一樣。
+     */
+    private hdCells(
+      clipId: string,
+      repeat: number,
+      center: { readonly x: number; readonly y: number },
+      frozenUnitIds: readonly string[],
+    ): readonly { readonly x: number; readonly y: number }[] {
+      if (clipId === "recovery") {
+        const frozen = new Set(frozenUnitIds);
+        return session.affectedUnits().filter(({ id }) => !frozen.has(id)).map(({ x, y }) => ({ x, y }));
+      }
+      if (clipId === "ice") {
+        const ice = TECHNIQUE_LAB_ICE[session.state.actionCode as keyof typeof TECHNIQUE_LAB_ICE];
+        const rangeValue = ice?.rangeValueSequence[repeat];
+        return session.effectCells().filter(({ value }) => value === rangeValue).map(({ position }) => position);
+      }
+      return [center];
     }
 
     private drawState(): void {

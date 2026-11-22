@@ -300,8 +300,8 @@ test("HD art style plays 1F–4F as HD clips on the original timeline and leaves
     await expect(hd).not.toHaveAttribute("data-map-action-hd-action", /./u);
   }
   // 沒有高清版的技能照畫原版。
-  expect(await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("1C"))).toBe(true);
-  await seek(page, 200);
+  expect(await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("1L"))).toBe(true);
+  await seek(page, 3200);
   await expect(canvas).toHaveAttribute("data-art-style", "hd");
   await expect(hd).not.toHaveAttribute("data-map-action-hd-action", /./u);
   expect(Number(await canvas.getAttribute("data-effect-tile-count"))).toBeGreaterThan(0);
@@ -365,6 +365,186 @@ test("REMAKE-204: HD art style plays 1H–3H as HD clips and runs the shared fin
   await page.getByTestId("technique-lab-art-style").selectOption("original");
   await expect(page.locator('[data-readout="time"]')).not.toContainText("餘韻");
   expect(Number(await page.getByTestId("technique-lab-timeline").getAttribute("max"))).toBe(2350);
+  expect(pageErrors).toEqual([]);
+});
+
+test("REMAKE-205: HD art style plays the single-target status techniques as HD clips; FM replays AA's clip", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/technique-lab.html?art=hd");
+  const canvas = page.locator("#technique-lab-canvas canvas");
+  const hd = page.getByTestId("map-action-hd-canvas");
+  const timeline = page.getByTestId("technique-lab-timeline");
+  // original timeline lengths (ms): draws x wait, as the battle controller plays them
+  const contracts = [
+    { code: "AA", clip: "attack-up", duration: 3000 },
+    { code: "FM", clip: "attack-up", duration: 3000 },
+    { code: "AD", clip: "defense-up", duration: 1650 },
+    { code: "SA", clip: "attack-down", duration: 1650 },
+    { code: "SD", clip: "defense-down", duration: 1500 },
+    { code: "LA", clip: "confusion", duration: 1650 },
+    { code: "SN", clip: "spell-seal", duration: 2250 },
+    { code: "IP", clip: "poison", duration: 2900 },
+    { code: "TR", clip: "dispel", duration: 2500 },
+  ] as const;
+  for (const contract of contracts) {
+    expect(await page.evaluate((code) => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode(code), contract.code)).toBe(true);
+    await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
+    await expect.poll(async () => {
+      await seek(page, 600);
+      return hd.getAttribute("data-map-action-hd-action");
+    }, { timeout: 15_000 }).toBe(contract.clip);
+    // no original tile under the HD clip, which stands on the target cell at the dragged tick
+    await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
+    await expect(hd).toHaveAttribute("data-map-action-hd-tick", "60.0");
+    await expectHdClipsOnScreen(hd);
+    expect((await labState(page))?.playback.durationMs).toBe(contract.duration);
+    // an afterglow runs the timeline on past the original end, drawing no original tile
+    const end = Number(await timeline.getAttribute("max"));
+    expect(end).toBeGreaterThanOrEqual(contract.duration);
+    if (end > contract.duration) {
+      await seek(page, (contract.duration + end) / 2);
+      await expect(canvas).toHaveAttribute("data-technique-phase", "hd-afterglow");
+      await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
+      await expect(hd).toHaveAttribute("data-map-action-hd-action", contract.clip);
+    }
+    if (contract.code === "SN") {
+      // the sealing strips carry the original's 閉嘴 lettering
+      await seek(page, 1150);
+      await page.waitForFunction(() => [...document.querySelectorAll<HTMLVideoElement>("video.map-action-hd-video")]
+        .filter((video) => (video.dataset.sourceUrl ?? "").includes("/spell-seal/"))
+        .every((video) => !video.seeking && video.readyState >= 2));
+      await page.waitForTimeout(150);
+      await captureVisualAudit(page, { path: "artifacts/playwright/technique-lab-hd-spell-seal.png", fullPage: true });
+    }
+    await seek(page, end);
+    await expect(canvas).toHaveAttribute("data-technique-phase", "none");
+    await expect(hd).not.toHaveAttribute("data-map-action-hd-action", /./u);
+  }
+  expect(pageErrors).toEqual([]);
+});
+
+test("REMAKE-206: HD art style draws the recovery heart on every healed ally and replays the ice cycle ring by ring", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/technique-lab.html?art=hd");
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
+  const canvas = page.locator("#technique-lab-canvas canvas");
+  const hd = page.getByTestId("map-action-hd-canvas");
+  const rectCount = async () => (await hd.getAttribute("data-map-action-hd-rects") ?? "").split(";").filter(Boolean).length;
+  const clickCell = async (worldX: number, worldY: number) => {
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error("technique laboratory canvas has no bounds");
+    await canvas.click({ position: { x: (worldX - 15 + .5) * box.width / 16, y: (worldY - 13 + .5) * box.height / 11 } });
+  };
+
+  // 1C-4C: one 60-tick cycle per ring, drawn on every cell of that ring (4 x distance), the afterglow after the last
+  for (const contract of [{ code: "1C", duration: 1200, rings: 2 }, { code: "4C", duration: 3000, rings: 5 }] as const) {
+    expect(await page.evaluate((code) => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode(code), contract.code)).toBe(true);
+    for (let ring = 1; ring <= contract.rings; ring += 1) {
+      await expect.poll(async () => {
+        await seek(page, (ring - 1) * 600 + 300);
+        return hd.getAttribute("data-map-action-hd-action");
+      }, { timeout: 15_000 }).toBe("ice");
+      await expect(canvas).toHaveAttribute("data-ice-distance-from-center", String(ring));
+      await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
+      await expect.poll(rectCount).toBe(ring * 4);
+      await expectHdClipsOnScreen(hd);
+      if (contract.code === "1C" && ring === 2) {
+        await captureVisualAudit(page, { path: "artifacts/playwright/technique-lab-hd-ice-1-ring-2.png", fullPage: true });
+      }
+    }
+    expect((await labState(page))?.playback.durationMs).toBe(contract.duration);
+    const end = Number(await page.getByTestId("technique-lab-timeline").getAttribute("max"));
+    expect(end).toBe(contract.duration + 200);
+    await seek(page, contract.duration + 100);
+    await expect(canvas).toHaveAttribute("data-technique-phase", "hd-afterglow");
+    await expect.poll(rectCount).toBe(contract.rings * 4);
+  }
+
+  // 1I-3I: the heart on each affected ally the ice shell does not block, as the original draws its tiles
+  expect(await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("1I"))).toBe(true);
+  await expect.poll(async () => {
+    await seek(page, 1200);
+    return hd.getAttribute("data-map-action-hd-action");
+  }, { timeout: 15_000 }).toBe("recovery");
+  await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
+  await expect.poll(rectCount).toBe(1);
+  expect((await labState(page))?.playback.durationMs).toBe(2550);
+
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("1C"));
+  await seek(page, 1200);
+  await expect(canvas).toHaveAttribute("data-frozen-unit-ids", /lab-2/u);
+  await page.getByRole("button", { name: "指定施法者" }).click();
+  await clickCell(25, 18);
+  await page.getByTestId("technique-lab-action").selectOption("3I");
+  await page.getByRole("button", { name: "指定目標格" }).click();
+  await clickCell(23, 18);
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
+  await expect.poll(async () => {
+    await seek(page, 1200);
+    return hd.getAttribute("data-map-action-hd-action");
+  }, { timeout: 15_000 }).toBe("recovery");
+  await expect(canvas).toHaveAttribute("data-frozen-unit-count", "1");
+  // the original draws two tiles here (the frozen ally gets none); HD draws two hearts
+  await expect.poll(rectCount).toBe(2);
+  await expectHdClipsOnScreen(hd);
+  await page.waitForTimeout(150);
+  await captureVisualAudit(page, { path: "artifacts/playwright/technique-lab-hd-recovery-3.png", fullPage: true });
+  expect(pageErrors).toEqual([]);
+});
+
+test("REMAKE-209/210: HD art style moves the stomp's leg and shadow stills on the original path and plays lightning's parts as HD clips", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/technique-lab.html?art=hd");
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
+  const canvas = page.locator("#technique-lab-canvas canvas");
+  const hd = page.getByTestId("map-action-hd-canvas");
+  const shows = async () => (await hd.getAttribute("data-map-action-hd-shows") ?? "").split(";").filter(Boolean)
+    .map((show) => show.split(":")[0] ?? "");
+  const rects = async () => (await hd.getAttribute("data-map-action-hd-rects") ?? "").split(";").filter(Boolean)
+    .map((rect) => rect.split(",").map(Number));
+
+  // 1D-3D: the leg and its shadow are stills; the leg rises and falls with the original step, the shadow stays put
+  expect(await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("1D"))).toBe(true);
+  await expect.poll(async () => {
+    await seek(page, 0);
+    return (await shows()).join(",");
+  }, { timeout: 15_000 }).toMatch(/^stomp-1-side[12]-leg,stomp-1-side[12]-shadow$/u);
+  await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
+  await expect(canvas).toHaveAttribute("data-stomp-y", "25");
+  const rising = await rects();
+  await seek(page, 160);
+  await expect(canvas).toHaveAttribute("data-stomp-y", "145");
+  await expect.poll(async () => (await rects())[0]?.[1]).toBe((rising[0]?.[1] ?? 0) + 120);
+  expect((await rects())[1]).toEqual(rising[1]);
+  await page.waitForTimeout(150);
+  await captureVisualAudit(page, { path: "artifacts/playwright/technique-lab-hd-stomp-1-quake.png", fullPage: true });
+  await seek(page, 450);
+  await expect(canvas).toHaveAttribute("data-technique-phase", "none");
+  await expect(hd).not.toHaveAttribute("data-map-action-hd-action", /./u);
+
+  // 1L: the storm cloud on its anchor, then the wave's sweep and markers, then the shared cleanup on each struck unit
+  expect(await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("1L"))).toBe(true);
+  await expect.poll(async () => {
+    await seek(page, 1000);
+    return (await shows()).join(",");
+  }, { timeout: 15_000 }).toBe("lightning-1-main");
+  await expect(canvas).toHaveAttribute("data-technique-phase", "main");
+  await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
+  await expectHdClipsOnScreen(hd);
+  await seek(page, 3200);
+  await expect(canvas).toHaveAttribute("data-technique-phase", "wave");
+  await expect.poll(async () => (await shows()).some((clip) => clip === "lightning-1-hit")).toBe(true);
+  await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
+  await page.waitForTimeout(150);
+  await captureVisualAudit(page, { path: "artifacts/playwright/technique-lab-hd-lightning-1-wave.png", fullPage: true });
+  await seek(page, 3640);
+  await expect(canvas).toHaveAttribute("data-technique-phase", "cleanup");
+  await expect.poll(shows).toEqual(["lightning-cleanup"]);
+  await expect.poll(async () => (await rects()).length).toBe(2);
+  expect((await labState(page))?.playback.durationMs).toBe(4140);
   expect(pageErrors).toEqual([]);
 });
 

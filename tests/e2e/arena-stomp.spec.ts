@@ -364,3 +364,71 @@ test("enemy tier-three great dragon knight uses mirrored 3D and group-13 dialogu
   expectStompSquadDamage(after, 20, 39);
   expect(pageErrors).toEqual([]);
 });
+
+test("REMAKE-209: in 高清 the 1D stomp moves the repainted leg and shadow stills along the native steps", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.addInitScript(() => {
+    localStorage.setItem("angel2.preferences.display.v1",
+      JSON.stringify({ imageScaling: "sharp", interfaceZoom: 100, portraitStyle: "hd" }));
+    // the arena loads far more than the default 250 resource-timing entries; keep the late HD stills listed
+    performance.setResourceTimingBufferSize(5000);
+  });
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("great-dragon-knight");
+    arena.setLevel(1);
+    const ally = arena.interact(20, 30);
+    arena.setSide(2);
+    arena.setClass("soldier");
+    arena.setLevel(1);
+    const enemy = arena.interact(23, 30);
+    return [ally, enemy];
+  });
+  expect(placed).toEqual([true, true]);
+  await page.getByTestId("arena-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  // both stills of the side the target stands on have arrived before the cast (the cast decides at its first step)
+  await expect.poll(() => page.evaluate(() => ["leg", "shadow"].every((part) => performance.getEntriesByType("resource")
+    .some((entry) => entry.name.includes(`/map-actions/hd/stomp-1-side2-${part}/hd.png`)
+      && (entry as PerformanceResourceTiming).responseEnd > 0))), { timeout: 15_000 }).toBe(true);
+  await page.waitForTimeout(300);
+  await clickArenaWorldCell(page, 20, 30);
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-stomp-1").click();
+  const frames = await recordCanvasFrames(page, [...STOMP_FRAME_KEYS, "mapActionHd", "mapActionHdStills"]);
+  await clickArenaWorldCell(page, 23, 30);
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapActionHd: "hd",
+    mapCombatStompPhase: "quake",
+  }, { path: `${ARTIFACT_DIR}/arena-stomp-1-hd-quake.png` });
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+    return current?.lastSpecialAction?.actionId === "stomp-1" && current.specialActionPresentation === undefined;
+  });
+  const recorded = await frames.stop();
+  expect(recorded.filter(({ mapActionHd }) => mapActionHd?.startsWith("original"))).toEqual([]);
+  const steps = recorded.filter(({ mapActionHd }) => mapActionHd === "hd");
+  expect(steps.length).toBeGreaterThan(10);
+  const legY = new Set<string>();
+  const shadow = new Set<string>();
+  for (const step of steps) {
+    expect(step.mapCombatEffectTileCount).toBe("0");
+    const [leg, shade] = (step.mapActionHdStills ?? "").split(";");
+    expect(leg).toMatch(/^stomp-1-side2-leg@-?\d+,-?\d+$/u);
+    expect(shade).toMatch(/^stomp-1-side2-shadow@-?\d+,-?\d+$/u);
+    legY.add(leg?.split(",")[1] ?? "");
+    shadow.add(shade?.split("@")[1] ?? "");
+  }
+  // the leg rises, shakes and falls; the shadow stays on the ground
+  expect(legY.size).toBeGreaterThan(3);
+  expect(shadow.size).toBe(1);
+  const after = await arenaBattleState(page);
+  expect(after?.lastSpecialAction?.damage).toBeGreaterThanOrEqual(10);
+  expect(after?.lastSpecialAction?.damage).toBeLessThanOrEqual(19);
+  expect(pageErrors).toEqual([]);
+});

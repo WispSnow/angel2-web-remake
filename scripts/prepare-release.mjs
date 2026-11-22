@@ -269,7 +269,7 @@ if (await pathExists(storyHdManifestPath)) {
     }
   }
 }
-// `REMAKE-203`/`REMAKE-204`: HD map-technique clips follow the same rule (fetched only when the player picks 高清).
+// `REMAKE-203`..`REMAKE-210`: HD map-effect clips and stills follow the same rule (fetched only when the player picks 高清).
 const mapActionHdManifestPath = path.join(releaseDirectory, "assets/original/map-actions/hd/hd-manifest.json");
 if (await pathExists(mapActionHdManifestPath)) {
   const mapActionHdManifest = JSON.parse(await readFile(mapActionHdManifestPath, "utf8"));
