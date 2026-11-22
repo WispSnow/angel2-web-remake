@@ -540,8 +540,16 @@ test("REMAKE-209/210: HD art style moves the stomp's leg and shadow stills on th
   await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
   await page.waitForTimeout(150);
   await captureVisualAudit(page, { path: "artifacts/playwright/technique-lab-hd-lightning-1-wave.png", fullPage: true });
+  // the struck units keep their marker to the end of the wave; it fades under the cleanup (REMAKE-211), then the
+  // cleanup is alone on both units
+  await seek(page, 3620);
+  await expect(canvas).toHaveAttribute("data-technique-phase", "wave");
+  await expect.poll(async () => (await shows()).filter((clip) => clip === "lightning-1-marker").length).toBe(1);
   await seek(page, 3640);
   await expect(canvas).toHaveAttribute("data-technique-phase", "cleanup");
+  await expect.poll(shows).toEqual(["lightning-1-marker", "lightning-cleanup"]);
+  await expect.poll(async () => (await rects()).length).toBe(4);
+  await seek(page, 4100);
   await expect.poll(shows).toEqual(["lightning-cleanup"]);
   await expect.poll(async () => (await rects()).length).toBe(2);
   expect((await labState(page))?.playback.durationMs).toBe(4140);

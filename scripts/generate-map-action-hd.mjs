@@ -157,14 +157,15 @@ function originalPhases(clipId) {
   }
   const lightning = /^lightning-([1234])-(main|hit|marker)$/u.exec(clipId);
   if (lightning) {
-    // REMAKE-210: the main part is every main-phase descriptor in order; the sweep frames (codes 1..sweepWidth) and the
-    // struck units' two alternating marker frames run at the wave pace
+    // REMAKE-210: the main part is every main-phase descriptor in order; the sweep frames (codes 1..sweepWidth) run at the
+    // wave pace. REMAKE-211: the struck units' marker covers every wave draw (its two frames alternating), so in HD a
+    // unit keeps it from the draw the wave reaches it to the end of the wave
     const definition = STAGE1_ACTION_PRESENTATION[`lightning${lightning[1]}`];
     if (lightning[2] === "main") {
       return definition.phases.map((phase) => ({ draws: phase.descriptorSequence.length, wait: phase.waitPerDrawNativeTicks }));
     }
     const hit = definition.commonHit;
-    const draws = lightning[2] === "hit" ? hit.sweepWidth : hit.runtimeTileCodes.length;
+    const draws = lightning[2] === "hit" ? hit.sweepWidth : hit.iterations * hit.waveDrawsPerIteration;
     return [{ draws, wait: hit.waitPerWaveDrawNativeTicks }];
   }
   if (clipId === "lightning-cleanup") {

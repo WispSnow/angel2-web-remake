@@ -16,6 +16,7 @@ import {
 import { STAGE0_ACTION_PRESENTATION_ASSETS, STAGE0_REST_PRESENTATION } from "../../src/game/content/stage0-actions.generated";
 import { STAGE1_ACTION_PRESENTATION } from "../../src/game/content/stage1-actions.generated";
 import { TECHNIQUE_LAB_FIRE, TECHNIQUE_LAB_HEAL } from "../../src/game/content/technique-lab.generated";
+import { lightningHdCells } from "../../src/game/phaser/map-action-hd-cells";
 import {
   activeMapActionHdCast,
   mapActionHdClipEnd,
@@ -114,21 +115,21 @@ const ORIGINAL: Record<string, () => readonly Phase[]> = {
     wait: shootingEvidence.commonImpact.timeline.waitPerDrawNativeTicks,
   }],
   wd: () => [{ draws: STAGE1_ACTION_PRESENTATION.wd.finishSteps, wait: STAGE1_ACTION_PRESENTATION.wd.waitPerGrowthOrFinishStepNativeTicks }],
-  // `REMAKE-210`: each tier's main phases, its sweep (codes 1..sweepWidth) and two-frame marker at the wave pace, and the
-  // MAGIC/6 finish all four tiers share
+  // `REMAKE-210`: each tier's main phases, its sweep (codes 1..sweepWidth) at the wave pace, and the MAGIC/6 finish all
+  // four tiers share; `REMAKE-211`: the marker covers every wave draw (its two frames alternating)
   ...Object.fromEntries(LIGHTNING_TIERS.flatMap((tier) => {
     const { phases, commonHit } = LIGHTNING[tier];
     const wait = commonHit.waitPerWaveDrawNativeTicks;
     return [
       [`lightning-${tier}-main`, () => descriptorPhases(phases)],
       [`lightning-${tier}-hit`, () => [{ draws: commonHit.sweepWidth, wait }]],
-      [`lightning-${tier}-marker`, () => [{ draws: commonHit.runtimeTileCodes.length, wait }]],
+      [`lightning-${tier}-marker`, () => [{ draws: commonHit.iterations * commonHit.waveDrawsPerIteration, wait }]],
     ];
   })),
   "lightning-cleanup": () => descriptorPhases([STAGE1_ACTION_PRESENTATION.lightning1.commonHit.cleanup]),
 };
 
-describe("HD map effects (REMAKE-203 fire, REMAKE-204 heal and rest, REMAKE-205..210 the rest)", () => {
+describe("HD map effects (REMAKE-203 fire, REMAKE-204 heal and rest, REMAKE-205..210 the rest, REMAKE-211 refinements)", () => {
   it("keeps every clip on its original graphics timeline, with any afterglow after it", () => {
     const ids = mapActionHdClips().map(({ clipId }) => clipId);
     expect(ids).toEqual(expect.arrayContaining(["fire-1", "fire-2", "fire-3", "fire-4", "heal-1", "heal-tail"]));
@@ -393,6 +394,33 @@ describe("HD map effects (REMAKE-203 fire, REMAKE-204 heal and rest, REMAKE-205.
       // every sweep frame can show at once while the wave crosses the board, plus the cells parked on the last one
       expect(mapActionHdInstanceCount(`lightning-${tier}-hit`), actionId).toBe(LIGHTNING[tier].commonHit.sweepWidth + 1);
       expect(mapActionHdInstanceCount(`lightning-${tier}-marker`), actionId).toBe(1);
+    }
+  });
+
+  it("keeps the struck units' marker from the wave's arrival to its end, then lets it fade (REMAKE-211)", () => {
+    for (const tier of LIGHTNING_TIERS) {
+      const definition = LIGHTNING[tier];
+      const { commonHit } = definition;
+      const waveDraws = commonHit.iterations * commonHit.waveDrawsPerIteration;
+      const marker = mapActionHdClip(`lightning-${tier}-marker`);
+      if (!marker) throw new Error(`no lightning-${tier}-marker clip`);
+      expect(marker.frameStartTicks.length, `${tier}`).toBe(waveDraws);
+      // a struck unit the wave reaches on its first draw, and one at the edge of the range map
+      const near = { x: 10, y: 10 };
+      const far = { x: 14, y: 10 };
+      const effectCells = [{ position: near, value: commonHit.rangeThresholdStart }, { position: far, value: 1 }];
+      const farArrives = Math.ceil((commonHit.rangeThresholdStart - 1) / commonHit.rangeThresholdDecrementPerWaveDraw);
+      for (let frame = 0; frame < waveDraws; frame += 1) {
+        const cells = lightningHdCells({ tier, definition, phase: "wave", frame, center: near, effectCells, hitPositions: [near, far] })
+          .filter(({ clipId }) => clipId === marker.clipId);
+        // the original only draws it while the sweep band crosses the unit; HD keeps it to the end of the wave
+        expect(cells.map(({ x }) => x), `${tier}:${frame}`).toEqual(frame >= farArrives ? [near.x, far.x] : [near.x]);
+        // every struck unit shows the wave's own frame: one video, which reaches the clip's last frame with the wave
+        expect(cells.map((cell) => cell.frame), `${tier}:${frame}`).toEqual(cells.map(() => frame));
+      }
+      // that last frame carries the afterglow, so the battle's show lingers under MAGIC/6
+      expect(marker.afterglowTicks, `${tier}`).toBeGreaterThan(0);
+      expect(mapActionHdFrameSpan(marker, waveDraws - 1)?.limitTick, `${tier}`).toBe(mapActionHdClipEnd(marker));
     }
   });
 });

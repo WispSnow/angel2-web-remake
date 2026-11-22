@@ -1084,6 +1084,17 @@ test("REMAKE-210: in 高清 the magician's 1L plays the storm cloud, the wave an
   const waveClips = new Set(wave.flatMap(({ mapActionHdGroups }) => Object.keys(hdGroups(mapActionHdGroups))
     .map((key) => key.split(":")[0])));
   expect([...waveClips].sort()).toEqual(["lightning-1-hit", "lightning-1-marker"]);
+  // `REMAKE-211`: the marker plays the wave's own frame on every struck unit it has reached, through the wave's last
+  // draw, and its afterglow runs on under the cleanup
+  const lastWave = wave.at(-1);
+  expect(hdGroups(lastWave?.mapActionHdGroups)[`lightning-1-marker:${lastWave?.mapCombatFrame}`]).toBe(struck);
+  for (const frame of wave) {
+    expect(Object.keys(hdGroups(frame.mapActionHdGroups)).filter((key) => key.startsWith("lightning-1-marker:")).every(
+      (key) => key === `lightning-1-marker:${frame.mapCombatFrame}`), `wave ${frame.mapCombatFrame}`).toBe(true);
+  }
+  const markerEnd = await page.evaluate(async () => (await import("/src/game/content/map-action-hd.ts"))
+    .mapActionHdClip("lightning-1-marker")?.durationTicks ?? 0);
+  expect(Math.max(...await recordedClipTicks(page, "lightning-1-marker"))).toBeGreaterThan(markerEnd);
   const cleanup = frames.filter(({ mapCombatPhase }) => mapCombatPhase === "lightningCleanup");
   expect(cleanup.length).toBeGreaterThan(0);
   for (const frame of cleanup) {

@@ -156,11 +156,11 @@ export const MAP_ACTION_HD_CLIPS: Readonly<Record<string, MapActionHdClip>> = {
   },
   "lightning-1-marker": {
     clipId: "lightning-1-marker",
-    video: { source: "/assets/original/map-actions/hd/lightning-1-marker/hd.mp4", width: 256, height: 488, frames: 4, fps: 100 },
+    video: { source: "/assets/original/map-actions/hd/lightning-1-marker/hd.mp4", width: 256, height: 488, frames: 84, fps: 100 },
     scale: 4, frameWidth: 256, frameHeight: 240,
     originX: 124, originY: 196, alphaX: 0, alphaY: 248,
-    durationTicks: 4, afterglowTicks: 0,
-    frameStartTicks: [0,2],
+    durationTicks: 44, afterglowTicks: 40,
+    frameStartTicks: [0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42],
   },
   "lightning-2-hit": {
     clipId: "lightning-2-hit",
@@ -180,11 +180,11 @@ export const MAP_ACTION_HD_CLIPS: Readonly<Record<string, MapActionHdClip>> = {
   },
   "lightning-2-marker": {
     clipId: "lightning-2-marker",
-    video: { source: "/assets/original/map-actions/hd/lightning-2-marker/hd.mp4", width: 504, height: 272, frames: 4, fps: 100 },
+    video: { source: "/assets/original/map-actions/hd/lightning-2-marker/hd.mp4", width: 504, height: 272, frames: 72, fps: 100 },
     scale: 4, frameWidth: 248, frameHeight: 272,
     originX: 124, originY: 224, alphaX: 256, alphaY: 0,
-    durationTicks: 4, afterglowTicks: 0,
-    frameStartTicks: [0,2],
+    durationTicks: 32, afterglowTicks: 40,
+    frameStartTicks: [0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30],
   },
   "lightning-3-hit": {
     clipId: "lightning-3-hit",
@@ -204,11 +204,11 @@ export const MAP_ACTION_HD_CLIPS: Readonly<Record<string, MapActionHdClip>> = {
   },
   "lightning-3-marker": {
     clipId: "lightning-3-marker",
-    video: { source: "/assets/original/map-actions/hd/lightning-3-marker/hd.mp4", width: 504, height: 272, frames: 4, fps: 100 },
+    video: { source: "/assets/original/map-actions/hd/lightning-3-marker/hd.mp4", width: 504, height: 272, frames: 68, fps: 100 },
     scale: 4, frameWidth: 248, frameHeight: 272,
     originX: 124, originY: 224, alphaX: 256, alphaY: 0,
-    durationTicks: 4, afterglowTicks: 0,
-    frameStartTicks: [0,2],
+    durationTicks: 28, afterglowTicks: 40,
+    frameStartTicks: [0,2,4,6,8,10,12,14,16,18,20,22,24,26],
   },
   "lightning-4-hit": {
     clipId: "lightning-4-hit",
@@ -228,18 +228,18 @@ export const MAP_ACTION_HD_CLIPS: Readonly<Record<string, MapActionHdClip>> = {
   },
   "lightning-4-marker": {
     clipId: "lightning-4-marker",
-    video: { source: "/assets/original/map-actions/hd/lightning-4-marker/hd.mp4", width: 504, height: 272, frames: 4, fps: 100 },
+    video: { source: "/assets/original/map-actions/hd/lightning-4-marker/hd.mp4", width: 504, height: 272, frames: 100, fps: 100 },
     scale: 4, frameWidth: 248, frameHeight: 272,
     originX: 124, originY: 224, alphaX: 256, alphaY: 0,
-    durationTicks: 4, afterglowTicks: 0,
-    frameStartTicks: [0,2],
+    durationTicks: 60, afterglowTicks: 40,
+    frameStartTicks: [0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56,58],
   },
   "lightning-cleanup": {
     clipId: "lightning-cleanup",
-    video: { source: "/assets/original/map-actions/hd/lightning-cleanup/hd.mp4", width: 248, height: 488, frames: 65, fps: 100 },
+    video: { source: "/assets/original/map-actions/hd/lightning-cleanup/hd.mp4", width: 248, height: 488, frames: 80, fps: 100 },
     scale: 4, frameWidth: 248, frameHeight: 240,
     originX: 124, originY: 208, alphaX: 0, alphaY: 248,
-    durationTicks: 50, afterglowTicks: 15,
+    durationTicks: 50, afterglowTicks: 30,
     frameStartTicks: [0,10,20,30,40],
   },
   "poison": {

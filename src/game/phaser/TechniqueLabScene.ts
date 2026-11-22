@@ -623,7 +623,8 @@ export function startTechniqueLabPhaser(
 
     /**
      * 高清落雷（`REMAKE-210`）：與戰場同一套格子規則（`lightningHdCells`），每組「片段＋幀」一場放映；時鐘是那一幀的
-     * 原版起點加上在這一原版幀裡走過的比例。主段的餘韻照戰場一樣與命中波重疊；收尾的餘韻實驗室不畫（時間軸停在原版終點）。
+     * 原版起點加上在這一原版幀裡走過的比例。主段的餘韻照戰場一樣與命中波重疊，受擊標記的餘韻與收尾重疊；收尾的餘韻
+     * 實驗室不畫（時間軸停在原版終點）。
      * 片段不全或還沒解碼時回 `false`（照畫原版）。
      */
     private drawHdLightning(
@@ -678,6 +679,17 @@ export function startTechniqueLabPhaser(
         const last = lightningHdCells({ ...input, phase: "main", frame: mainEnd.frame.globalDrawIndex });
         const tick = mainClip.durationTicks + nativeTick - mainEnd.endNativeTicks;
         shows.push({ clip: mainClip, tick: () => tick, target: () => last.map(point), rate, playing: rate > 0 });
+      }
+      // the struck units' marker fades under the cleanup, from the last wave frame (`REMAKE-211`, as the battle's
+      // lingering show)
+      const markerClip = mapActionHdClip(`lightning-${tier}-marker`);
+      const waveEnd = timeline.filter(({ frame: timed }) => timed.kind === "wave").at(-1);
+      if (frame.frame.kind === "cleanup" && markerClip && waveEnd?.frame.kind === "wave"
+        && nativeTick - waveEnd.endNativeTicks < markerClip.afterglowTicks) {
+        const last = lightningHdCells({ ...input, phase: "wave", frame: waveEnd.frame.frame })
+          .filter(({ clipId }) => clipId === markerClip.clipId);
+        const tick = markerClip.durationTicks + nativeTick - waveEnd.endNativeTicks;
+        shows.push({ clip: markerClip, tick: () => tick, target: () => last.map(point), rate, playing: rate > 0 });
       }
       for (const { clip, clipFrame, cells: targets } of groups.values()) {
         const start = clip.frameStartTicks[clipFrame] ?? 0;

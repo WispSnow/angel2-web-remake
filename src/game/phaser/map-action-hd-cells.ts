@@ -23,8 +23,10 @@ interface CellPosition {
 
 /**
  * 落雷（`REMAKE-210`）每一幀的高清格子，與 `renderLightningFrame` 同一套規則：主段畫在中心加這一幀的錨點偏移
- * （雲與雷柱逐格移動）；命中波的掃描畫在掃描帶裡每一格、各自的幀是「範圍值 − 門檻 − 1」，受擊單位上疊兩幀
- * 交替的標記；收尾畫在每個受擊單位上。`frame` 在主段是全部主段描述符的序號，在命中波與收尾是該階段的幀。
+ * （雲與雷柱逐格移動）；命中波的掃描畫在掃描帶裡每一格、各自的幀是「範圍值 − 門檻 − 1」；收尾畫在每個受擊單位上。
+ * `frame` 在主段是全部主段描述符的序號，在命中波與收尾是該階段的幀。受擊標記（`REMAKE-211`）比原版留得久：
+ * 原版只在掃描帶經過那幾步畫兩幀交替的標記，一閃而過；高清從波到達那一步起一直留到命中波結束（片段涵蓋整段
+ * 命中波、照原版兩幀交替），最後一幀的餘韻在收尾時慢慢散去。
  */
 export function lightningHdCells(input: {
   readonly tier: 1 | 2 | 3 | 4;
@@ -54,8 +56,7 @@ export function lightningHdCells(input: {
   const rangeValueByPosition = new Map(effectCells.map(({ position, value }) => [`${position.x},${position.y}`, value]));
   const markers = hitPositions.flatMap(({ x, y }) => {
     const code = lightningWaveDistance(hit, frame, rangeValueByPosition.get(`${x},${y}`) ?? 0);
-    return code >= 0 && code <= hit.sweepWidth
-      ? [{ x, y, clipId: `lightning-${tier}-marker`, frame: frame % hit.runtimeTileCodes.length }] : [];
+    return code >= 0 ? [{ x, y, clipId: `lightning-${tier}-marker`, frame }] : [];
   });
   return [...sweep, ...markers];
 }
