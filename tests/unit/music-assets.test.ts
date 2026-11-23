@@ -18,12 +18,14 @@ interface SeamManifestTrack {
   crossfadeFrames: number;
   sourceBoundary: { rmsDbfs: number };
   outputBoundary: { rmsDbfs: number };
+  encodedFrames: number;
+  encodedBoundary: { rmsDbfs: number };
 }
 
 interface SeamManifest {
   version: number;
   algorithm: string;
-  encoding: { codec: string; bitrateKbps: number };
+  encoding: { codec: string; bitrateKbps: number; sampleRate: number; loopContextFrames: number };
   tracks: SeamManifestTrack[];
 }
 
@@ -38,7 +40,7 @@ describe("generated seamless stage-zero music", () => {
     expect(manifest).toMatchObject({
       version: 3,
       algorithm: "periodic-linear-overlap-add",
-      encoding: { codec: "opus", bitrateKbps: 112 },
+      encoding: { codec: "opus", bitrateKbps: 112, sampleRate: 48_000, loopContextFrames: 22_050 },
     });
     expect(manifest.tracks.map(({ id }) => id)).toEqual([
       "story-stage0",
@@ -51,6 +53,11 @@ describe("generated seamless stage-zero music", () => {
       expect(track.crossfadeFrames).toBe(STAGE0_MUSIC_SEAM_CROSSFADE_FRAMES);
       expect(track.sourceFrames - track.outputFrames).toBe(track.crossfadeFrames);
       expect(track.outputBoundary.rmsDbfs).toBeLessThan(-30);
+      // Encoded as a plain file, the Opus loops jumped by up to −19.8 dBFS at the wrap (S00-P, 2026-11-22): both
+      // ends bordered on silence. Encoded with half a second of their own tail and head around them, the decoded
+      // loops stay at the Vorbis files' level. The generator measures this on an ffmpeg decode of the output.
+      expect(track.encodedFrames).toBe(Math.round(track.outputFrames * manifest.encoding.sampleRate / track.sampleRate));
+      expect(track.encodedBoundary.rmsDbfs).toBeLessThan(-32);
       const output = await readFile(path.join(root, track.output));
       expect(sha256(output)).toBe(track.outputSha256);
       expect(output.toString("ascii", 0, 4)).toBe("OggS");

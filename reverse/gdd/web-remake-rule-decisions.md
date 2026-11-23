@@ -7296,3 +7296,12 @@ CRF 20 版 94.9–95.7。2 倍放大的新旧对照（肖像与口型图块、�
   文件，长度与 ffmpeg 解码逐样本一致，语音时长与目录逐毫秒一致——Chrome 会丢掉预跳过、裁掉尾端填充；
 - 音乐生成重跑逐字节相同；`story-hd`、`intro-hd`、`the-end-hd`、`startup-hd`、`portrait-hd`、`map-action-hd`、
   `resource-manifest` 单元测试与 `check-original-assets.mjs --verify-hashes` 通过。
+
+补正（2026-11-22，1.2.0 发布前检查）：完整端到端的 S00-P 发现第 0 关三段无缝循环解码后的接缝跳变变大（主角回合
+−19.8 dBFS，原 Vorbis 约 −34.5 dBFS）：44.1→48 kHz 重采样与 Opus 编码器都把文件两端当作接着静音。
+`generate-music-assets.mjs` 改为在循环前后各接上 0.5 秒它自己的尾段与头段再编码，再把 Ogg 流裁回循环本身：加大
+`OpusHead` 的 pre-skip，丢掉终点之后的封包，末页以 granule 位置裁掉余量。只接 0.1 秒时编码器还没稳定，主角回合仍有
+−29.2 dBFS；0.3 秒到 1 秒都在 −33.7～−33.8 dBFS。现在解码后的接缝为剧情 −39.4、主角回合 −33.8、敌方回合 −35.6 dBFS，
+长度与裁切前一样；接缝清单（仍为第 3 版）在 `encoding` 记下 48 kHz 与 `loopContextFrames`，每段记下以 ffmpeg 解码量得的
+`encodedFrames` 与 `encodedBoundary`，`music-assets.test.ts` 要求后者低于 −32 dBFS。其余 54 首逐字节不变，资源清单身份
+改为 `fadf17c6fed0`。
