@@ -195,7 +195,7 @@ if (!(await pathExists(musicManifestPath))) {
   throw new Error("release build is missing the deduplicated OGG music manifest");
 }
 const musicManifest = JSON.parse(await readFile(musicManifestPath, "utf8"));
-if (musicManifest.version !== 1 || musicManifest.tracks.length !== 54) {
+if (musicManifest.version !== 2 || musicManifest.tracks.length !== 54) {
   throw new Error("release build has an unexpected music manifest");
 }
 for (const track of musicManifest.tracks) {

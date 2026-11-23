@@ -14,7 +14,7 @@
 // - display-text hashes and spoken texts match today's content and voice
 //   script, so a later fix to a text forces the affected clips to be redone;
 // - every clip's voice and pace are the accepted cast (scripts/lib/voice-cast.mjs);
-// - every OGG matches its hash and is mono, and no stray OGG ships.
+// - every OGG matches its hash and is mono Ogg Opus (REMAKE-214), and no stray OGG ships.
 //
 // `--import <workbench>` first copies finished clips from the git-ignored voice
 // workbench (final.json + final/**/*.ogg, as made by its finish.mjs) into the
@@ -51,7 +51,7 @@ const voiceRoot = path.join(assetRoot, "voice");
 const manifestPath = path.join(voiceRoot, "voice-manifest.json");
 const generatedModule = path.join(root, "src/game/content/voice-catalog.generated.ts");
 const FORMAT = "ANGEL2 story voice-over";
-const VERSION = 2;
+const VERSION = 3;
 const TARGET_LUFS = -19;
 
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
@@ -164,8 +164,9 @@ async function importWorkbench(workbench, script) {
     format: FORMAT,
     version: VERSION,
     decisions: ["REMAKE-188", "REMAKE-189"],
+    codec: "opus",
     encoder: final.format.encoder,
-    quality: final.format.quality,
+    bitrateKbps: final.format.bitrateKbps,
     channels: 1,
     sampleRate: final.format.sampleRate,
     loudnessLufs: TARGET_LUFS,
@@ -319,9 +320,9 @@ for (const clip of everyClip) {
   if (bytes.toString("ascii", 0, 4) !== "OggS" || sha256(bytes) !== clip.sha256 || bytes.length !== clip.bytes) {
     fail(`${clip.output} does not match voice-manifest.json`);
   }
-  // Vorbis identification header: channel count is the byte after "\x01vorbis" + version.
-  const header = bytes.indexOf(Buffer.from("\x01vorbis", "latin1"));
-  if (header < 0 || bytes[header + 11] !== 1) fail(`${clip.output} is not mono Vorbis`);
+  // Opus identification header: "OpusHead", version byte, then the channel count.
+  const header = bytes.indexOf(Buffer.from("OpusHead", "latin1"));
+  if (header < 0 || bytes[header + 9] !== 1) fail(`${clip.output} is not mono Opus`);
 }
 
 // The first voiced page of every story is decoded on stage entry (VoiceDirector).

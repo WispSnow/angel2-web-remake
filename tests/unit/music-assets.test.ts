@@ -23,6 +23,7 @@ interface SeamManifestTrack {
 interface SeamManifest {
   version: number;
   algorithm: string;
+  encoding: { codec: string; bitrateKbps: number };
   tracks: SeamManifestTrack[];
 }
 
@@ -35,8 +36,9 @@ describe("generated seamless stage-zero music", () => {
       await readFile(path.join(root, "public/assets/original/stage0-music-seams.json"), "utf8"),
     ) as SeamManifest;
     expect(manifest).toMatchObject({
-      version: 2,
+      version: 3,
       algorithm: "periodic-linear-overlap-add",
+      encoding: { codec: "opus", bitrateKbps: 112 },
     });
     expect(manifest.tracks.map(({ id }) => id)).toEqual([
       "story-stage0",
@@ -62,8 +64,9 @@ describe("generated seamless stage-zero music", () => {
   test("publishes one OGG per reverse music master and no legacy music copies", async () => {
     const manifest = JSON.parse(
       await readFile(path.join(root, "public/assets/original/music/music-manifest.json"), "utf8"),
-    ) as { version: number; quality: number; tracks: Array<{ output: string; outputSha256: string }> };
-    expect(manifest).toMatchObject({ version: 1, quality: 5 });
+    ) as { version: number; codec: string; bitrateKbps: number; tracks: Array<{ output: string; outputSha256: string }> };
+    // REMAKE-214: Ogg Opus at 112 kbps, the same rate as the orchestral remixes.
+    expect(manifest).toMatchObject({ version: 2, codec: "opus", bitrateKbps: 112 });
     expect(manifest.tracks).toHaveLength(54);
     const outputPaths = new Set(manifest.tracks.map(({ output }) => output));
     expect(outputPaths.size).toBe(manifest.tracks.length);

@@ -7253,3 +7253,46 @@ BK/12 用回 BK/10 的云层，最后的 BK/13 是静止画、没有视频与画
   `stage0-ice-shell-hd-cursor.png`，另以 4 倍像素密度截取换回合奔跑者经过冰壳的画面核对挖空形状）；
 - `technique-lab.spec.ts` 的 `REMAKE-206` 用例：实验室冰封单位在高清时改画高清冰壳，回復心形照旧不画在它身上；截图人工查看；
 - 素材包重新导入后只多出 `ice-shell` 一项、其余片段逐字节不变，`check-original-assets.mjs --verify-hashes` 全部通过。
+
+### REMAKE-214：素材包音频与高清视频重新编码
+
+`[DD]` 用户认为游戏包偏大，要求压缩素材（2026-11-22），选定全部一起做、原版与交响音乐都用 Opus 112 kbps。只改交付编码，
+不改内容、时长、循环点或任何表现规则：
+
+1. **音乐改为 Ogg Opus 112 kbps VBR**（之前 Vorbis q5，约 160 kbps）。原版 54 首与第 0 关三段无缝循环由
+   `scripts/generate-music-assets.mjs` 从 `reverse/converted/audio/rix-wav` 的无损母带直接编码；交响改编 36 段由 Suno
+   工作台的 `_tools/encode-opus.mjs` 从 48 kHz 循环母带重编，`make-loop`／`make-whole-loop` 以后也直接产出 Opus。容器仍是
+   `.ogg`、文件名不变，运行时引用不动。Opus 一律以 48 kHz 解码：交响改编解码后逐帧等于母带，`loopStartFrame`／`loopEndFrame`
+   照旧采样级准确；原版曲目解码长度与母带相差不到一个 48 kHz 样本。实测平均码率：交响 117 kbps，原版 FM 曲目 131 kbps
+   （Opus VBR 在明亮的方波音色上多给码率）。
+2. **语音改为 Ogg Opus 32 kbps 单声道**（之前 Vorbis q2，约 70 kbps）。语音工作台没有保留无损中间档，`reencode-opus.mjs`
+   按 `final.json` 记录的原 take、裁切点与语速重建同一份响度标准化 WAV 再编码，之后 `finish.mjs` 也直接产出 Opus。重建 WAV
+   的整合响度与记录全部一致；旁白时长逐毫秒不变（开场插图切换点与尾声停留时间依它），55 段剧情语音与战斗台词因
+   44.1→48 kHz 取整多 1 ms。`durationMs` 按解码后的样本数计算：ffprobe 报的时长仍含 Opus 的 312 样本预跳过（6.5 ms），
+   解码器都会丢掉。
+3. **高清视频提高 CRF、改用 preset veryslow**，仍是 H.264 yuv420p：剧情插图循环、标题与 The end 从无损母带重编，CRF 21→25；
+   开场与尾声 23→27；地图特效从工作台保存的逐帧 PNG 重编，CRF 14→18，保留 10 帧 GOP（战场按 native tick 跳帧）；肖像没有
+   无损母带（整条链每一步都是 CRF 20），导出时由已核可的交付件转码为 CRF 25（tune animation）。海报、云层、标题 PNG 与
+   静帧逐字节不变，帧数、尺寸与堆叠布局不变。
+4. **不换 AV1**：同画质下只比调好的 H.264 再小 5–10%，旧设备与 Safari 未必能硬件解码，地图特效又要频繁跳帧。原版像素
+   PNG 保持无损、不动。
+
+结果（实际字节）：交响 72.5→56.6 MiB、原版音乐 45.2→29.9 MiB、语音 47.0→21.0 MiB、剧情视频 54.2→27.2 MiB、肖像视频
+32.9→16.6 MiB、地图特效视频 29.2→17.8 MiB；素材包 303.7→191.8 MiB（−37%），资源清单身份 `20d8b7a055e1`。
+
+画质：VMAF（对无损母带，旧→新）插图循环 96.2→95.0、The end 97.6→96.3、开场 94.8→92.6、尾声 95.1→92.6；肖像对出货的
+CRF 20 版 94.9–95.7。2 倍放大的新旧对照（肖像与口型图块、红眼版、地图特效合成、开场与尾声）人工查看没有可见差异。
+音频没有客观分数，以试听为准。
+
+只改表现素材的编码，不改模拟、PRNG、存档或结算；两个规则集同样适用。`REMAKE-181`、`REMAKE-188`／`REMAKE-189`、
+`REMAKE-192`、`REMAKE-196`–`REMAKE-201`、`REMAKE-203`–`REMAKE-213` 记载的旧编码参数（oggenc q5／q2、CRF 20／21／23／14）
+以本条为准。
+
+回归证据：
+- `music-assets.test.ts`、`music-remix.test.ts`、`voice-catalog.test.ts`：三份清单记 Opus 与码率（音乐清单第 2 版、
+  第 0 关接缝清单第 3 版、交响清单第 2 版、语音清单第 3 版），每个文件哈希相符；语音生成器改查 `OpusHead` 单声道，交响
+  导入拒绝仍是 Vorbis 的循环；`prepare-release.mjs` 的音乐清单版本检查随之改为 2；
+- 浏览器核对（一次性）：已安装的 Chrome 以 `OfflineAudioContext` 解码全部交响与原版曲目和每 15 段取一的语音共 232 个
+  文件，长度与 ffmpeg 解码逐样本一致，语音时长与目录逐毫秒一致——Chrome 会丢掉预跳过、裁掉尾端填充；
+- 音乐生成重跑逐字节相同；`story-hd`、`intro-hd`、`the-end-hd`、`startup-hd`、`portrait-hd`、`map-action-hd`、
+  `resource-manifest` 单元测试与 `check-original-assets.mjs --verify-hashes` 通过。

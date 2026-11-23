@@ -151,7 +151,10 @@ beforeAll(async () => {
 
 describe("REMAKE-188 voice catalog", () => {
   test("matches the asset pack manifest and its mono OGG bytes", async () => {
-    expect(manifest).toMatchObject({ version: 2, decisions: ["REMAKE-188", "REMAKE-189"], loudnessLufs: -19, channels: 1 });
+    // REMAKE-214: mono Ogg Opus at 32 kbps (format version 3).
+    expect(manifest).toMatchObject({
+      version: 3, decisions: ["REMAKE-188", "REMAKE-189"], codec: "opus", bitrateKbps: 32, loudnessLufs: -19, channels: 1,
+    });
     const byKey = new Map(manifest.clips.map((clip) => [clip.key, clip]));
     expect(VOICE_CLIPS.map(({ key }) => key).sort()).toEqual([...byKey.keys()].sort());
     for (const clip of VOICE_CLIPS) {

@@ -53,7 +53,8 @@ describe("REMAKE-181 remix catalog", () => {
       path.join(root, "public/assets/original/music/remix/remix-manifest.json"),
       "utf8",
     )) as RemixManifest;
-    expect(manifest).toMatchObject({ version: 1, decision: "REMAKE-181", loudnessLufs: -16 });
+    // REMAKE-214: Ogg Opus at 112 kbps, the same rate as the original tracks.
+    expect(manifest).toMatchObject({ version: 2, decision: "REMAKE-181", codec: "opus", bitrateKbps: 112, loudnessLufs: -16 });
     expect(MUSIC_REMIX_TRACKS.map(({ key }) => key)).toEqual(manifest.tracks.map(({ key }) => key));
     for (const [index, track] of manifest.tracks.entries()) {
       const generated = MUSIC_REMIX_TRACKS[index];

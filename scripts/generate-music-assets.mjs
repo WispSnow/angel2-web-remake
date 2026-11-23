@@ -13,7 +13,10 @@ const publicRoot = path.join(root, "public/assets/original");
 const musicRoot = path.join(publicRoot, "music");
 const generatedModule = path.join(root, "src/game/content/stage0-music.generated.ts");
 const CROSSFADE_FRAMES = 1024;
-const QUALITY = 5;
+// Ogg Opus at 112 kbps (REMAKE-214): Opus always decodes at 48 kHz, so the 44.1 kHz masters are
+// resampled on the way in. Same container as the earlier Vorbis q5 (~160 kbps), about a third smaller.
+const CODEC = "opus";
+const BITRATE_KBPS = 112;
 const CONTAINERS = ["MUSIC", "MAGIC", "UN"];
 
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
@@ -100,9 +103,14 @@ function serialFor(container, record, generated = false) {
 }
 
 function encodeOgg(inputPath, outputPath, serial) {
-  const result = spawnSync("oggenc", ["-Q", "-q", String(QUALITY), "--discard-comments", "--serial", String(serial), "-o", outputPath, inputPath], { encoding: "utf8" });
+  // bitexact: no encoder tag and a fixed stream serial, so a rerun writes the same bytes.
+  const result = spawnSync("ffmpeg", [
+    "-v", "error", "-y", "-i", inputPath, "-map_metadata", "-1",
+    "-c:a", "libopus", "-b:a", `${BITRATE_KBPS}k`, "-vbr", "on", "-compression_level", "10",
+    "-fflags", "+bitexact", "-flags:a", "+bitexact", "-serial_offset", String(serial & 0x7fffffff), "-f", "ogg", outputPath,
+  ], { encoding: "utf8" });
   if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`oggenc failed for ${inputPath}: ${result.stderr}`);
+  if (result.status !== 0) throw new Error(`ffmpeg libopus failed for ${inputPath}: ${result.stderr}`);
 }
 
 async function pathExists(target) {
@@ -144,8 +152,8 @@ async function generateSeamless(id, container, record, outputName, temporaryRoot
   return { id, source: path.relative(root, sourcePath), output: path.relative(root, output), sourceSha256: sha256(sourceBytes), outputSha256: sha256(outputBytes), sampleRate: sourceWave.sampleRate, channels: sourceWave.channels, sourceFrames: sourceWave.frames, outputFrames: seamlessWave.frames, crossfadeFrames: CROSSFADE_FRAMES, crossfadeMilliseconds: Number((CROSSFADE_FRAMES * 1000 / sourceWave.sampleRate).toFixed(6)), sourceBoundary: boundaryMetrics(sourceWave), outputBoundary: boundaryMetrics(seamlessWave) };
 }
 
-const encoderVersion = spawnSync("oggenc", ["--version"], { encoding: "utf8" }).stdout.trim().split("\n").slice(0, 2).join(" ");
-if (!encoderVersion) throw new Error("oggenc is required to generate development music assets");
+const encoderVersion = spawnSync("ffmpeg", ["-hide_banner", "-version"], { encoding: "utf8" }).stdout?.trim().split("\n")[0] ?? "";
+if (!encoderVersion) throw new Error("ffmpeg with libopus is required to generate development music assets");
 const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "angel2-music-"));
 try {
   const tracks = [];
@@ -155,8 +163,8 @@ try {
     await generateSeamless("battle-stage0-player-loop", "MUSIC", 6, "stage0-player-seamless.ogg", temporaryRoot),
     await generateSeamless("battle-stage0-enemy-loop", "MUSIC", 4, "stage0-enemy-seamless.ogg", temporaryRoot),
   ];
-  await writeFile(path.join(musicRoot, "music-manifest.json"), `${JSON.stringify({ format: "ANGEL2 deduplicated music assets", version: 1, encoder: "oggenc", encoderVersion, quality: QUALITY, tracks }, null, 2)}\n`);
-  await writeFile(path.join(publicRoot, "stage0-music-seams.json"), `${JSON.stringify({ format: "ANGEL2 stage-0 seamless music loops", version: 2, algorithm: "periodic-linear-overlap-add", encoding: { codec: "vorbis", quality: QUALITY }, tracks: seams }, null, 2)}\n`);
+  await writeFile(path.join(musicRoot, "music-manifest.json"), `${JSON.stringify({ format: "ANGEL2 deduplicated music assets", version: 2, codec: CODEC, encoder: "ffmpeg libopus", encoderVersion, bitrateKbps: BITRATE_KBPS, tracks }, null, 2)}\n`);
+  await writeFile(path.join(publicRoot, "stage0-music-seams.json"), `${JSON.stringify({ format: "ANGEL2 stage-0 seamless music loops", version: 3, algorithm: "periodic-linear-overlap-add", encoding: { codec: CODEC, bitrateKbps: BITRATE_KBPS }, tracks: seams }, null, 2)}\n`);
   const sampleRates = new Set(seams.map((track) => track.sampleRate));
   if (sampleRates.size !== 1) throw new Error("stage-0 music sources must share one sample rate");
   const [sampleRate] = sampleRates;
@@ -168,7 +176,7 @@ try {
     if (await pathExists(target)) for (const entry of await readdir(target)) if (entry.endsWith(".wav")) legacyFiles.push(path.join(target, entry));
   }
   await Promise.all(legacyFiles.map((file) => rm(file, { force: true })));
-  console.log(`generated ${tracks.length} deduplicated OGG masters and ${seams.length} Stage 0 seamless loops`);
+  console.log(`generated ${tracks.length} deduplicated Ogg Opus masters and ${seams.length} Stage 0 seamless loops`);
   console.log(`removed ${legacyFiles.length} duplicated music WAV assets`);
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });

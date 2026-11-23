@@ -27,6 +27,8 @@ const generatedModule = path.join(root, "src/game/content/music-remix.generated.
 const TARGET_LUFS = -16;
 
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
+const CODEC = "opus";
+const BITRATE_KBPS = 112;
 
 /** `MUSIC/7` + `MUSIC/6` -> `MUSIC-07-06`; `MAGIC/73` -> `MAGIC-73`. */
 function fileStem(entryTrack, loopTrack) {
@@ -56,6 +58,10 @@ async function importWorkbench(workbench) {
     const ogg = await readFile(path.join(loopFolder, loop.output.replace(/^loop\//u, "")));
     if (loop.loudness.targetLufs !== TARGET_LUFS) throw new Error(`${entry.name}: loudness target is not ${TARGET_LUFS} LUFS`);
     if (loop.oggDecodedFrames !== loop.outputFrames) throw new Error(`${entry.name}: OGG frame count differs from the master`);
+    // REMAKE-214: Ogg Opus at 112 kbps (the workbench's _tools/opus.mjs); a Vorbis loop is stale.
+    if (loop.encoding?.codec !== CODEC || loop.encoding.bitrateKbps !== BITRATE_KBPS) {
+      throw new Error(`${entry.name}: loop is not Ogg Opus ${BITRATE_KBPS} kbps; run _tools/encode-opus.mjs`);
+    }
     await mkdir(remixRoot, { recursive: true });
     await copyFile(path.join(loopFolder, loop.output.replace(/^loop\//u, "")), path.join(remixRoot, `${stem}.ogg`));
     tracks.push({
@@ -83,10 +89,10 @@ async function importWorkbench(workbench) {
   if (tracks.length === 0) throw new Error(`no finished loops under ${workbench}`);
   const manifest = {
     format: "ANGEL2 orchestral remix music",
-    version: 1,
+    version: 2,
     decision: "REMAKE-181",
-    encoder: "oggenc",
-    quality: 5,
+    codec: CODEC,
+    bitrateKbps: BITRATE_KBPS,
     loudnessLufs: TARGET_LUFS,
     tracks,
   };
@@ -95,7 +101,8 @@ async function importWorkbench(workbench) {
 }
 
 function validate(manifest) {
-  if (manifest.format !== "ANGEL2 orchestral remix music" || manifest.version !== 1) {
+  if (manifest.format !== "ANGEL2 orchestral remix music" || manifest.version !== 2
+    || manifest.codec !== CODEC || manifest.bitrateKbps !== BITRATE_KBPS) {
     throw new Error("unexpected remix manifest format");
   }
   const keys = new Set();
