@@ -1,6 +1,7 @@
 import { BATTLE_ACTION_DEFINITIONS } from "../content/actions";
 import type { BattleUnit, Position, Side } from "../types";
 import { techniqueEffectRange } from "./actions/range-map";
+import { iceShielded, type BattleRuleOptions } from "./rule-options";
 import { waterWarriorRootId } from "./water-warrior-split";
 import type {
   SpecialActionAffectedUnit,
@@ -20,6 +21,7 @@ export function prepareScriptedLightning4(
   center: Position,
   targetSide: Side,
   actorId: string,
+  rules?: BattleRuleOptions,
 ): SpecialActionResult {
   const definition = BATTLE_ACTION_DEFINITIONS["lightning-4"];
   const effect = techniqueEffectRange(
@@ -39,7 +41,7 @@ export function prepareScriptedLightning4(
       - (right.y * battlefield.width + right.x))
     .map((unit) => {
       const statusesAfter = cloneStatuses(unit);
-      const frozen = unit.actionDisabled;
+      const frozen = iceShielded(unit, rules);
       const guarded = unit.statuses.magicGuard > 0;
       const blocked = frozen || guarded;
       if (!frozen) statusesAfter.magicGuard = 0;

@@ -75,6 +75,7 @@ import {
   onOriginalDebugModeChange,
   originalDebugHotkey,
 } from "./original-debug-mode";
+import { onRuleOptionsChange } from "./rule-options";
 import { mountOriginalDebugUi, ORIGINAL_DEBUG_UI_MARKUP } from "./original-debug-ui";
 import {
   isKeyboardCancel,
@@ -1490,7 +1491,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       status.innerHTML = skillCastHint("ice-cast-summary", [
         BATTLE_ACTION_DEFINITIONS[iceCastPreview.actionId].label,
         `<b class="ice-cast-freeze">藍格冰封</b>`,
-        `<b class="ice-cast-displace">黃圈只推開</b>`,
+        // REMAKE-216 原版冰雪沒有只推不冰的外圈。
+        ...(iceCastPreview.displacementRingCells.length > 0
+          ? [`<b class="ice-cast-displace">黃圈只推開</b>`]
+          : []),
         "點範圍內施展",
         "右鍵取消",
       ], controller.statusMessage);
@@ -2099,9 +2103,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   render();
   const stopScaling = configureGameScaling(required(root, "#game-viewport"), screen, {
     originalDebugToggle: controller.isCampaignPersistenceEnabled,
+    ruleOptionToggles: controller.isCampaignPersistenceEnabled,
   });
   // 開關是宿主偏好，不經控制器；切換時重畫一次，讓第 37 關的顯形與熱鍵狀態立即生效。
   const stopOriginalDebugSubscription = onOriginalDebugModeChange(() => controller.emit());
+  // REMAKE-216：懷舊規則選項同樣在宿主選單切換，戰鬥物件要立刻拿到新規則。
+  const stopRuleOptionsSubscription = onRuleOptionsChange(() => controller.syncRuleOptions());
   const stopGamepad = bindGamepad(controller, {
     onInput: () => {
       lastInputSource = "keyboard-or-gamepad";
@@ -2117,6 +2124,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     storyHdLayer.destroy();
     stopScaling();
     stopOriginalDebugSubscription();
+    stopRuleOptionsSubscription();
     stopGamepad();
     recordBackupUi.dispose();
     battleChrome.dispose();

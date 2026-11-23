@@ -2,6 +2,7 @@ import { classCombatRole, terrainDefensePercentFor } from "../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../types";
 import type { AlliedAiAction } from "./ai-contracts";
 import { positionKey, reachableCells, type GridBattlefield } from "./grid";
+import { iceShielded, type BattleRuleOptions } from "./rule-options";
 
 type SisterActionId = "fire-1" | "heal-1";
 
@@ -13,6 +14,8 @@ export interface EnemyThreatContext {
   /** 状态 ±20 与难度倍率的原版顺序都由这里收口，见 `content/stage0.ts`。 */
   effectiveStatsFor: (unit: BattleUnit) => UnitStats;
   movementPath: (id: string, destination: Position) => Position[];
+  /** `REMAKE-216`：原版冰雪下冰封單位仍是普通攻擊目標，也就能解除警戒。 */
+  rules?: BattleRuleOptions;
   planSisterAction: (
     unit: BattleUnit,
     actionId: SisterActionId,
@@ -24,7 +27,7 @@ function minimumOrdinaryDamage(
   attacker: BattleUnit,
   defender: BattleUnit,
 ): number {
-  if (defender.actionDisabled) return 0;
+  if (iceShielded(defender, context.rules)) return 0;
   const attackerStats = context.effectiveStatsFor(attacker);
   const defenderStats = context.effectiveStatsFor(defender);
   const defenderDefense = defenderStats.defense;
@@ -70,7 +73,7 @@ function planOrdinaryAttack(
   }> = [];
 
   for (const target of context.units.filter((candidate) =>
-    candidate.side === 1 && !candidate.actionDisabled)) {
+    candidate.side === 1 && !iceShielded(candidate, context.rules))) {
     for (const offset of offsets) {
       const position = { x: target.x + offset.x, y: target.y + offset.y };
       if (!positionKeys.has(positionKey(position)) || occupied.has(positionKey(position))) continue;

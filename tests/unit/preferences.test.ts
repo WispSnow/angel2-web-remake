@@ -3,19 +3,23 @@ import {
   DEFAULT_DISPLAY_PREFERENCES,
   DEFAULT_MUSIC_PREFERENCES,
   DEFAULT_PRESENTATION_PREFERENCES,
+  DEFAULT_RULE_PREFERENCES,
   DEFAULT_SOUND_PREFERENCES,
   DEFAULT_VOICE_PREFERENCES,
   DISPLAY_PREFERENCES_KEY,
   loadDisplayPreferences,
   loadMusicPreferences,
   loadPresentationPreferences,
+  loadRulePreferences,
   loadSoundPreferences,
   loadVoicePreferences,
   MUSIC_PREFERENCES_KEY,
   PRESENTATION_PREFERENCES_KEY,
+  RULE_PREFERENCES_KEY,
   saveDisplayPreferences,
   saveMusicPreferences,
   savePresentationPreferences,
+  saveRulePreferences,
   saveSoundPreferences,
   saveVoicePreferences,
   SOUND_PREFERENCES_KEY,
@@ -250,5 +254,31 @@ describe("display preferences", () => {
       );
       expect(loadDisplayPreferences(storage)).toEqual({ imageScaling: "smooth", interfaceZoom: 125, portraitStyle: "original" });
     }
+  });
+});
+
+describe("REMAKE-215/216 rule preferences", () => {
+  test("default both nostalgia switches off and fall back field by field", () => {
+    const storage = new MemoryStorage();
+    expect(DEFAULT_RULE_PREFERENCES).toEqual({ keepFailedAttemptGrowth: false, originalIce: false });
+    expect(loadRulePreferences(storage)).toEqual(DEFAULT_RULE_PREFERENCES);
+    storage.setItem(RULE_PREFERENCES_KEY, "{");
+    expect(loadRulePreferences(storage)).toEqual(DEFAULT_RULE_PREFERENCES);
+    storage.setItem(RULE_PREFERENCES_KEY, "null");
+    expect(loadRulePreferences(storage)).toEqual(DEFAULT_RULE_PREFERENCES);
+    storage.setItem(RULE_PREFERENCES_KEY, JSON.stringify({ keepFailedAttemptGrowth: "yes", originalIce: true }));
+    expect(loadRulePreferences(storage)).toEqual({ keepFailedAttemptGrowth: false, originalIce: true });
+  });
+
+  test("round-trip under their own key without touching the other preferences", () => {
+    const storage = new MemoryStorage();
+    for (const keepFailedAttemptGrowth of [false, true]) {
+      for (const originalIce of [false, true]) {
+        saveRulePreferences(storage, { keepFailedAttemptGrowth, originalIce });
+        expect(loadRulePreferences(storage)).toEqual({ keepFailedAttemptGrowth, originalIce });
+      }
+    }
+    expect(storage.getItem(DISPLAY_PREFERENCES_KEY)).toBeNull();
+    expect(storage.getItem(PRESENTATION_PREFERENCES_KEY)).toBeNull();
   });
 });

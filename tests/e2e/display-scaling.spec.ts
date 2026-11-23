@@ -35,7 +35,7 @@ test("the page shows only the game and the scaling choice lives in the corner me
 
   await openHostMenu(page);
   await expect(hostMenu(page).locator("[data-host-menu-row]")).toHaveText([
-    "繼續遊戲", "畫面縮放", "復刻說明", "圖鑑", "RoadMap", "原版Debug",
+    "繼續遊戲", "畫面縮放", "敗退保留經驗", "原版冰雪", "復刻說明", "圖鑑", "RoadMap", "原版Debug",
   ].map((label) => new RegExp(`^\\s*${label}`)));
   await page.getByTestId("host-menu-row-image-scaling").click();
   await expect(page.getByTestId("host-menu-submenu").getByRole("menuitemradio")).toHaveText(

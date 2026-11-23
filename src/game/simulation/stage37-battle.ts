@@ -27,6 +27,7 @@ import {
 import { validateDeploymentResult, type DeploymentResult } from "./deployment";
 import type { ForceDefinition } from "./forces";
 import { DeterministicRng } from "./rng";
+import { iceShielded } from "./rule-options";
 
 const STAGE37_UNIT_CONFIG: DeployedStageUnitConfig = {
   alliedUnits: STAGE37_SEMANTIC_ALLIED_UNITS,
@@ -140,12 +141,12 @@ export class Stage37Battle extends Stage0Battle {
       && actor.side === 2
       && (actionId === "lightning-4" || actionId === "fire-4")
       && target?.side === 1
-      && !target.actionDisabled;
+      && !iceShielded(target, this.rules);
   }
 
   private handTarget(trial: DeterministicRng): BattleUnit | undefined {
     const candidates = this.units
-      .filter((unit) => unit.side === 1 && !unit.actionDisabled)
+      .filter((unit) => unit.side === 1 && !iceShielded(unit, this.rules))
       .sort((left, right) => left.y * this.stage.width + left.x
         - (right.y * this.stage.width + right.x));
     if (candidates.length === 0) return undefined;

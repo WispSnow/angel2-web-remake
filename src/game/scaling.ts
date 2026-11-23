@@ -71,6 +71,11 @@ export interface GameScalingOptions {
    * 掛上去只會讓人以為那裡也吃這個開關。
    */
   readonly originalDebugToggle?: boolean;
+  /**
+   * `REMAKE-215`／`REMAKE-216` 的懷舊規則開關（敗退保留經驗、原版冰雪）。和「原版Debug」
+   * 一樣只屬於正式戰役表面：競技場與實驗室一律用複刻規則。
+   */
+  readonly ruleOptionToggles?: boolean;
 }
 
 export function configureGameScaling(
@@ -82,6 +87,7 @@ export function configureGameScaling(
   // 頁面上沒有畫面外的宿主列：設定、暫停與參考面板都收在畫面右下角的選單入口裡。
   const unmountHostMenu = mountHostMenu(screen, {
     originalDebugToggle: options.originalDebugToggle !== false,
+    ruleOptionToggles: options.ruleOptionToggles !== false,
     interfaceZoom: desktop,
   });
   restoreInterfaceZoomOnce();

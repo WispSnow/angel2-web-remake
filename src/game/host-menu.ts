@@ -27,6 +27,13 @@ import {
 } from "./original-debug-mode";
 import { setProgramPaused } from "./program-clock";
 import { registerProgramPausePresenter } from "./program-pause";
+import {
+  onRuleOptionsChange,
+  RULE_OPTION_DESCRIPTIONS,
+  ruleOptions,
+  setRuleOption,
+  type RuleOptionId,
+} from "./rule-options";
 import { LOGICAL_SCREEN_WIDTH } from "./scaling-constants";
 
 /**
@@ -44,7 +51,9 @@ import { LOGICAL_SCREEN_WIDTH } from "./scaling-constants";
  * - 外框借用原版系統選單（網點玻璃底、金色藤蔓框、劍形選中條）與勝利條件面板的素材，
  *   文字則照字體分層規則用現代字體——玩家一眼就能分辨這不是原版選單。
  *
- * 這些選擇只改宿主表現：不進模擬狀態、PRNG、規則身份或存檔。
+ * 畫面縮放、參考面板與「原版Debug」只改宿主表現：不進模擬狀態、PRNG、規則身份或存檔。
+ * 用戶 2026-11-23 另加兩個懷舊規則開關（`REMAKE-215`「敗退保留經驗」、`REMAKE-216`
+ * 「原版冰雪」）：它們會改變結算，但同樣只按瀏覽器保存、不進存檔，控制器讀它們的值。
  */
 
 /** 入口在邏輯螢幕裡的落點：回合框（480..640×322..350）右端圓弧，「合」字止於 x≈614。 */
@@ -72,7 +81,15 @@ const VIEWPORT_MARGIN = 8;
 /** 選單與入口位置上紅寶石之間至少留的 CSS px。 */
 const CLOSE_GAP = 4;
 
-type RowId = "resume" | "image-scaling" | "interface-zoom" | HostOverlayId | "original-debug";
+/** 懷舊規則開關的列 id（也是 `data-testid` 的一部分）。 */
+const RULE_ROW_IDS = {
+  keepFailedAttemptGrowth: "keep-growth",
+  originalIce: "original-ice",
+} as const satisfies Record<RuleOptionId, string>;
+
+type RuleRowId = (typeof RULE_ROW_IDS)[RuleOptionId];
+
+type RowId = "resume" | "image-scaling" | "interface-zoom" | RuleRowId | HostOverlayId | "original-debug";
 
 interface ChoiceOption {
   readonly value: string;
@@ -86,17 +103,32 @@ interface ChoiceRow {
   write(value: string): void;
 }
 
+/** 開關列：「原版Debug」與兩個懷舊規則選項。 */
+interface ToggleRow {
+  read(): boolean;
+  write(enabled: boolean): void;
+  /** 懷舊規則選項開與關時說明框的正文；「原版Debug」另有 Caps Lock 狀態，由 `describe` 特別處理。 */
+  readonly onText?: string;
+  readonly offText?: string;
+}
+
 interface MenuRow {
   readonly id: RowId;
   readonly label: string;
   readonly kind: "resume" | "choice" | "overlay" | "toggle";
   readonly hint?: string;
   readonly choice?: ChoiceRow;
+  readonly toggle?: ToggleRow;
 }
 
 export interface HostMenuOptions {
   /** `REMAKE-174` 的「原版Debug」只屬於正式遊戲表面；實驗室不掛。 */
   readonly originalDebugToggle: boolean;
+  /**
+   * `REMAKE-215`／`REMAKE-216` 的懷舊規則開關同樣只屬於正式戰役表面：競技場與實驗室是
+   * 內存測試場，一律用複刻規則，掛上去只會讓人以為那裡也吃這兩個開關。
+   */
+  readonly ruleOptionToggles: boolean;
   /** 桌面版才有「介面縮放」：網頁版用瀏覽器自己的縮放。 */
   readonly interfaceZoom: boolean;
 }
@@ -123,15 +155,33 @@ const INTERFACE_ZOOM_CHOICE: ChoiceRow = {
   },
 };
 
+const ORIGINAL_DEBUG_TOGGLE: ToggleRow = {
+  read: originalDebugModeEnabled,
+  write: setOriginalDebugModeEnabled,
+};
+
+const RULE_OPTION_ROWS: readonly MenuRow[] = RULE_OPTION_DESCRIPTIONS.map(({ id, label, onText, offText }) => ({
+  id: RULE_ROW_IDS[id],
+  label,
+  kind: "toggle",
+  toggle: {
+    read: () => ruleOptions()[id],
+    write: (enabled: boolean) => setRuleOption(id, enabled),
+    onText,
+    offText,
+  },
+}));
+
 const menuRows = (options: HostMenuOptions): readonly MenuRow[] => [
   { id: "resume", label: "繼續遊戲", kind: "resume" },
   { id: "image-scaling", label: "畫面縮放", kind: "choice", choice: IMAGE_SCALING_CHOICE },
   ...(options.interfaceZoom
     ? [{ id: "interface-zoom", label: "介面縮放", kind: "choice", choice: INTERFACE_ZOOM_CHOICE } as const]
     : []),
+  ...(options.ruleOptionToggles ? RULE_OPTION_ROWS : []),
   ...HOST_OVERLAYS.map(({ id, label, hint }) => ({ id, label, kind: "overlay", hint } as const)),
   ...(options.originalDebugToggle
-    ? [{ id: "original-debug", label: "原版Debug", kind: "toggle" } as const]
+    ? [{ id: "original-debug", label: "原版Debug", kind: "toggle", toggle: ORIGINAL_DEBUG_TOGGLE } as const]
     : []),
 ];
 
@@ -245,7 +295,8 @@ export function mountHostMenu(screen: HTMLElement, options: HostMenuOptions): ()
             role="${row.kind === "toggle" ? "menuitemcheckbox" : "menuitem"}"
             ${row.kind === "choice" ? `aria-haspopup="menu" aria-expanded="false"` : ""}>
             <span class="host-menu-label">${escapeHtml(row.label)}${row.kind === "toggle"
-              ? `<i class="host-menu-lamp" data-testid="host-menu-original-debug-lamp" aria-hidden="true"></i>`
+              ? `<i class="host-menu-lamp" data-host-menu-lamp="${row.id}" data-testid="host-menu-${row.id}-lamp"
+                aria-hidden="true"></i>`
               : ""}</span>${row.kind === "choice" ? `<span class="host-menu-marker" aria-hidden="true">▸</span>` : ""}
           </button>`).join("")}
       </div>
@@ -270,7 +321,6 @@ export function mountHostMenu(screen: HTMLElement, options: HostMenuOptions): ()
   const descriptionExtra = required<HTMLElement>("[data-description-extra]");
   const descriptionKeys = required<HTMLElement>("[data-description-keys]");
   const rowButtons = [...layer.querySelectorAll<HTMLButtonElement>(".host-menu-list:not(.host-menu-submenu) .host-menu-row")];
-  const lamp = layer.querySelector<HTMLElement>(".host-menu-lamp");
 
   let open = false;
   let selected = 0;
@@ -316,25 +366,35 @@ export function mountHostMenu(screen: HTMLElement, options: HostMenuOptions): ()
         descriptionKeys.textContent = "Enter 打開　視窗內 Esc 回到選單";
         break;
       case "toggle": {
-        const enabled = originalDebugModeEnabled();
+        const enabled = row.toggle?.read() ?? false;
         descriptionValue.textContent = enabled ? "開" : "關";
+        descriptionKeys.textContent = "Enter 切換開關";
+        if (row.id !== "original-debug") {
+          descriptionBody.textContent = (enabled ? row.toggle?.onText : row.toggle?.offText) ?? "";
+          break;
+        }
         descriptionBody.textContent = !enabled
           ? ORIGINAL_DEBUG_OFF_TEXT
           : capsLockOn ? ORIGINAL_DEBUG_CAPS_LOCK_ON_TEXT : ORIGINAL_DEBUG_CAPS_LOCK_OFF_TEXT;
         descriptionExtra.innerHTML = ORIGINAL_DEBUG_HOTKEYS
           .map((hotkey) => `<span>${escapeHtml(hotkey)}</span>`).join(" ");
         descriptionExtra.hidden = false;
-        descriptionKeys.textContent = "Enter 切換開關";
         break;
       }
     }
   };
 
   const renderToggle = () => {
-    const enabled = originalDebugModeEnabled();
-    const button = rowButtons.find((candidate) => candidate.dataset.hostMenuRow === "original-debug");
-    button?.setAttribute("aria-checked", String(enabled));
-    if (lamp) lamp.dataset.state = !enabled ? "off" : capsLockOn ? "caps" : "on";
+    for (const [index, button] of rowButtons.entries()) {
+      const row = rowAt(index);
+      if (row.kind !== "toggle" || !row.toggle) continue;
+      const enabled = row.toggle.read();
+      button.setAttribute("aria-checked", String(enabled));
+      const lamp = button.querySelector<HTMLElement>("[data-host-menu-lamp]");
+      if (!lamp) continue;
+      // 只有「原版Debug」的指示燈多一個 Caps Lock 狀態。
+      lamp.dataset.state = !enabled ? "off" : row.id === "original-debug" && capsLockOn ? "caps" : "on";
+    }
   };
 
   const renderSelection = (focus: boolean) => {
@@ -428,7 +488,7 @@ export function mountHostMenu(screen: HTMLElement, options: HostMenuOptions): ()
         return;
       }
       case "toggle":
-        setOriginalDebugModeEnabled(!originalDebugModeEnabled());
+        if (row.toggle) row.toggle.write(!row.toggle.read());
         renderSelection(true);
         return;
     }
@@ -645,6 +705,10 @@ export function mountHostMenu(screen: HTMLElement, options: HostMenuOptions): ()
     renderToggle();
     if (open) describe();
   });
+  const unsubscribeRules = onRuleOptionsChange(() => {
+    renderToggle();
+    if (open) describe();
+  });
 
   const unregister = registerProgramPausePresenter({
     element: layer,
@@ -677,6 +741,7 @@ export function mountHostMenu(screen: HTMLElement, options: HostMenuOptions): ()
     unsubscribeScaling();
     unsubscribeZoom();
     unsubscribeDebug();
+    unsubscribeRules();
     launcher.destroy();
     trigger.remove();
     tip.remove();

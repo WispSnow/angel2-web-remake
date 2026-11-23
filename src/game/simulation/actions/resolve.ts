@@ -8,6 +8,7 @@ import {
 import { immuneToPhysicalShootingFor, killRewardFor } from "../../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../../types";
 import type { DeterministicRng } from "../rng";
+import { iceShielded, type BattleRuleOptions } from "../rule-options";
 import { cloneUnitStatuses, magicGuardCounterFor } from "../status";
 import { waterWarriorGroupIn, waterWarriorRootId } from "../water-warrior-split";
 import { planIceDisplacement } from "./ice-displacement";
@@ -39,6 +40,11 @@ export interface SpecialActionResolutionContext {
    * 照一般施法，以施法者為準。施法者自己一律不受自己的傷害技影響（`[SR]`）。
    */
   areaSide?: BattleUnit["side"];
+  /**
+   * `REMAKE-216` 懷舊規則選項；沒有給時按複刻規則（冰封單位不受攻治、破邪解冰、落點冰封、
+   * 連線方向外推）。
+   */
+  rules?: BattleRuleOptions;
 }
 
 const positionKey = ({ x, y }: Position): string => `${x},${y}`;
@@ -223,7 +229,7 @@ function preparePrayer(
         definition.outcomes.healing.minimum,
         definition.outcomes.healing.maximum,
       );
-      if (unit.actionDisabled) {
+      if (iceShielded(unit, context.rules)) {
         blocked = true;
         blockReason = "frozen";
       } else {
@@ -286,7 +292,7 @@ function prepareSingleTarget(
 
   if (isSingleTargetShootingAction(intent.actionId)) {
     const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
-    if (target.actionDisabled) {
+    if (iceShielded(target, context.rules)) {
       blocked = true;
       blockReason = "frozen";
     } else if (shootingEvaded(target)) {
@@ -298,7 +304,7 @@ function prepareSingleTarget(
     }
   } else if (isFireAction(intent.actionId)) {
     const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
-    if (target.actionDisabled) {
+    if (iceShielded(target, context.rules)) {
       blocked = true;
       blockReason = "frozen";
     } else {
@@ -321,7 +327,7 @@ function prepareSingleTarget(
     }
   } else if (isHealAction(intent.actionId)) {
     const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
-    if (target.actionDisabled) {
+    if (iceShielded(target, context.rules)) {
       blocked = true;
       blockReason = "frozen";
     } else {
@@ -448,7 +454,9 @@ function prepareSingleTarget(
     targetStatusesAfter.techniqueSeal = 0;
     return {
       affected: affectedUnit(target, {
-        actionDisabledAfter: false,
+        // REMAKE-013 adds the freeze to TR's five cleanses. Native TR never reads
+        // the separate ice array, so `REMAKE-216`'s original ice leaves it alone.
+        actionDisabledAfter: context.rules?.originalIce ? target.actionDisabled : false,
         statusesAfter: targetStatusesAfter,
       }),
       experienceGained: definition.experience.base + trial.between(
@@ -520,7 +528,7 @@ function prepareMagicArcher(
   const lineUnits = path
     .slice(1)
     .map((position) => context.units.find((unit) => unit.x === position.x && unit.y === position.y
-      && unit.side !== actor.side && !unit.actionDisabled))
+      && unit.side !== actor.side && !iceShielded(unit, context.rules)))
     .filter((unit): unit is BattleUnit => Boolean(unit));
   const pool = sharedLifePool();
   const affectedUnits = lineUnits.map((unit) => {
@@ -579,7 +587,7 @@ function prepareVirt(
   const lineUnits = path
     .slice(1)
     .map((position) => context.units.find((unit) => unit.x === position.x && unit.y === position.y
-      && unit.id !== actor.id && unit.side === target.side && !unit.actionDisabled))
+      && unit.id !== actor.id && unit.side === target.side && !iceShielded(unit, context.rules)))
     .filter((unit): unit is BattleUnit => Boolean(unit));
   const pool = sharedLifePool();
   const affectedUnits = lineUnits.map((unit) => {
@@ -633,7 +641,7 @@ function prepareWd(
   const pool = sharedLifePool();
   const affectedUnits = context.units
     .filter((unit) => unit.side === target.side
-      && !unit.actionDisabled
+      && !iceShielded(unit, context.rules)
       && pathKeys.has(positionKey(unit)))
     .sort((left, right) => path.findIndex((cell) => positionKey(cell) === positionKey(left))
       - path.findIndex((cell) => positionKey(cell) === positionKey(right)))
@@ -682,7 +690,7 @@ function prepareLightning(
       - (right.y * context.battlefield.width + right.x))
     .map((unit) => {
       const statusesAfter = cloneUnitStatuses(unit.statuses);
-      const frozen = unit.actionDisabled;
+      const frozen = iceShielded(unit, context.rules);
       const guarded = unit.statuses.magicGuard > 0;
       const blocked = frozen || guarded;
       const blockReason: ActionBlockReason | undefined = frozen
@@ -735,6 +743,8 @@ function prepareIce(
     center,
     context.units,
     context.battlefield,
+    undefined,
+    context.rules,
   );
   const affectedUnits = targets.map(({ unit, positionAfter, freezes, blocked, blockReason }) => {
     const statusesAfter = cloneUnitStatuses(unit.statuses);
@@ -786,7 +796,7 @@ function prepareRecovery(
     .sort((left, right) => left.y * context.battlefield.width + left.x
       - (right.y * context.battlefield.width + right.x))
     .map((unit) => {
-      const frozen = unit.actionDisabled;
+      const frozen = iceShielded(unit, context.rules);
       const rangeValue = effect.valueAt(unit);
       const healingForRangeValue = Object.entries(definition.healing.byRangeValue)
         .find(([value]) => Number(value) === rangeValue)?.[1];
@@ -842,7 +852,7 @@ function prepareStomp(
     .sort((left, right) => left.y * context.battlefield.width + left.x
       - (right.y * context.battlefield.width + right.x))
     .map((unit) => {
-      const frozen = unit.actionDisabled;
+      const frozen = iceShielded(unit, context.rules);
       // The roll happens per cell whatever the pool has left, so an already
       // drained group still costs the same PRNG draws.
       const rolledDamage = frozen
@@ -916,7 +926,7 @@ export function prepareSpecialAction(
     ));
   } else if (intent.actionId === "wd") {
     if (!target) throw new Error("WD action requires a target unit");
-    if (target.actionDisabled) throw new Error("WD cannot target a frozen unit");
+    if (iceShielded(target, context.rules)) throw new Error("WD cannot target a frozen unit");
     ({ affectedUnits, experienceGained, effectCells } = prepareWd(
       actor,
       target,

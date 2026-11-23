@@ -98,6 +98,11 @@ import {
   type ForceDefinition,
 } from "./forces";
 import { planTerrainHoldForceAiAction } from "./force-ai";
+import {
+  DEFAULT_BATTLE_RULE_OPTIONS,
+  iceShielded,
+  type BattleRuleOptions,
+} from "./rule-options";
 import { planNativeStageRoute } from "./stage-route";
 import type {
   AiActionSelection,
@@ -599,6 +604,11 @@ export class Stage0Battle {
   debugDataEdits?: BattleDataEdits;
   private aiPlanningCache?: AiPlanningCache;
   private activeAiPlanningCache?: AiPlanningCache;
+  /**
+   * `REMAKE-216` 懷舊規則選項。玩家在宿主選單切換、由控制器同步過來；它是當下的規則
+   * 身份而不是戰況，所以不序列化，讀檔或重建戰鬥後由控制器重新給。
+   */
+  private battleRules: BattleRuleOptions = DEFAULT_BATTLE_RULE_OPTIONS;
 
   constructor(
     public readonly difficulty: Difficulty = 0,
@@ -644,6 +654,23 @@ export class Stage0Battle {
     );
   }
 
+  get rules(): BattleRuleOptions {
+    return this.battleRules;
+  }
+
+  /** 換規則只影響下一次判定與結算；冰封位本身兩種規則共用，不必改寫任何單位。 */
+  setRules(rules: BattleRuleOptions): void {
+    this.battleRules = Object.freeze({ ...rules });
+  }
+
+  /**
+   * `REMAKE-013` 的冰封護盾只擋「這個動作會不會碰到冰封單位」：狀態類技術與破邪本來就能
+   * 選冰封單位；原版冰雪（`REMAKE-216`）下冰封單位對所有動作都是合法目標。
+   */
+  private canTargetWhileFrozen(actionId: BattleActionId, target: BattleUnit): boolean {
+    return canTargetFrozenUnit(actionId) || !iceShielded(target, this.battleRules);
+  }
+
   /**
    * Cache identity deliberately derives from the public mutable simulation
    * state instead of relying on callers to announce mutations. Tests, stage
@@ -672,7 +699,8 @@ export class Stage0Battle {
       unit.debugAiBehavior === undefined ? "-" : "d",
       ...UNIT_STATUS_KEYS.map((key) => unit.statuses[key]),
     ].join(",")).join("|");
-    return `${this.round}/${this.rng.state}/${this.rng.calls}/${this.debugDataEdits?.revision ?? 0}/${terrain}/${units}`;
+    return `${this.round}/${this.rng.state}/${this.rng.calls}/${this.debugDataEdits?.revision ?? 0}/`
+      + `${this.battleRules.originalIce ? "ice:original" : "ice:remake"}/${terrain}/${units}`;
   }
 
   private createAiPlanningCache(signature: string): AiPlanningCache {
@@ -1424,7 +1452,7 @@ export class Stage0Battle {
       || attacker.side === defender.side
       || attacker.acted
       || attacker.actionDisabled
-      || defender.actionDisabled
+      || iceShielded(defender, this.battleRules)
       || manhattan(attacker, defender) !== 1) {
       throw new Error("illegal ordinary attack");
     }
@@ -1613,7 +1641,7 @@ export class Stage0Battle {
         && (definition.target === "ally"
           ? target.side === actor.side
           : target.side !== actor.side)
-        && (canTargetFrozenUnit(actionId) || !target.actionDisabled))
+        && this.canTargetWhileFrozen(actionId, target))
       .map(({ x, y }) => ({ x, y }));
   }
 
@@ -1629,7 +1657,7 @@ export class Stage0Battle {
       && (definition.target === "ally"
         ? target.side === actor.side
         : target.side !== actor.side)
-      && (canTargetFrozenUnit(actionId) || !target.actionDisabled));
+      && this.canTargetWhileFrozen(actionId, target));
   }
 
   magicArcherLineOptions(actorId: string, targetId: string): MagicArcherLineOption[] {
@@ -1638,7 +1666,7 @@ export class Stage0Battle {
     if (!actor || !target
       || actor.classId !== "magic-archer"
       || actor.side === target.side
-      || target.actionDisabled
+      || iceShielded(target, this.battleRules)
       || this.actionRange(actor.id, "magic-archer-shot").valueAt(target) === 0) return [];
     const context = this.expertAiEvaluationContext();
     const movementPath = [{ x: actor.x, y: actor.y }];
@@ -1659,7 +1687,7 @@ export class Stage0Battle {
       );
       const affectedUnitIds = path.slice(1).flatMap((position) => {
         const unit = this.unitAt(position);
-        return unit && unit.side !== actor.side && !unit.actionDisabled ? [unit.id] : [];
+        return unit && unit.side !== actor.side && !iceShielded(unit, this.battleRules) ? [unit.id] : [];
       });
       return {
         path,
@@ -1746,6 +1774,7 @@ export class Stage0Battle {
           width: this.stage.viewport.width,
           height: this.stage.viewport.height,
         },
+        rules: this.battleRules,
       },
       center,
     );
@@ -2490,6 +2519,7 @@ export class Stage0Battle {
       movementPath: (unitId, destination) => this.movementPath(unitId, destination),
       alliedBehaviorFor: (unitId) => this.alliedBehaviorFor(unitId),
       enemyBehaviorFor: (unitId) => this.enemyBehaviorFor(unitId),
+      rules: this.battleRules,
       planClassAction: (candidate, requestedActionIds, options) =>
         this.planClassAction(candidate, requestedActionIds, {
           ...options,
@@ -2649,6 +2679,7 @@ export class Stage0Battle {
       unit: (id) => this.unit(id),
       effectiveStatsFor: (unit) => this.effectiveStatsFor(unit),
       movementPath: (id, destination) => this.movementPath(id, destination),
+      rules: this.battleRules,
       planSisterAction: (unit, actionId) => this.planClassAction(
         unit,
         [actionId],
@@ -2938,13 +2969,13 @@ export class Stage0Battle {
     // anchors to the friendly front is never itself the front a leader waits on.
     const pureSupport = !this.canOpenHostilities(unit);
     const opponents = this.units.filter((candidate) => candidate.side !== unit.side
-      && !candidate.actionDisabled
+      && !iceShielded(candidate, this.battleRules)
       && (options.targetFilter?.(candidate) ?? true));
     let strategicTargets: BattleUnit[];
     if (pureSupport) {
       const allies = this.units.filter((candidate) => candidate.side === unit.side
         && candidate.id !== unit.id
-        && !candidate.actionDisabled);
+        && !iceShielded(candidate, this.battleRules));
       if (allies.length === 0 || opponents.length === 0) {
         return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
       }
@@ -3349,6 +3380,7 @@ export class Stage0Battle {
       terrainSlotAt: (position) => this.terrainSlotAt(position),
       statsFor: (unit) => this.statsFor(unit),
       effectiveStatsFor: (unit) => this.effectiveStatsFor(unit),
+      rules: this.battleRules,
       ...(this.activeAiPlanningCache ? {
         cache: this.activeAiPlanningCache.expert,
       } : {}),
@@ -3545,7 +3577,7 @@ export class Stage0Battle {
     const targetFilter = this.forces.targetFilterFor(unit.id, units);
     const targets = units
       .filter((candidate) => candidate.side !== unit.side
-        && !candidate.actionDisabled
+        && !iceShielded(candidate, this.battleRules)
         && (targetFilter?.(candidate) ?? true))
       .flatMap((candidate) => neighbors(candidate, this.dynamicBattlefield));
     return movementCostsToNearestTarget(
@@ -3648,7 +3680,7 @@ export class Stage0Battle {
     const occupied = new Set(this.units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
     const enemies = this.units
       .filter((candidate) => candidate.side === opponentSide
-        && !candidate.actionDisabled
+        && !iceShielded(candidate, this.battleRules)
         && (options.targetFilter?.(candidate) ?? true))
       .sort((left, right) => left.y * this.stage.width + left.x - (right.y * this.stage.width + right.x));
     const nativeCandidateOffsets = [
@@ -4090,7 +4122,7 @@ export class Stage0Battle {
             : target.side !== unit.side;
           if (!correctSide
             || range.valueAt(target) === 0
-            || (!canTargetFrozenUnit(actionId) && target.actionDisabled)
+            || !this.canTargetWhileFrozen(actionId, target)
             || !(options.targetFilter?.(target) ?? true)) continue;
           // REMAKE-099: a physical shot at a swift dragon knight is a
           // guaranteed zero, so no ranking mode may spend a turn on it. The
@@ -4426,7 +4458,7 @@ export class Stage0Battle {
       .filter((target) => range.valueAt(target) > 0
         && (isVirtActionId(actionId) || target.side === targetSide)
         && (definition.target === "ally" || target.id !== caster.id)
-        && (canTargetFrozenUnit(actionId) || !target.actionDisabled))
+        && this.canTargetWhileFrozen(actionId, target))
       .map(({ x, y }) => ({ x, y }));
   }
 
@@ -4447,7 +4479,7 @@ export class Stage0Battle {
         path,
         affectedUnitIds: path.slice(1).flatMap((position) => {
           const unit = this.unitAt(position);
-          return unit && unit.side === target.side && !unit.actionDisabled ? [unit.id] : [];
+          return unit && unit.side === target.side && !iceShielded(unit, this.battleRules) ? [unit.id] : [];
         }),
         guaranteedKills: 0,
         expectedDamage: 0,
@@ -4495,6 +4527,7 @@ export class Stage0Battle {
         units: this.units,
         battlefield: this.dynamicBattlefield,
         statsFor: (unit) => this.statsFor(unit),
+        rules: this.battleRules,
         // 以目標為中心的範圍技作用於所選目標那一方（DS:`1EF6`）；冰雪以施法者為中心，照一般規則。
         // VIRT 的目標可以是任一方，作用方就是目標那一方（DS:`1EF4`）。
         ...(selfCentered ? {} : {

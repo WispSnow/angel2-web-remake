@@ -15,6 +15,7 @@ import {
   type GridBattlefield,
 } from "./grid";
 import type { BattleUnit, Position, UnitStats } from "../types";
+import { iceShielded, type BattleRuleOptions } from "./rule-options";
 
 export interface ForceAiPlanningContext {
   width: number;
@@ -26,6 +27,8 @@ export interface ForceAiPlanningContext {
   movementPath: (unitId: string, destination: Position) => Position[];
   alliedBehaviorFor: (unitId: string) => number;
   enemyBehaviorFor: (unitId: string) => number;
+  /** `REMAKE-216`：原版冰雪下貼身的冰封敵人仍是可以出手的目標。 */
+  rules?: BattleRuleOptions;
   planClassAction: (
     unit: BattleUnit,
     requestedActionIds?: readonly BattleActionId[],
@@ -229,7 +232,7 @@ export function planTerrainHoldForceAiAction(
    */
   const hasImmediateAction = classAction !== undefined
     || context.units.some((candidate) => candidate.side !== unit.side
-      && !candidate.actionDisabled
+      && !iceShielded(candidate, context.rules)
       && (targetFilter?.(candidate) ?? true)
       && manhattan(unit, candidate) === 1);
   if (!hasImmediateAction

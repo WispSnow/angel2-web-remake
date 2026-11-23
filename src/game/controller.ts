@@ -66,6 +66,9 @@ import {
   originalDebugModeEnabled,
   type OriginalDebugHotkey,
 } from "./original-debug-mode";
+import { battleRuleOptionsFrom, ruleOptions } from "./rule-options";
+import { stageEntryWithAttemptGrowth } from "./simulation/retry-growth";
+import { DEFAULT_BATTLE_RULE_OPTIONS, iceShielded } from "./simulation/rule-options";
 import {
   cameraContains,
   cameraFocusForOrigin,
@@ -615,7 +618,7 @@ function isPhysicalShotDodgedBy(actionId: BattleActionId, target: BattleUnit): b
 }
 
 export class GameController {
-  battle: Stage0Battle;
+  private currentBattle!: Stage0Battle;
   difficulty: Difficulty;
   phase: GamePhase = "prebattleStory";
   campaignRoute?: CampaignRouteId;
@@ -1034,8 +1037,11 @@ export class GameController {
     );
     const freezeCells: Position[] = [];
     const displacementRingCells: Position[] = [];
+    // REMAKE-216: under original ice the outer ring freezes too, so there is no
+    // shove-only band to draw — the whole footprint is the freeze band.
+    const originalIce = this.battle.rules.originalIce;
     for (const cell of effect.cells()) {
-      if (effect.valueAt(cell) > 1) freezeCells.push(cell);
+      if (originalIce || effect.valueAt(cell) > 1) freezeCells.push(cell);
       else displacementRingCells.push(cell);
     }
     return { actionId, center, freezeCells, displacementRingCells };
@@ -1354,6 +1360,46 @@ export class GameController {
 
   get isCampaignPersistenceEnabled(): boolean {
     return this.campaignPersistenceEnabled;
+  }
+
+  get battle(): Stage0Battle {
+    return this.currentBattle;
+  }
+
+  /** 每換一個戰鬥物件（進關、重打、讀檔、部署）都重新交給它目前的懷舊規則選項。 */
+  set battle(battle: Stage0Battle) {
+    this.currentBattle = battle;
+    this.applyRuleOptions();
+  }
+
+  /**
+   * `REMAKE-216`：把宿主選單目前的規則選項交給戰鬥模擬。只有正式戰役（含調試中心的夾具）
+   * 跟著選單走；競技場與各實驗室是內存測試場，選單上也沒有這兩個開關，一律用複刻規則。
+   */
+  private applyRuleOptions(): void {
+    this.currentBattle.setRules(this.campaignPersistenceEnabled
+      ? battleRuleOptionsFrom(ruleOptions())
+      : DEFAULT_BATTLE_RULE_OPTIONS);
+  }
+
+  /** 玩家在宿主選單切換開關後由介面層呼叫：下一次判定與結算立即改用新規則。 */
+  syncRuleOptions(): void {
+    this.applyRuleOptions();
+    // 冰雪預覽開著時切換，說明句要跟著預覽的分帶一起換。
+    const preview = this.iceCastPreview;
+    const unit = this.selectedUnit;
+    if (preview && unit) {
+      this.statusMessage = this.iceConfirmStatusMessage(BATTLE_ACTION_DEFINITIONS[preview.actionId].label, unit);
+    }
+    this.emit();
+  }
+
+  /** `REMAKE-101` 冰雪確認態的說明句；`REMAKE-216` 原版冰雪沒有只推不冰的外圈。 */
+  private iceConfirmStatusMessage(label: string, unit: BattleUnit): string {
+    return this.battle.rules.originalIce
+      ? `「${label}」以${unit.className}為中心：範圍內的敵軍都會被冰封。確定施展或按右鍵取消。`
+      : `「${label}」以${unit.className}為中心：藍格內的敵軍會被冰封，`
+        + "黃色外圈只會被推出範圍。確定施展或按右鍵取消。";
   }
 
   /**
@@ -2152,6 +2198,7 @@ export class GameController {
       definition.target,
       definition.targetSide,
       actor.id,
+      this.battle.rules,
     );
     if (this.skippingScriptedSequence) {
       this.specialActionPresentation = undefined;
@@ -2279,7 +2326,9 @@ export class GameController {
       this.actionMode = "actionMenu";
       this.statusMessage = `選擇${unit.className}的行動。`;
     } else if (unit.actionDisabled) {
-      this.statusMessage = "此單位正被冰封，本次我方階段不能行動，也不能被攻擊或治療。";
+      this.statusMessage = this.battle.rules.originalIce
+        ? "此單位正被冰封，本次我方階段不能行動。"
+        : "此單位正被冰封，本次我方階段不能行動，也不能被攻擊或治療。";
     } else {
       this.statusMessage = "此單位本回合已行動。";
     }
@@ -2369,7 +2418,7 @@ export class GameController {
   private attackTargetCells(unit: BattleUnit): Position[] {
     return this.battle.units
       .filter((candidate) => candidate.side !== unit.side
-        && !candidate.actionDisabled
+        && !iceShielded(candidate, this.battle.rules)
         && manhattan(unit, candidate) === 1)
       .map(({ x, y }) => ({ x, y }));
   }
@@ -2453,9 +2502,7 @@ export class GameController {
         return;
       }
       this.actionMode = "selfAreaConfirm";
-      this.statusMessage
-        = `「${definition.label}」以${unit.className}為中心：藍格內的敵軍會被冰封，`
-        + "黃色外圈只會被推出範圍。確定施展或按右鍵取消。";
+      this.statusMessage = this.iceConfirmStatusMessage(definition.label, unit);
       this.emit();
       return;
     }
@@ -2880,7 +2927,8 @@ export class GameController {
         || actionId === "ice-2"
         || actionId === "ice-3"
         || actionId === "ice-4"
-        ? `冰雪擊退 ${moved} 名敵人，冰封 ${frozen} 名；其下一次本陣營行動被跳過，期間不能成為攻擊或治療目標。`
+        ? `冰雪擊退 ${moved} 名敵人，冰封 ${frozen} 名；其下一次本陣營行動被跳過`
+          + (this.battle.rules.originalIce ? "。" : "，期間不能成為攻擊或治療目標。")
         : actionId === "dispel" && targetPresentation
           ? `${targetPresentation.name}的${cleansedFrozen ? "冰封及異常狀態" : "異常狀態"}已由破邪解除。`
         : actionId === "attack-up" && targetPresentation
@@ -6550,7 +6598,19 @@ export class GameController {
     this.restartBattle(this.stageRuntime.retry.statusText);
   }
 
-  private restartBattle(message: string): void {
+  private restartBattle(retryMessage: string): void {
+    // REMAKE-215：「敗退保留經驗」打開時，先把這次嘗試的經驗、升級與轉職併回入關快照，
+    // 下面兩條重建路徑就都從帶著成長的新快照出發。競技場與實驗室沒有戰役名冊可保留。
+    const keepGrowth = this.campaignPersistenceEnabled && ruleOptions().keepFailedAttemptGrowth;
+    if (keepGrowth) {
+      this.stageEntrySnapshot = stageEntryWithAttemptGrowth(
+        this.stageEntrySnapshot,
+        this.battle.campaignSnapshot(),
+      );
+    }
+    const message = keepGrowth
+      ? `${retryMessage}（敗退保留經驗：已保留這次得到的經驗。）`
+      : retryMessage;
     if (this.stageRuntime.retry.mode !== "skip-entry-story") {
       this.movementPresentation = undefined;
       this.systemMenuOpen = false;

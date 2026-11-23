@@ -1,6 +1,7 @@
 import { BATTLE_ACTION_DEFINITIONS, type IceActionId } from "../../content/actions";
 import { movementRulesFor } from "../../content/classes";
 import type { BattleUnit, Position } from "../../types";
+import type { BattleRuleOptions } from "../rule-options";
 import {
   techniqueEffectRange,
   type ActionBattlefield,
@@ -11,7 +12,8 @@ import type { ActionBlockReason } from "./types";
 /**
  * `REMAKE-095` replaced the native "down, up, left, right" scan with a radial
  * one; `REMAKE-096` then took the direction set back to these four. The list
- * order survives as the tie-break below, so it stays in native order.
+ * order survives as the tie-break below, so it stays in native order — and
+ * `REMAKE-216`'s original-ice option scans it as is.
  */
 const DISPLACEMENT_OFFSETS = [
   { x: 0, y: 1 },
@@ -45,7 +47,9 @@ export interface IcePlannedTarget {
    * `REMAKE-094`: the ice bit follows the settled landing cell, not the cell the
    * target occupied when the range map was built. A target pushed onto a value-0
    * cell leaves the effect and keeps acting; one that cannot be pushed stays on a
-   * positive-value cell and freezes as before.
+   * positive-value cell and freezes as before. Under `REMAKE-216`'s original-ice
+   * option every unblocked target freezes wherever it lands, as the native loop
+   * writes the bit before any push.
    */
   readonly freezes: boolean;
   readonly blocked: boolean;
@@ -78,6 +82,11 @@ export function iceAiFreezeReach(actionId: IceActionId): number {
  * Shared by the authoritative resolver and the expert AI scorer so a wizard can
  * never value a cast that its own resolution would turn into a pure shove.
  * Pure: it reads public simulation state only and never touches the gameplay RNG.
+ *
+ * `REMAKE-216`: with `rules.originalIce` the plan is the native one — the fixed
+ * down/up/left/right scan and a freeze on every unblocked target, pushed out of
+ * the effect or not. Range geometry, processing order, the strictly-lower and
+ * value-0 destination rule and the three immunity chains are shared.
  */
 export function planIceDisplacement(
   actionId: IceActionId,
@@ -88,7 +97,9 @@ export function planIceDisplacement(
   /** Callers that already hold the range map for this centre may pass it in;
    *  building one walks the whole board and the AI scores many candidates. */
   cachedEffect?: NumericRangeMap,
+  rules?: BattleRuleOptions,
 ): IceDisplacementPlan {
+  const originalIce = rules?.originalIce === true;
   const definition = BATTLE_ACTION_DEFINITIONS[actionId];
   const effect = cachedEffect ?? techniqueEffectRange(
     center,
@@ -132,7 +143,10 @@ export function planIceDisplacement(
       // REMAKE-096: every orthogonal push gains exactly one range value, so the
       // candidates are all equidistant and the angle order is the whole ordering
       // — the closest direction first, then the rest as its fallback.
-      const destination = radialOffsetOrder(unit.x - center.x, unit.y - center.y)
+      const offsets = originalIce
+        ? DISPLACEMENT_OFFSETS
+        : radialOffsetOrder(unit.x - center.x, unit.y - center.y);
+      const destination = offsets
         .map((offset) => ({ x: unit.x + offset.x, y: unit.y + offset.y }))
         .find((position) => effect.contains(position)
           && effect.valueAt(position) < currentValue
@@ -149,7 +163,7 @@ export function planIceDisplacement(
         unit,
         positionAfter,
         moved: Boolean(destination),
-        freezes: effect.valueAt(positionAfter) > 0,
+        freezes: originalIce || effect.valueAt(positionAfter) > 0,
         blocked,
         blockReason,
       };

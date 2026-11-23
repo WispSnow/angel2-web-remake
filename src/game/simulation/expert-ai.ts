@@ -16,6 +16,7 @@ import type { BattleUnit, Position, UnitStats } from "../types";
 import type { AlliedAiAction } from "./ai-contracts";
 import type { BattleActionId } from "./actions/types";
 import { planIceDisplacement } from "./actions/ice-displacement";
+import { iceShielded, type BattleRuleOptions } from "./rule-options";
 import {
   techniqueEffectRange,
   techniqueSelectionPath,
@@ -31,6 +32,8 @@ export interface ExpertAiEvaluationContext {
   statsFor: (unit: Pick<BattleUnit, "classId" | "experience" | "side">) => UnitStats;
   effectiveStatsFor: (unit: BattleUnit) => UnitStats;
   cache?: ExpertAiEvaluationCache;
+  /** `REMAKE-216`：估值與結算讀同一份規則選項，原版冰雪下冰封單位照常是攻治目標。 */
+  rules?: BattleRuleOptions;
 }
 
 /** All entries belong to one immutable battle-state signature. */
@@ -400,7 +403,7 @@ export function expertSpecialUtility(
   if (actionId === "fire-1" || actionId === "fire-2"
     || actionId === "fire-3" || actionId === "fire-4") {
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
-    const damage = target.actionDisabled || target.statuses.magicGuard > 0
+    const damage = iceShielded(target, context.rules) || target.statuses.magicGuard > 0
       ? 0
       : Math.min(
         target.life,
@@ -409,7 +412,7 @@ export function expertSpecialUtility(
       );
     utility.guaranteedKills = damage >= target.life && damage > 0 ? 1 : 0;
     utility.effectiveDamage = damage;
-    utility.support = target.statuses.magicGuard > 0 && !target.actionDisabled ? 20 : 0;
+    utility.support = target.statuses.magicGuard > 0 && !iceShielded(target, context.rules) ? 20 : 0;
     countEffectiveWizardHit(utility, target, damage > 0 || utility.support > 0);
     utility.targetThreat = targetThreat(context, target);
     if (damage === 0 && utility.support === 0) utility.waste = 1;
@@ -430,7 +433,7 @@ export function expertSpecialUtility(
     const lineCells = new Set(line.map((cell) => `${cell.x},${cell.y}`));
     for (const affected of context.units) {
       if (affected.side !== target.side
-        || affected.actionDisabled
+        || iceShielded(affected, context.rules)
         || affected.statuses.magicGuard > 0
         || !lineCells.has(`${affected.x},${affected.y}`)) continue;
       const damage = Math.min(
@@ -483,7 +486,8 @@ export function expertSpecialUtility(
       const expectedHalfDamage = Math.floor(expectedRoll / 2);
       const minimumHalfDamage = Math.floor(definition.damage.minimum / 2);
       for (const affected of context.units) {
-        if (affected.side === actor.side || affected.id === target.id || affected.actionDisabled) continue;
+        if (affected.side === actor.side || affected.id === target.id
+          || iceShielded(affected, context.rules)) continue;
         if (!lineCells.has(`${affected.x},${affected.y}`)) continue;
         if (affected.statuses.magicGuard > 0) {
           utility.support += 20;
@@ -510,18 +514,19 @@ export function expertSpecialUtility(
     for (const affected of context.units.filter((candidate) =>
       candidate.side !== actor.side && effect.valueAt(candidate) > 0)) {
       const rangeValue = effect.valueAt(affected);
-      const damage = affected.actionDisabled || affected.statuses.magicGuard > 0
+      const shielded = iceShielded(affected, context.rules);
+      const damage = shielded || affected.statuses.magicGuard > 0
         ? 0
         : Math.min(affected.life, damageByRangeValue[rangeValue] ?? 0);
       utility.effectiveDamage += damage;
       countEffectiveWizardHit(
         utility,
         affected,
-        damage > 0 || (affected.statuses.magicGuard > 0 && !affected.actionDisabled),
+        damage > 0 || (affected.statuses.magicGuard > 0 && !shielded),
       );
       if (damage >= affected.life && damage > 0) utility.guaranteedKills += 1;
       utility.targetThreat += targetThreat(context, affected);
-      if (affected.statuses.magicGuard > 0 && !affected.actionDisabled) utility.support += 20;
+      if (affected.statuses.magicGuard > 0 && !shielded) utility.support += 20;
     }
     if (utility.effectiveDamage === 0 && utility.support === 0) utility.waste = 1;
     return utility;
@@ -547,6 +552,7 @@ export function expertSpecialUtility(
       units,
       { width: context.width, height: context.height, terrainSlotAt: context.terrainSlotAt },
       cachedTechniqueEffectRange(context, position, definition.range.effectRadius),
+      context.rules,
     );
     for (const { unit: affected, blockReason, freezes } of targets) {
       if (blockReason === "frozen" || blockReason === "classImmune") continue;
@@ -569,7 +575,7 @@ export function expertSpecialUtility(
   if (actionId === "heal-1" || actionId === "heal-2" || actionId === "heal-3") {
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
     const maximumLife = context.statsFor(target).maxLife;
-    const healing = target.actionDisabled
+    const healing = iceShielded(target, context.rules)
       ? 0
       : Math.min(
         maximumLife - target.life,
@@ -587,7 +593,8 @@ export function expertSpecialUtility(
     const effect = cachedTechniqueEffectRange(context, target, definition.range.effectRadius);
     const healingByRangeValue: Readonly<Record<number, number>> = definition.healing.byRangeValue;
     for (const affected of context.units.filter((candidate) =>
-      candidate.side === actor.side && effect.valueAt(candidate) > 0 && !candidate.actionDisabled)) {
+      candidate.side === actor.side && effect.valueAt(candidate) > 0
+      && !iceShielded(candidate, context.rules))) {
       const maximumLife = context.statsFor(affected).maxLife;
       const rangeValue = effect.valueAt(affected);
       const healing = Math.min(maximumLife - affected.life, healingByRangeValue[rangeValue] ?? 0);
@@ -606,7 +613,7 @@ export function expertSpecialUtility(
     const conservativeEffect = cachedTechniqueEffectRange(context, target, 4);
     for (const affected of context.units.filter((candidate) =>
       candidate.side !== actor.side
-      && !candidate.actionDisabled
+      && !iceShielded(candidate, context.rules)
       && conservativeEffect.valueAt(candidate) > 0)) {
       utility.effectiveDamage += Math.min(affected.life, expectedDamage);
       countEffectiveWizardHit(utility, affected, expectedDamage > 0);
@@ -623,8 +630,12 @@ export function expertSpecialUtility(
       + target.statuses.defenseDown
       + target.statuses.poison
       + target.statuses.techniqueSeal;
-    utility.support = harmfulStatuses * 60 + (target.actionDisabled ? 500 : 0);
-    utility.criticalSaves = target.actionDisabled ? 1 : 0;
+    // Only the remake's TR thaws a frozen ally (REMAKE-013); native TR never
+    // reads the ice array, so under REMAKE-216's original ice a freeze is no
+    // reason to cast it.
+    const thaws = target.actionDisabled && !context.rules?.originalIce;
+    utility.support = harmfulStatuses * 60 + (thaws ? 500 : 0);
+    utility.criticalSaves = thaws ? 1 : 0;
     utility.targetThreat = targetThreat(context, target);
     if (utility.support === 0) utility.waste = 1;
     return utility;

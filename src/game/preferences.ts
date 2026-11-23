@@ -339,3 +339,49 @@ export function saveDebugPreferences(
 ): void {
   storage.setItem(DEBUG_PREFERENCES_KEY, JSON.stringify(preferences));
 }
+
+/**
+ * `REMAKE-215`／`REMAKE-216` 懷舊規則選項：宿主選單裡的兩個開關，按瀏覽器保存，預設都關。
+ *
+ * 它們和上面的表現偏好不同，**會改變結算**：控制器在重建本關與每次結算時讀目前的值。
+ * 用戶 2026-11-23 決定做成可隨時切換的設備級選項，不進存檔——讀檔一律沿用選單上的值，
+ * 所以同一份存檔在兩種設定下各自確定，但不保證跨設定重現。
+ */
+export interface RulePreferences {
+  /** `REMAKE-215`：戰敗或全面撤退後重打本關時，保留這次嘗試的經驗、升級與轉職（原版行為）。 */
+  keepFailedAttemptGrowth: boolean;
+  /** `REMAKE-216`：冰雪系技術改用原版機制。 */
+  originalIce: boolean;
+}
+
+export const RULE_PREFERENCES_KEY = "angel2.preferences.rules.v1";
+
+export const DEFAULT_RULE_PREFERENCES: Readonly<RulePreferences> = {
+  keepFailedAttemptGrowth: false,
+  originalIce: false,
+};
+
+export function loadRulePreferences(storage: PreferenceStorage): RulePreferences {
+  const raw = storage.getItem(RULE_PREFERENCES_KEY);
+  if (!raw) return { ...DEFAULT_RULE_PREFERENCES };
+  try {
+    const candidate = JSON.parse(raw) as Partial<RulePreferences> | null;
+    return {
+      keepFailedAttemptGrowth: typeof candidate?.keepFailedAttemptGrowth === "boolean"
+        ? candidate.keepFailedAttemptGrowth
+        : DEFAULT_RULE_PREFERENCES.keepFailedAttemptGrowth,
+      originalIce: typeof candidate?.originalIce === "boolean"
+        ? candidate.originalIce
+        : DEFAULT_RULE_PREFERENCES.originalIce,
+    };
+  } catch {
+    return { ...DEFAULT_RULE_PREFERENCES };
+  }
+}
+
+export function saveRulePreferences(
+  storage: PreferenceStorage,
+  preferences: RulePreferences,
+): void {
+  storage.setItem(RULE_PREFERENCES_KEY, JSON.stringify(preferences));
+}
