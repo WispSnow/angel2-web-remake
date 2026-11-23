@@ -130,6 +130,19 @@ export async function prepareStartupMusic(
       source.start();
       return { source, level };
     };
+    /**
+     * Pause toggles do not wait for the browser. Chrome rejects every resume()
+     * or suspend() still pending when the context closes ("AudioContext is
+     * closed."), so opening and closing the pause menu just before the opening
+     * ended used to leave an uncaught rejection. After dispose nothing is left
+     * to play, so that rejection is expected.
+     */
+    const changePlayback = (change: Promise<void>) => {
+      void change.catch((error: unknown) => {
+        if (disposed) return;
+        console.warn("startup music could not change its playback state", error);
+      });
+    };
     /** A player who never picks 交響 must not keep these bytes after the opening. */
     const discardUndecodedRemixes = () => {
       discardEncodedMusic(remixUrls.intro);
@@ -242,8 +255,8 @@ export async function prepareStartupMusic(
       setPaused: (nextPaused) => {
         paused = nextPaused;
         if (disposed) return;
-        if (paused) void context.suspend();
-        else if (unlocked) void context.resume();
+        if (paused) changePlayback(context.suspend());
+        else if (unlocked) changePlayback(context.resume());
       },
       dispose: () => {
         if (disposed) return;
@@ -256,7 +269,7 @@ export async function prepareStartupMusic(
         // Closing the context would cut a fade that is still running.
         const close = () => {
           output.disconnect();
-          void context.close();
+          void context.close().catch(() => undefined);
         };
         const remainingSeconds = fadesEndAt - context.currentTime;
         if (remainingSeconds > 0) setTimeout(close, remainingSeconds * 1000);
@@ -264,7 +277,7 @@ export async function prepareStartupMusic(
       },
     };
   } catch (error) {
-    void context.close();
+    void context.close().catch(() => undefined);
     throw error;
   }
 }

@@ -39,9 +39,26 @@ class FakeContext {
   createGain() { const gain = new FakeGain(); this.gains.push(gain); return gain; }
   createBufferSource() { const source = new FakeSource(); this.sources.push(source); return source; }
   decodeAudioData = async (bytes: ArrayBuffer) => ({ url: new TextDecoder().decode(bytes) });
-  resume = async () => { this.state = "running"; };
-  suspend = async () => { this.state = "suspended"; };
-  close = async () => { this.closed += 1; };
+  /** Like a browser that has not answered yet: resume()/suspend() stay pending. */
+  stall = false;
+  private readonly stalled: ((reason: unknown) => void)[] = [];
+  resume = () => this.change("running");
+  suspend = () => this.change("suspended");
+  /** Chrome rejects every resume()/suspend() still pending when the context closes. */
+  close = async () => {
+    this.closed += 1;
+    this.state = "closed";
+    for (const reject of this.stalled.splice(0)) {
+      reject(new DOMException("AudioContext is closed.", "InvalidStateError"));
+    }
+  };
+  private change(state: AudioContextState): Promise<void> {
+    if (!this.stall) {
+      this.state = state;
+      return Promise.resolve();
+    }
+    return new Promise((_resolve, reject) => { this.stalled.push(reject); });
+  }
 }
 
 const encode = (url: string): ArrayBuffer => new TextEncoder().encode(url).buffer as ArrayBuffer;
@@ -216,5 +233,30 @@ describe("REMAKE-186 startup music style", () => {
     music.playTitle(() => undefined);
     music.dispose();
     expect(FakeContext.last.closed).toBe(1);
+  });
+
+  test("a pause toggle still pending when the opening ends is not an uncaught error", async () => {
+    const uncaught: unknown[] = [];
+    const record = (reason: unknown) => { uncaught.push(reason); };
+    process.on("unhandledRejection", record);
+    try {
+      const music = await prepare();
+      await music.unlock();
+      music.playTitle(() => undefined);
+      FakeContext.last.stall = true;
+      // Open and close the host menu on the title screen, then start a new
+      // game before the browser has answered either request.
+      music.setPaused(true);
+      music.setPaused(false);
+      music.dispose();
+      expect(FakeContext.last.closed).toBe(1);
+      // Node reports unhandled rejections once the microtask queue drains.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    } finally {
+      process.off("unhandledRejection", record);
+    }
+    expect(uncaught).toEqual([]);
+    // Nothing is left to play after dispose, so the rejection is not worth a warning either.
+    expect(vi.mocked(console.warn)).not.toHaveBeenCalled();
   });
 });
