@@ -33,23 +33,30 @@ const useHd = (page: Page) => page.addInitScript(([key, value]) => localStorage.
 
 declare global {
   interface Window {
-    __storyHdSkyDraws?: { fractionalStrip: number; band: number };
-    __titleHdDraws?: { base: number; band: number; bandSource: string; bandX: number[]; multiply: number; lighter: number };
+    __storyHdSkyDraws?: { fractionalStrip: number; band: number; blendedCopy: number; blendedVideo: number };
+    __titleHdDraws?: {
+      base: number; band: number; bandSource: string; bandX: number[]; multiply: number; lighter: number; blendedVideo: number;
+    };
     __introHdDraws?: { base: number; videos: number[]; originals: number; rect: number[] };
   }
 }
 
-/** Counts how the sky reaches the story canvas: the strip image itself at a fractional x, or a band canvas. */
+/**
+ * Counts how the sky reaches the story canvas (the strip image itself at a fractional x, or a band canvas) and how
+ * the stacked loop is blended over it: from a copy of the video frame, never from the `<video>` itself.
+ */
 const recordSkyDraws = (page: Page) => page.addInitScript(() => {
-  const counts = { fractionalStrip: 0, band: 0 };
+  const counts = { fractionalStrip: 0, band: 0, blendedCopy: 0, blendedVideo: 0 };
   window.__storyHdSkyDraws = counts;
   const draw = CanvasRenderingContext2D.prototype.drawImage;
   CanvasRenderingContext2D.prototype.drawImage = function (this: CanvasRenderingContext2D, ...args: unknown[]) {
     if (this.canvas instanceof HTMLCanvasElement && this.canvas.dataset.testid === "story-hd-canvas") {
       const source = args[0];
       const dx = Number(args.length >= 9 ? args[5] : args[1]);
+      const blended = this.globalCompositeOperation !== "source-over";
       if (source instanceof HTMLImageElement && source.dataset.sourceUrl?.endsWith("/sky.webp") && !Number.isInteger(dx)) counts.fractionalStrip += 1;
-      if (source instanceof HTMLCanvasElement) counts.band += 1;
+      if (source instanceof HTMLCanvasElement) counts[blended ? "blendedCopy" : "band"] += 1;
+      if (source instanceof HTMLVideoElement && blended) counts.blendedVideo += 1;
     }
     return (draw as (...a: unknown[]) => void).apply(this, args);
   } as typeof draw;
@@ -114,6 +121,11 @@ test("REMAKE-196: in 高清 the airship scene covers the whole screen, its cloud
   const draws = await page.evaluate(() => window.__storyHdSkyDraws);
   expect(draws?.fractionalStrip).toBe(0);
   expect(draws?.band).toBeGreaterThan(10);
+  // Safari draws a <video> as source-over whatever the composite mode says, which left the clouds black (user report
+  // 2026-11-22): the loop is blended only from a canvas copy of its frame. Chromium honours the mode either way, so
+  // the draw calls are checked.
+  expect(draws?.blendedVideo).toBe(0);
+  expect(draws?.blendedCopy).toBeGreaterThan(10);
 
   const geometry = await page.evaluate(() => {
     const screen = document.querySelector<HTMLElement>(".logical-screen")!;
@@ -257,7 +269,7 @@ const TITLE = `${HD}/title`;
 
 /** Counts what reaches the title's HD canvas: the original canvas, the cloud band (and its source x), the women's halves. */
 const recordTitleDraws = (page: Page) => page.addInitScript(() => {
-  const counts = { base: 0, band: 0, bandSource: "", bandX: [] as number[], multiply: 0, lighter: 0 };
+  const counts = { base: 0, band: 0, bandSource: "", bandX: [] as number[], multiply: 0, lighter: 0, blendedVideo: 0 };
   window.__titleHdDraws = counts;
   const draw = CanvasRenderingContext2D.prototype.drawImage;
   CanvasRenderingContext2D.prototype.drawImage = function (this: CanvasRenderingContext2D, ...args: unknown[]) {
@@ -270,6 +282,9 @@ const recordTitleDraws = (page: Page) => page.addInitScript(() => {
         counts.bandX.push(Number(args[1]));
         if (counts.bandX.length > 400) counts.bandX.shift();
       } else if (source instanceof HTMLVideoElement) {
+        if (this.globalCompositeOperation !== "source-over") counts.blendedVideo += 1;
+      } else if (source instanceof HTMLCanvasElement) {
+        // the women: blended from a canvas copy of the video frame (Safari ignores the mode for a <video>)
         if (this.globalCompositeOperation === "multiply") counts.multiply += 1;
         if (this.globalCompositeOperation === "lighter") counts.lighter += 1;
       }
@@ -306,6 +321,9 @@ test("REMAKE-197: in 高清 the title draws HD land, scrolling clouds and the tw
   const first = await draws();
   expect(first.base).toBeGreaterThan(20);
   expect(first.multiply).toBe(first.lighter);
+  // Safari draws a <video> as source-over whatever the composite mode says, which stood the women on black (user report
+  // 2026-11-22); Chromium honours the mode either way, so the draw calls are checked.
+  expect(first.blendedVideo).toBe(0);
   expect(first.bandSource).toBe(`${TITLE}/sky-0.webp`);
   // the clouds scroll leftwards at a constant speed: the band's source x keeps growing (modulo the period)
   await page.waitForTimeout(1500);

@@ -2,6 +2,7 @@ import { STARTUP_DISSOLVE_PATTERNS, STARTUP_SCREEN, STARTUP_TITLE } from "./cont
 import { storyHdTitleAssetUrls, type StoryHdTitle } from "./content/story-hd";
 import { isProgramPaused } from "./program-clock";
 import { stagedRenderAssetAvailable, stagedRenderAssetSource } from "./staged-render-asset-cache";
+import { VideoFrameCopy } from "./video-frame-copy";
 
 /** 分頁回到前景等長時間停頓之後，雲層一幀最多前進這麼多時間（同劇情插圖）。 */
 const MAX_SKY_STEP_MS = 100;
@@ -44,7 +45,7 @@ function canvas2d(width: number, height: number): [HTMLCanvasElement, CanvasRend
  * 1. 原版畫布本身（最近鄰放大）：藍底的淡入、選單文字與反白、框外的標誌帶都照原版流程畫在那裡；
  * 2. 框內矩形裡的雲層（整數位置平鋪成長帶，每幀取一段，見 `StoryHdLayer`）與地景；
  * 3. 重建的畫框與框外藍底（最近鄰），蓋住矩形超出畫框內緣的部分與原版上半圖；
- * 4. 兩名女子：畫布 `multiply` 下半、`lighter` 上半；
+ * 4. 兩名女子：畫布 `multiply` 下半、`lighter` 上半，都從視訊當前幀的複本合成（Safari 直接畫視訊時不理合成模式，見 `VideoFrameCopy`）；
  * 5. 還沒溶入的部分用藍底蓋回（原版 8×8 圖樣按溶入步數累加），然後是溶入中的標誌文字。
  *
  * 只換表現：標題的計時、溶入步數、選單與閒置重播都照原版流程，由 `startup.ts` 傳進目前的步數。
@@ -53,6 +54,7 @@ export class TitleHdLayer {
   readonly canvas: HTMLCanvasElement;
   private readonly context: CanvasRenderingContext2D;
   private readonly video: HTMLVideoElement;
+  private readonly videoFrame = new VideoFrameCopy();
   private readonly images = new Map<string, HTMLImageElement>();
   private readonly bands = new Map<string, HTMLCanvasElement>();
   private readonly covers = new Map<number, HTMLCanvasElement>();
@@ -197,14 +199,15 @@ export class TitleHdLayer {
     if (frame) ctx.drawImage(frame, ART_X, ART_Y);
 
     const { women } = this.title;
-    if (this.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+    const womenFrame = this.videoFrame.frame(this.video);
+    if (womenFrame) {
       const half = women.height / 2;
       ctx.setTransform(art, 0, 0, art, ART_X * k, ART_Y * k);
       ctx.imageSmoothingEnabled = true;
       ctx.globalCompositeOperation = "multiply";
-      ctx.drawImage(this.video, 0, half, women.width, half, women.x, women.y, women.width, half);
+      ctx.drawImage(womenFrame, 0, half, women.width, half, women.x, women.y, women.width, half);
       ctx.globalCompositeOperation = "lighter";
-      ctx.drawImage(this.video, 0, 0, women.width, half, women.x, women.y, women.width, half);
+      ctx.drawImage(womenFrame, 0, 0, women.width, half, women.x, women.y, women.width, half);
       ctx.globalCompositeOperation = "source-over";
     }
 
@@ -298,6 +301,7 @@ export class TitleHdLayer {
     this.video.removeAttribute("src");
     this.video.load();
     this.video.remove();
+    this.videoFrame.release();
     this.canvas.remove();
   }
 }

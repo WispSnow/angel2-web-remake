@@ -2,6 +2,7 @@ import type { StoryHdEntry, StoryHdVideo } from "./content/story-hd";
 import { isProgramPaused } from "./program-clock";
 import { stagedRenderAssetSource } from "./staged-render-asset-cache";
 import { markStoryHdFailed } from "./story-hd-style";
+import { VideoFrameCopy } from "./video-frame-copy";
 
 /** 視訊卡住（時間不前進）這麼久就從頭重播；第二次起連同重新載入（同高清肖像）。 */
 const STALL_MS = 900;
@@ -16,7 +17,8 @@ const MAX_SKY_STEP_MS = 100;
  *   瀏覽器的雙線性縮放不會斷線。
  * - 有雲層：使用者要雲用獨立圖層當背景捲軸（2026-11-18），不能隨循環先飄再退回。`<canvas>` 每幀先畫
  *   等速捲動的平鋪雲層，再乘上 `stacked` 視訊下半的 `1 − alpha`、加上上半已乘過 alpha 的前景：
- *   `sky × (1 − a) + 前景 × a`，只用 2D 畫布的 `multiply` 與 `lighter`。視訊本身透明地留在畫布下面解碼。
+ *   `sky × (1 − a) + 前景 × a`，只用 2D 畫布的 `multiply` 與 `lighter`。視訊本身透明地留在畫布下面解碼；
+ *   兩次合成都從視訊當前幀的複本畫（Safari 直接畫視訊時不理合成模式，雲層會變黑，見 `VideoFrameCopy`）。
  *   雲層位移以雲層檔為單位保留：同一段劇情換到共用雲層的插圖（`BK/5`→`BK/31`、`BK/10`→`BK/12`）雲不會跳回原位。
  *   換到另一張有雲層的插圖時沿用同一塊畫布，新視訊就緒前畫布停在上一張的最後一幀；只有全新的畫布才先畫封面
  *   （位移 0 的合成），否則封面的雲會閃一下再跳到保留的位置。
@@ -43,6 +45,7 @@ export class StoryHdLayer {
   /** 畫布上已有完整合成（之後換插圖時保留到新視訊就緒，不再畫封面）。 */
   private canvasHasFrame = false;
   private readonly skyOffsets = new Map<string, number>();
+  private readonly videoFrame = new VideoFrameCopy();
 
   constructor(private readonly host: HTMLElement) {}
 
@@ -168,9 +171,9 @@ export class StoryHdLayer {
     const width = canvas.width;
     const height = canvas.height;
     context.globalCompositeOperation = "source-over";
-    const frameReady = video.readyState >= 2 && video.videoWidth > 0;
     const skyReady = sky?.complete === true && sky.naturalWidth > 0;
-    if (!frameReady || !skyReady) {
+    const frame = skyReady ? this.videoFrame.frame(video) : undefined;
+    if (!frame || !skyReady) {
       if (!this.canvasHasFrame && poster?.complete && poster.naturalWidth > 0) context.drawImage(poster, 0, 0, width, height);
       return;
     }
@@ -183,9 +186,9 @@ export class StoryHdLayer {
     // 雲層內容向右移 offset：畫面 x 取長帶的 x + (tile − offset)，一次畫完，沒有平鋪縫
     context.drawImage(band, tile - offset, 0, width, entry.sky.height, 0, 0, width, entry.sky.height);
     context.globalCompositeOperation = "multiply";
-    context.drawImage(video, 0, height, width, height, 0, 0, width, height);
+    context.drawImage(frame, 0, height, width, height, 0, 0, width, height);
     context.globalCompositeOperation = "lighter";
-    context.drawImage(video, 0, 0, width, height, 0, 0, width, height);
+    context.drawImage(frame, 0, 0, width, height, 0, 0, width, height);
     context.globalCompositeOperation = "source-over";
     this.canvasHasFrame = true;
   }
@@ -261,6 +264,7 @@ export class StoryHdLayer {
       video.remove();
     }
     if (!keepCanvas) {
+      this.videoFrame.release();
       this.canvas?.remove();
       this.canvas = undefined;
       this.context = undefined;
