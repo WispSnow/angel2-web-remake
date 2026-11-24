@@ -388,6 +388,14 @@ body.debug-hub-page {
   color: #f8e7c5;
   font-family: "Noto Serif TC", "PingFang TC", serif;
   filter: drop-shadow(0 12px 24px rgb(0 0 0 / 48%));
+  /* Collapsed, the 300px box is empty beside the DEBUG button; let clicks
+     reach the battle HUD underneath and catch them only on real controls. */
+  pointer-events: none;
+}
+
+.debug-toolbar-toggle,
+.debug-toolbar-panel {
+  pointer-events: auto;
 }
 
 .debug-toolbar-toggle {

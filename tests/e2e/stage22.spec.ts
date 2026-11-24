@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { drawnFrame, recordCanvasFrames } from "./canvas-frame-recorder";
+import { openDebugToolbar } from "./debug-toolbar";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -208,6 +209,7 @@ test("S22-G: Nia defeat returns to a clean stage 22 deployment", async ({ page }
     focusId: "2:28",
     cameraOrigin: { x: 18, y: 21 },
   });
+  await openDebugToolbar(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");
   await expect(page.getByTestId("status-strip")).toContainText("妮雅");

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { openDebugToolbar } from "./debug-toolbar";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { expectStoryBackground } from "./story-background";
 import { captureVisualAudit } from "./visual-audit";
@@ -166,6 +167,7 @@ test("S10-D/E: the corrected objective requires eliminating every pursuer and pr
 
 test("S10-F/G: defeat replays SAY/28 and completion enters playable stage 12", async ({ page }) => {
   await page.goto("/?debugScenario=stage-10-near-defeat&difficulty=0&test=1");
+  await openDebugToolbar(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");
   await page.getByTestId("retry-button").click();

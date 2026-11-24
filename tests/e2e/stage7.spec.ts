@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { openDebugToolbar } from "./debug-toolbar";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { expectStoryBackground } from "./story-background";
 import { captureVisualAudit } from "./visual-audit";
@@ -171,6 +172,7 @@ test("S07-F/G/H: defeat and retreat replay SAY/17, victory saves v25, and enters
   await page.goto("/?debugScenario=stage-07-near-defeat&difficulty=0&test=1");
   await waitForPhase(page, "player");
   const entry = await state(page);
+  await openDebugToolbar(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");
   await expect(page.getByTestId("retry-button")).toBeVisible();

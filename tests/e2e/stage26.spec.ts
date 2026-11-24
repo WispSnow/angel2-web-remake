@@ -3,6 +3,7 @@ import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-pa
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { drawnFrames, recordCanvasFrames } from "./canvas-frame-recorder";
 import { attackOnlyAdjacentEnemy } from "./command-controls";
+import { openDebugToolbar } from "./debug-toolbar";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -203,6 +204,7 @@ test("S26-G: Binaweiji's removal starts SAY/0050 while seven priests remain", as
 test("S26-H: Nia defeat returns directly to the same deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-26-near-defeat&difficulty=0&test=1");
   await waitForPhase(page, "player");
+  await openDebugToolbar(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");
   await expect(page.getByTestId("status-strip")).toContainText("妮雅");

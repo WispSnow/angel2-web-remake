@@ -437,7 +437,6 @@ test("S02-J: fixed battle remains readable in a narrow reduced-motion viewport",
   await page.setViewportSize({ width: 720, height: 620 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/?debugScenario=stage-02-player&difficulty=0&test=1");
-  await page.locator(".debug-toolbar-toggle").click();
   const screen = page.getByTestId("game-screen");
   await expect(screen).toBeVisible();
   const bounds = await screen.boundingBox();

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { openDebugToolbar } from "./debug-toolbar";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -226,6 +227,7 @@ test("S11-H: every player-to-enemy transition adds one immediately active lower-
 
 test("S11-F/G: defeat rebuilds the opening and completion routes to internal stage 10", async ({ page }) => {
   await page.goto("/?debugScenario=stage-11-near-defeat&difficulty=0&test=1");
+  await openDebugToolbar(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");
   await page.getByTestId("retry-button").click();

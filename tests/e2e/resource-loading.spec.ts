@@ -4,6 +4,7 @@ import { portraitAssetUrls } from "../../src/game/content/portrait-assets";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { STARTUP_IMAGE_URLS } from "../../src/game/startup-screen";
 import type { CompletedSaveData } from "../../src/game/types";
+import { openDebugToolbar } from "./debug-toolbar";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { openHostMenu, resumeFromHostMenu } from "./host-menu-helpers";
 import { activateStartup, skipOpeningToTitle } from "./startup-controls";
@@ -696,6 +697,7 @@ test("the stage runtime module loads under the loading page, not before it", asy
 
   await page.goto("/?test=1&debugScenario=stage-00-player");
   await expect(page.getByTestId("game-screen")).toBeVisible();
+  await openDebugToolbar(page);
   await page.locator("[data-debug-complete]").click();
 
   const overlay = page.getByTestId("resource-loading-overlay");
@@ -724,6 +726,7 @@ test("the deployment surface crosses the stage gate, not the phase switch", asyn
 
   await page.goto("/?test=1&debugScenario=stage-00-player");
   await expect(page.getByTestId("game-screen")).toBeVisible();
+  await openDebugToolbar(page);
   await page.locator("[data-debug-complete]").click();
   const overlay = page.getByTestId("resource-loading-overlay");
   await expect(overlay).toBeVisible();
@@ -752,6 +755,7 @@ test("clearing a stage forces only its successor, then prefetches the following 
 
   await page.goto("/?test=1&debugScenario=stage-00-player");
   await expect(page.getByTestId("game-screen")).toBeVisible();
+  await openDebugToolbar(page);
   await page.locator("[data-debug-complete]").click();
   const overlay = page.getByTestId("resource-loading-overlay");
   await expect(overlay).toBeVisible();

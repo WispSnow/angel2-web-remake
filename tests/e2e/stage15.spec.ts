@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { openDebugToolbar } from "./debug-toolbar";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -173,6 +174,7 @@ test("S15-D/E: the corrected objective defeats Lan without requiring the other n
 
 test("S15-F/G: defeat retries deployment and completion enters Dragon Tower Floor Three", async ({ page }) => {
   await page.goto("/?debugScenario=stage-15-near-defeat&difficulty=0&test=1");
+  await openDebugToolbar(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");
   await page.getByTestId("retry-button").click();

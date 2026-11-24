@@ -6,6 +6,7 @@ import { STAGE38_STORY_PAGES } from "../../src/game/content/stage38-runtime.gene
 import type { DialoguePage } from "../../src/game/types";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { attackOnlyAdjacentEnemy } from "./command-controls";
+import { openDebugToolbar } from "./debug-toolbar";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { nativeTextInkColumns, ROUND_LINE_BOX, STAGE_LABEL_BOX } from "./native-text-ink";
 import { captureVisualAudit } from "./visual-audit";
@@ -264,6 +265,7 @@ test("S38-I: every ghost in the SAY/0164 chant takes the portrait for its own ph
 test("S38-E: Nia defeat retries the hidden-stage deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-38-near-defeat&difficulty=0&test=1");
   await waitForPhase(page, "player");
+  await openDebugToolbar(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");
   await page.getByTestId("retry-button").click();

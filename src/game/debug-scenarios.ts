@@ -4895,8 +4895,8 @@ export function mountDebugToolbar(
   toolbar.className = "debug-toolbar";
   toolbar.dataset.testid = "debug-toolbar";
   toolbar.innerHTML = `
-    <button class="debug-toolbar-toggle" type="button" data-debug-toggle aria-expanded="true">DEBUG</button>
-    <div class="debug-toolbar-panel">
+    <button class="debug-toolbar-toggle" type="button" data-debug-toggle aria-expanded="false">DEBUG</button>
+    <div class="debug-toolbar-panel" hidden>
       <div class="debug-toolbar-heading"><b>開發調試</b><a href="/debug.html">場景選擇</a></div>
       <p data-debug-scenario></p>
       <p data-debug-roster></p>

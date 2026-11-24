@@ -5,6 +5,7 @@ import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import type { CompletedSaveData } from "../../src/game/types";
 import { drawnFrames, MAP_COMBAT_FRAME_KEYS, recordCanvasFrames } from "./canvas-frame-recorder";
+import { openDebugToolbar } from "./debug-toolbar";
 import { activeDialogueRecord } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -450,9 +451,12 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
 
   await expect(page.getByTestId("deployment-screen")).toBeVisible();
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 5／8");
-  await expect(page.getByTestId("debug-toolbar")).toBeVisible();
-  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：預設職業成長");
-  await expect(page.getByTestId("debug-toolbar")).toContainText(
+  const toolbar = page.getByTestId("debug-toolbar");
+  const toolbarToggle = toolbar.getByRole("button", { name: "DEBUG" });
+  const toolbarPanel = toolbar.locator(".debug-toolbar-panel");
+  await expect(toolbar).toBeVisible();
+  await expect(toolbar).toContainText("成長：預設職業成長");
+  await expect(toolbar).toContainText(
     "每關成長：100 · 本關最高成長預算：100",
   );
   const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
@@ -472,6 +476,26 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     experience: 100,
   }));
   await captureVisualAudit(page, { path: `${ARTIFACT_DIR}/debug-stage1-deployment.png` });
+
+  // The scenario page opens with the toolbar collapsed to its DEBUG button,
+  // and the empty rest of the 300px toolbar box must not swallow clicks.
+  await expect(toolbarToggle).toBeVisible();
+  await expect(toolbarToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(toolbarPanel).toBeHidden();
+  await expect(toolbar.getByRole("button", { name: "直接通關" })).toBeHidden();
+  const toggleBox = await toolbarToggle.boundingBox();
+  expect(toggleBox).not.toBeNull();
+  expect(await page.evaluate(({ x, y }) => (
+    document.elementFromPoint(x, y)?.closest(".debug-toolbar") === null
+  ), { x: toggleBox!.x - 40, y: toggleBox!.y + toggleBox!.height / 2 })).toBe(true);
+
+  await toolbarToggle.click();
+  await expect(toolbarToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(toolbarPanel).toBeVisible();
+  await expect(toolbar.getByRole("button", { name: "直接通關" })).toBeVisible();
+  await toolbarToggle.click();
+  await expect(toolbarToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(toolbarPanel).toBeHidden();
 });
 
 test("debug hub stage-49 fixtures directly expose every epilogue result", async ({ page }) => {
@@ -936,6 +960,7 @@ test("debug scenarios can enter player phases and directly complete either imple
   await page.goto("/?debugScenario=stage-00-player&difficulty=2");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await expect(page.getByTestId("debug-toolbar")).toContainText("第 0 關");
+  await openDebugToolbar(page);
   await page.getByRole("button", { name: "直接通關" }).click();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "4");
   await expect(page.getByTestId("debug-toolbar")).toContainText("第 1 關 · 騎士城堡前");
@@ -951,6 +976,7 @@ test("debug scenarios can enter player phases and directly complete either imple
   expect(player).toMatchObject({ stageId: "stage-01", phase: "player" });
   expect(player.units).toContainEqual(expect.objectContaining({ id: "1:24", classId: "magician" }));
 
+  await openDebugToolbar(page);
   await page.getByRole("button", { name: "直接通關" }).click();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "155");
   await expect(page.getByTestId("debug-toolbar")).toContainText("第 2 關 · 攻打騎士堡");
@@ -963,6 +989,7 @@ test("debug scenarios can enter player phases and directly complete either imple
 
   await page.goto("/?debugScenario=stage-02-player&difficulty=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await openDebugToolbar(page);
   await page.getByRole("button", { name: "直接通關" }).click();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "12");
   await expect(page.getByTestId("debug-toolbar")).toContainText("第 3 關 · 救援友軍");

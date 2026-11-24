@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
+import { openDebugToolbar } from "./debug-toolbar";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { nativeTextInkColumns, ROUND_LINE_BOX, STAGE_LABEL_BOX } from "./native-text-ink";
 import { captureVisualAudit } from "./visual-audit";
@@ -435,6 +436,7 @@ test("S05-L: fast presentation and disabled combat sound preserve the portal res
     combatSoundEnabled: false,
   });
 
+  await openDebugToolbar(page);
   await page.getByRole("button", { name: "直接通關" }).click();
   const initial = await advancePortalToLightning(page);
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "19");

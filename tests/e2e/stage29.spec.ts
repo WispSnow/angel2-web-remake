@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { attackOnlyAdjacentEnemy } from "./command-controls";
+import { openDebugToolbar } from "./debug-toolbar";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { expectStoryBackground } from "./story-background";
 import { captureVisualAudit } from "./visual-audit";
@@ -244,6 +245,7 @@ test("S29-F: removing the final guard uses ordinary victory feedback without a v
 test("S29-G: Nia defeat retries from SAY/0056", async ({ page }) => {
   await page.goto("/?debugScenario=stage-29-near-defeat&difficulty=0&test=1");
   await waitForPhase(page, "player");
+  await openDebugToolbar(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");
   await expect(page.getByTestId("status-strip")).toContainText("妮雅");

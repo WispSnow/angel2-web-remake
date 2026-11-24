@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openDebugToolbar } from "./debug-toolbar";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -42,6 +43,7 @@ test("REMAKE-185: a cleared stage's gate holds the next stage until its deployme
   await expect(page.getByTestId("game-screen")).toBeVisible({ timeout: 15_000 });
   // Stage 1 is scene 1, so module 27 picks MUSIC/16 for its roster screen.
   const deployment = await holdRemix(page, "MUSIC-16.ogg");
+  await openDebugToolbar(page);
   await page.locator("[data-debug-complete]").click();
   const overlay = page.getByTestId("resource-loading-overlay");
   await expect(overlay).toHaveAttribute("data-resource-pack", "stage:stage-01");

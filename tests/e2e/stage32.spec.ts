@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { attackOnlyAdjacentEnemy } from "./command-controls";
+import { openDebugToolbar } from "./debug-toolbar";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -159,6 +160,7 @@ test("S32-F: defeating the final alliance unit starts SAY/0064", async ({ page }
 test("S32-G: Nia defeat retries directly from deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-32-near-defeat&difficulty=0&test=1");
   await waitForPhase(page, "player");
+  await openDebugToolbar(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");
   await expect(page.getByTestId("status-strip")).toContainText("妮雅");

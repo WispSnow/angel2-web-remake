@@ -5,6 +5,7 @@ import {
   stage8TerrainSlotAt,
 } from "../../src/game/content/stage8";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { openDebugToolbar } from "./debug-toolbar";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { expectStoryBackground } from "./story-background";
 import { captureVisualAudit } from "./visual-audit";
@@ -324,6 +325,7 @@ test("S08-G/H: retry and retreat replay SAY/21, while completion enters stage 9 
   await page.goto("/?debugScenario=stage-08-near-defeat&difficulty=0&test=1");
   await waitForPhase(page, "player");
   const entry = await state(page);
+  await openDebugToolbar(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");
   await page.getByTestId("retry-button").click();
