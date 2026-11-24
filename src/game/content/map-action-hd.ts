@@ -121,7 +121,7 @@ const MAP_ACTION_HD_CASTS: Readonly<Record<string, readonly MapActionHdSegment[]
   "map-hit": [{ clipId: "hit", phases: { primaryHit: 0, counterHit: 0 } }],
   "map-death": [{ clipId: "death", phases: { defenderDeath: 0, attackerDeath: 0, specialDeath: 0 } }],
   // `REMAKE-208`：射擊只畫在目標上；魔弓 `3V`（與調試的 VIRT）同一組圖逐格沿直線長出，`WD` 沿路徑長出，
-  // 每格從自己長出的那一步開始播（`staggered`），收尾時全部格子一起重播
+  // 每格從自己長出的那一步開始播（`staggered`）、播完接一步餘韻；收尾是同一條尾跡繼續推過目標，不重播
   "archer-shot": [{ clipId: "shoot", phases: { shootHit: 0 } }],
   "crossbow-shot": [{ clipId: "shoot", phases: { shootHit: 0 } }],
   "water-warrior-shot": [{ clipId: "shoot", phases: { shootHit: 0 } }],
@@ -141,7 +141,7 @@ const MAP_ACTION_HD_CASTS: Readonly<Record<string, readonly MapActionHdSegment[]
 
 /**
  * 逐格錯開播放的片段（`REMAKE-208`）：同一時刻各格停在不同幀，每個播放位置要一支視訊——每一幀一支，再加
- * 一支給已經播到最後一幀、停著等收尾的格子。
+ * 一支給上一步播完最後一幀、這一步播餘韻的格子（原版在這一步清掉它）。
  */
 const MAP_ACTION_HD_STAGGERED_CLIPS: ReadonlySet<string> = new Set([
   "shoot", "wd", "lightning-1-hit", "lightning-2-hit", "lightning-3-hit", "lightning-4-hit",

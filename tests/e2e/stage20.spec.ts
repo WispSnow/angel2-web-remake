@@ -188,6 +188,17 @@ test("S20-E: demon dragon casts the native-timed WD path and defeats Nia", async
     .filter(({ mapCombatFrame }) => Number(mapCombatFrame) >= 2);
   expect(growth.length).toBeGreaterThan(0);
   expect(growth[0]?.mapCombatEffectTextureKeys).toMatch(/map-wd-/u);
+  // one trail (`1000:666D/66C9`): finish frame f leaves the target on frame f + 1, so the path never starts over on
+  // frame 0, and the last finish frame (the `82h` step on the target) draws nothing
+  const finish = drawnFrames(drawn, { mapCombatPhase: "wdFinish" });
+  expect(finish.length).toBeGreaterThan(0);
+  for (const frame of finish) {
+    const keys = (frame.mapCombatEffectTextureKeys ?? "").split(",").filter(Boolean);
+    const target = Number(frame.mapCombatFrame) + 1;
+    expect(keys, `wdFinish ${frame.mapCombatFrame}`).not.toContain("map-wd-0");
+    if (target < 10) expect(keys, `wdFinish ${frame.mapCombatFrame}`).toContain(`map-wd-${target}`);
+    else expect(frame.mapCombatEffectTileCount, `wdFinish ${frame.mapCombatFrame}`).toBe("0");
+  }
   expect((await state(page)).lastSpecialAction).toMatchObject({ actionId: "wd" });
 });
 
@@ -226,15 +237,25 @@ test("REMAKE-208: in 高清 the demon dragon's WD path grows a cell at a time on
     expect(frame.mapCombatEffectTileCount, `${frame.mapCombatPhase} ${frame.mapCombatFrame}`).toBe("0");
   }
   const groupsOf = (value: string | undefined) => (value ?? "").split(",").filter(Boolean);
-  // growing: every cell on its own frame, the newest on frame 0, one group per playing position
-  for (const frame of growth) {
+  // one trail (`1000:666D/66C9`): every cell on its own frame, so no two cells ever share a playing position; a cell
+  // past its last frame fades on the afterglow position
+  for (const frame of [...growth, ...finish]) {
     const groups = groupsOf(frame.mapActionHdGroups);
-    expect(groups.every((group) => /^wd:\d+h?x\d+$/u.test(group)), frame.mapActionHdGroups).toBe(true);
-    expect(groups.some((group) => /^wd:0x/u.test(group)), frame.mapActionHdGroups).toBe(true);
+    expect(groups.every((group) => /^wd:(?:\d+|afterglow)x1$/u.test(group)), frame.mapActionHdGroups).toBe(true);
+  }
+  // growing: the newest cell on frame 0
+  for (const frame of growth) {
+    expect(groupsOf(frame.mapActionHdGroups), frame.mapActionHdGroups).toContain("wd:0x1");
   }
   expect(Math.max(...growth.map(({ mapActionHdGroups }) => groupsOf(mapActionHdGroups).length))).toBeGreaterThan(1);
-  // finishing: the whole path replays one frame together
-  for (const frame of finish) expect(groupsOf(frame.mapActionHdGroups)).toHaveLength(1);
+  // finishing: the trail moves on past the target (finish frame f puts it on frame f + 1, the last one fades it out);
+  // the path never starts over on frame 0
+  for (const frame of finish) {
+    const target = Number(frame.mapCombatFrame) + 1;
+    const groups = groupsOf(frame.mapActionHdGroups);
+    expect(groups, `wdFinish ${frame.mapCombatFrame}`).toContain(target < 10 ? `wd:${target}x1` : "wd:afterglowx1");
+    expect(groups, `wdFinish ${frame.mapCombatFrame}`).not.toContain("wd:0x1");
+  }
   expect((await state(page)).lastSpecialAction).toMatchObject({ actionId: "wd" });
 });
 

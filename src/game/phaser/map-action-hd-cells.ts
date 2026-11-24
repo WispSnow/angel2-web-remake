@@ -10,8 +10,11 @@ export interface MapActionHdCell {
   readonly y: number;
   /** 逐格錯開的片段（`REMAKE-208`）：這一格自己的原版幀（未給時用控制器的幀）。 */
   readonly frame?: number;
-  /** 長出階段已經播到最後一幀、停著等收尾：高清停在那一幀的終點，不播餘韻。 */
-  readonly held?: boolean;
+  /**
+   * 魔弓直線或 `WD` 路徑上已經播完最後一幀的一格（原版這一步寫 `82h` 清掉它）：高清在這一步播片段的餘韻，片段沒有
+   * 餘韻就不畫。直線與路徑上的每一格都會給這個欄位（`false` 表示還在播自己的幀）。
+   */
+  readonly afterglow?: boolean;
   /** 這一格由哪段片段畫（同一階段同時畫兩段時，例如落雷的掃描與受擊標記，`REMAKE-210`）；未給時用該階段的第一段。 */
   readonly clipId?: string;
 }

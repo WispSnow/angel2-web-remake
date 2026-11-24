@@ -3,7 +3,7 @@ import { MAP_COMBAT_FRAME_KEYS, recordCanvasFrames } from "./canvas-frame-record
 import { captureVisualAudit } from "./visual-audit";
 
 type ClassActionId = "archer-shot" | "fire-1" | "heal-1" | "lightning-1" | "recovery-1";
-type PromotedClassId = "archer" | "cavalry" | "magician" | "monk" | "sister" | "warrior";
+type PromotedClassId = "archer" | "magic-archer" | "cavalry" | "magician" | "monk" | "sister" | "warrior";
 
 interface ActionDebugState {
   phase: string;
@@ -1132,6 +1132,57 @@ test("REMAKE-208: in 高清 the archer's shot plays the arrow-impact clip on the
   const after = await state(page);
   expect(after.units.find(({ id }) => id === target.id)?.life ?? 0)
     .toBe(Math.max(0, target.life - after.lastSpecialAction!.damage));
+});
+
+test("REMAKE-208: in 高清 the magic archer's line plays the clip once per cell, as one trail without a replay", async ({ page }) => {
+  await useHdArtStyle(page);
+  await page.goto("/?test=1&skipStartup=1&slowMap=1");
+  await forceSetup(page, "magic-archer");
+  // every playing position of the staggered clip (eight frames and the afterglow) has a decoded frame
+  await expect.poll(() => page.evaluate((source) => {
+    const videos = [...document.querySelectorAll<HTMLVideoElement>("video")]
+      .filter((video) => video.dataset.sourceUrl === source);
+    return videos.length === 9 && videos.every((video) => video.readyState >= 2);
+  }, SHOOT_HD), { timeout: 15_000 }).toBe(true);
+  const recorded = await recordCanvasFrames(page, [...MAP_COMBAT_FRAME_KEYS, "mapActionHd", "mapActionHdGroups"]);
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-shoot").click();
+  await expect.poll(async () => (await state(page)).actionMode).toBe("specialTarget");
+  await clickMapCell(page, 380, 177);
+  await recorded.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "shootLineFinish",
+    mapCombatFrame: "1",
+  }, { path: "artifacts/playwright/stage0-magic-archer-line-hd.png" });
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState;
+    return current.lastSpecialAction?.actionId === "magic-archer-shot" && current.specialActionPresentation === undefined;
+  });
+  const frames = (await recorded.stop()).filter(({ mapCombatPhase }) => mapCombatPhase?.startsWith("shootLine"));
+  const growth = frames.filter(({ mapCombatPhase }) => mapCombatPhase === "shootLineGrow");
+  const finish = frames.filter(({ mapCombatPhase }) => mapCombatPhase === "shootLineFinish");
+  // shooter, three cells, target; then UN/60's eight finish steps (`1000:659B`)
+  expect(growth.map(({ mapCombatFrame }) => mapCombatFrame)).toEqual(["0", "1", "2", "3", "4"]);
+  expect(finish.map(({ mapCombatFrame }) => mapCombatFrame)).toEqual(Array.from({ length: 8 }, (_, frame) => String(frame)));
+  for (const frame of frames) {
+    expect(frame.mapActionHd, `${frame.mapCombatPhase} ${frame.mapCombatFrame}`).toBe("hd");
+    expect(frame.mapCombatEffectTileCount, `${frame.mapCombatPhase} ${frame.mapCombatFrame}`).toBe("0");
+  }
+  // growing: the newest cell on frame 0, each older cell one frame further, so every cell has its own position
+  growth.forEach((frame, step) => {
+    expect(hdGroups(frame.mapActionHdGroups), `shootLineGrow ${step}`)
+      .toEqual(Object.fromEntries(Array.from({ length: step + 1 }, (_, age) => [`shoot:${age}`, 1])));
+  });
+  // finishing: the same trail moves on past the target (finish frame f puts it on frame f + 1, the cells behind it
+  // further on or already faded); nothing starts over on frame 0, and the last step fades the target out
+  finish.forEach((frame, index) => {
+    const expected: Record<string, number> = {};
+    for (let back = 0; back < 5; back += 1) {
+      const age = index + 1 + back;
+      if (age < 8) expected[`shoot:${age}`] = 1;
+      else if (age === 8) expected["shoot:afterglow"] = 1;
+    }
+    expect(hdGroups(frame.mapActionHdGroups), `shootLineFinish ${index}`).toEqual(expected);
+  });
 });
 
 test("REMAKE-210: in 高清 the magician's 1L plays the storm cloud, the wave and the cleanup as HD clips", async ({ page }) => {

@@ -117,6 +117,18 @@ export function mapActionHdFrameSpan(
   };
 }
 
+/**
+ * 逐格錯開的直線或路徑（`REMAKE-208`）上，一格播完最後一幀的下一步：原版在這一步寫 `82h` 清掉那一格，高清在這一步裡
+ * 把片段的餘韻播完（之後那一格不再畫）。片段沒有餘韻時回傳 `undefined`，那一格就不畫。
+ */
+export function mapActionHdAfterglowSpan(
+  clip: MapActionHdClip,
+): { startTick: number; endTick: number; limitTick: number } | undefined {
+  if (clip.afterglowTicks <= 0) return undefined;
+  const endTick = mapActionHdClipEnd(clip);
+  return { startTick: clip.durationTicks, endTick, limitTick: endTick };
+}
+
 /** 片段畫面結束的 tick：有餘韻時是餘韻終點，否則是原版時間線終點。 */
 export function mapActionHdClipEnd(clip: MapActionHdClip): number {
   return clip.durationTicks + clip.afterglowTicks;

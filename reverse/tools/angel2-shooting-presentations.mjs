@@ -331,9 +331,9 @@ async function extract(
       tileCodeBoundary: "codes 1..8 map to the eight UN/60 frames; final raw code 82h has a high-bit renderer role that remains unnamed and must not be normalized away",
       timing: {
         waitPerGrowthOrFinishStepNativeTicks: 20,
-        growthPass: "walk the stored list backward from the source toward index 0/target; each newly reached cell applies floor(baseRoll/2), advances the staggered descriptor trail, flushes, then waits",
+        growthPass: "walk the stored list backward from the source toward index 0/target; each newly reached cell applies floor(baseRoll/2), then 1000:6532 writes descriptor 0 on that cell and descriptor n on the n-th cell back toward the source until the FFFF terminator, flushes, then waits",
         selectedTargetSecondDamage: "after the growth pass, apply floor(baseRoll/2) once more to list index 0; therefore the selected target receives 2*floor(baseRoll/2), not only one half-roll",
-        finishPass: "apply descriptor stages 2..8 and raw 82h across the full line, one flush/wait per stage",
+        finishPass: "1000:659B continues the same trail rather than replaying the line: finish step k (1..8) writes descriptor k on list index 0 and descriptor k+n on index n until the FFFF terminator, one flush/wait per step; every cell therefore shows each UN/60 frame once and then the 82h entry, which 0000:7EDD does not draw as a tile",
         finishSteps: 8,
         totalFixedWaitFormulaNativeTicks: "(lineCellCount + 8) * 20",
       },

@@ -18,9 +18,11 @@ import { STAGE0_ACTION_PRESENTATION_ASSETS, STAGE0_REST_PRESENTATION } from "../
 import { STAGE1_ACTION_PRESENTATION } from "../../src/game/content/stage1-actions.generated";
 import { TECHNIQUE_LAB_FIRE, TECHNIQUE_LAB_HEAL } from "../../src/game/content/technique-lab.generated";
 import { lightningHdCells } from "../../src/game/phaser/map-action-hd-cells";
+import { lineTrailCells } from "../../src/game/map-technique-presentation";
 import {
   activeMapActionHdCast,
   activeMapActionHdIceShell,
+  mapActionHdAfterglowSpan,
   mapActionHdClipEnd,
   mapActionHdFrameSpan,
   mapActionHdTick,
@@ -381,10 +383,54 @@ describe("HD map effects (REMAKE-203 fire, REMAKE-204 heal and rest, REMAKE-205.
       }
     }
     for (const phase of ["wdGrowth", "wdFinish"]) expect(mapActionHdSegmentFor("wd", phase)?.staggered, phase).toBe(true);
-    // every frame can show at once while the line grows, plus the cells parked on the last frame
+    // every frame can show at once along the trail, plus the cell fading out on the clip's afterglow
     expect(mapActionHdInstanceCount("shoot")).toBe(9);
     expect(mapActionHdInstanceCount("wd")).toBe(11);
     expect(mapActionHdInstanceCount("fire-1")).toBe(1);
+  });
+
+  it("runs 3V's line and WD's path as one advancing trail: each cell plays its frames once, the finish replays nothing", () => {
+    // `1000:6532`: the newest cell takes descriptor 0, the n-th cell back towards the shooter descriptor n
+    expect(lineTrailCells(["shooter", "middle", "target"], 1, 8))
+      .toEqual([{ cell: "shooter", age: 1 }, { cell: "middle", age: 0 }]);
+    // `1000:659B`: finish step k (frame k − 1) writes descriptor k on the target and k + n on the n-th cell back,
+    // so the target goes on from frame 1 instead of the whole line starting over on frame 0
+    expect(lineTrailCells(["shooter", "middle", "target"], 3, 8))
+      .toEqual([{ cell: "shooter", age: 3 }, { cell: "middle", age: 2 }, { cell: "target", age: 1 }]);
+    const shootFrames = 8;
+    const wdFrames = STAGE1_ACTION_PRESENTATION.wd.finishSteps;
+    for (const frames of [shootFrames, wdFrames]) {
+      for (const length of [1, 2, 5, frames + 3]) {
+        const path = Array.from({ length }, (_, index) => index);
+        const ages = new Map<number, number[]>();
+        // growth steps, then the finish, as the controller emits them
+        for (let step = 0; step < length + frames; step += 1) {
+          for (const { cell, age } of lineTrailCells(path, step, frames)) ages.set(cell, [...(ages.get(cell) ?? []), age]);
+        }
+        // each cell: frame 0 to the last once, then the `82h` step that clears it (the target's is the last step)
+        for (const cell of path) {
+          expect(ages.get(cell), `${frames} frames, ${length} cells, cell ${cell}`)
+            .toEqual(Array.from({ length: frames + 1 }, (_, age) => age));
+        }
+      }
+    }
+  });
+
+  it("fades a line cell out on the clip's afterglow the step after its last frame (REMAKE-208)", () => {
+    for (const clipId of ["shoot", "wd"]) {
+      const clip = mapActionHdClip(clipId);
+      if (!clip) throw new Error(`no HD clip for ${clipId}`);
+      expect(clip.afterglowTicks, clipId).toBeGreaterThan(0);
+      // the last frame stops at the original end; the afterglow is a playing position of its own
+      expect(mapActionHdAfterglowSpan(clip), clipId).toEqual({
+        startTick: clip.durationTicks,
+        endTick: mapActionHdClipEnd(clip),
+        limitTick: mapActionHdClipEnd(clip),
+      });
+    }
+    const sweep = mapActionHdClip("lightning-1-hit");
+    if (!sweep) throw new Error("no HD clip for lightning-1-hit");
+    expect(mapActionHdAfterglowSpan(sweep)).toBeUndefined();
   });
 
   it("repaints the stomp's leg and shadow as stills the battle moves (REMAKE-209)", () => {

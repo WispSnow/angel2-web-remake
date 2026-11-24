@@ -7820,7 +7820,7 @@ export class GameController {
   }
 
   forceClassActionSetupForTest(
-    classId: "soldier" | "archer" | "cavalry" | "magician" | "monk" | "sister" | "warrior",
+    classId: "soldier" | "archer" | "magic-archer" | "cavalry" | "magician" | "monk" | "sister" | "warrior",
     ordinaryCombat = false,
     stage1Target: "boss" | "pursuing" = "boss",
   ): void {
@@ -7857,7 +7857,7 @@ export class GameController {
     // attacking from where it stood.
     enemy.x = ordinaryCombat
       ? 30
-      : classId === "archer"
+      : classId === "archer" || classId === "magic-archer"
         ? 33
         : 30;
     enemy.y = 26;
@@ -8617,7 +8617,7 @@ export interface Angel2DebugApi {
   forceRestSetup: () => void;
   forceRoundLimitSetup: () => void;
   forceClassActionSetup: (
-    classId: "soldier" | "archer" | "cavalry" | "magician" | "monk" | "sister" | "warrior",
+    classId: "soldier" | "archer" | "magic-archer" | "cavalry" | "magician" | "monk" | "sister" | "warrior",
     ordinaryCombat?: boolean,
   ) => void;
   clearSaves: () => void;

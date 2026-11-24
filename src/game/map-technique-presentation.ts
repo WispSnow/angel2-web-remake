@@ -201,3 +201,25 @@ export function lightningWaveDistance(
     - waveFrame * hit.rangeThresholdDecrementPerWaveDraw;
   return rangeValue - rangeThreshold;
 }
+
+/**
+ * 魔弓 `3V` 的直線與 `WD` 的路徑這一步畫在哪些格、各寫描述符表的第幾項（`1000:6532/659B`、`1000:666D/66C9`）。
+ * 原版只有一條逐步前進的尾跡：長出時每到一格，那一格寫表的第 0 項、往施法者那頭的第 n 格寫第 n 項；收尾從第 1 項
+ * 起照同一規則把尾跡推過目標（收尾第 k 步，目標寫第 k 項），直到表的終止符。表的最後一項是高位碼 `82h`，`7EDD` 不把
+ * 高位碼當圖塊畫，那一格只重畫地形；再往後的格子不再寫。所以每一格只從第 0 幀播到最後一幀一次，下一步就被清掉。
+ * 收尾不是整條線一起重播，而是讓靠近目標、還沒播完的格子把剩下的幀播完。
+ *
+ * `growthOrder` 是先長出的格子在前（魔弓的路徑從射手排到目標；`WD` 的路徑表從目標排起，要傳反過來的順序）。`step`
+ * 是長出的第幾步，收尾接在後面（收尾第 f 幀 = 路徑格數 + f）。`age` 小於 `frames` 時是那一格畫的幀，等於 `frames`
+ * 是寫 `82h` 的那一步（原版清掉那一格，高清在這一步播餘韻）。
+ */
+export function lineTrailCells<T>(
+  growthOrder: readonly T[],
+  step: number,
+  frames: number,
+): readonly { readonly cell: T; readonly age: number }[] {
+  return growthOrder.flatMap((cell, index) => {
+    const age = step - index;
+    return age >= 0 && age <= frames ? [{ cell, age }] : [];
+  });
+}

@@ -13,6 +13,7 @@ import type { BattleUnit, Position } from "../types";
 import {
   iceFrameAtGlobalIndex,
   lightningFrameAtMainIndex,
+  lineTrailCells,
 } from "../map-technique-presentation";
 import { TURN_TRANSITION_DUST } from "../turn-transition-presentation";
 import { buildStompPresentationSteps } from "../stomp-presentation";
@@ -57,6 +58,7 @@ import {
   activeMapActionHdIceShell,
   mapActionHdCastFailed,
   mapActionHdFailed,
+  mapActionHdAfterglowSpan,
   mapActionHdFrameSpan,
   mapActionHdTick,
   markMapActionHdFailed,
@@ -82,11 +84,32 @@ const EDGE_PAN_INTERVAL_MS = 110;
 const unitFigureTextureKey = (unitId: string): string => `unit-figure-${unitId}`;
 const MAP_HIT_FRAME_TIMELINE = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
 
+/** 魔弓 `3V` 直線用的 `UN/60` 幀數：DS:`6888` 的九項描述符是 tile code `1..8` 加 `82h`。 */
+const SHOOT_LINE_FRAMES = 8;
+
+/**
+ * 魔弓直線（與調試的 VIRT）或 `WD` 路徑這一步的尾跡，原版圖塊與高清片段共用（規則見 `lineTrailCells`）；其他階段
+ * 回傳 `undefined`。`WD` 的 `MAGIC/19` 有 10 幀，描述符是 `1..10` 加 `82h`，收尾步數正好等於幀數。
+ */
+function battleLineTrail(special: SpecialActionPresentation): {
+  readonly frames: number;
+  readonly cells: readonly { readonly cell: Position; readonly age: number }[];
+} | undefined {
+  const shoot = special.phase === "shootLineGrow" || special.phase === "shootLineFinish";
+  if (!shoot && special.phase !== "wdGrowth" && special.phase !== "wdFinish") return undefined;
+  const path = special.result.effectCells.map(({ position }) => position);
+  const frames = shoot ? SHOOT_LINE_FRAMES : actionPresentationCatalog().wd.finishSteps;
+  const finish = special.phase === "shootLineFinish" || special.phase === "wdFinish";
+  // the magic archer's path runs shooter → target; WD's table starts at the target and grows from the caster's end
+  const growthOrder = shoot ? path : [...path].reverse();
+  return { frames, cells: lineTrailCells(growthOrder, finish ? path.length + special.frame : special.frame, frames) };
+}
+
 /**
  * 高清片段這一幀要畫在哪些格上（`REMAKE-206`）：回復畫在每個未被擋下的受治療單位上，冰雪畫在當前這一圈的每一格
- * （與原版同一圈同時顯示當前幀），其餘畫在效果中心。魔弓 `3V` 的直線與 `WD` 的路徑（`REMAKE-208`）照原版逐格
- * 規則給每格自己的幀：長出時新的一格從第 0 幀開始、較早的格子每步往後一幀、到最後一幀就停著；收尾時全部格子
- * 一起從第 0 幀重播。
+ * （與原版同一圈同時顯示當前幀），其餘畫在效果中心。魔弓 `3V` 的直線與 `WD` 的路徑（`REMAKE-208`）照原版的尾跡
+ * 給每格自己的幀：新的一格從第 0 幀開始、較早的格子每步往後一幀，播完最後一幀的下一步（原版寫 `82h` 清掉那一格）
+ * 播片段的餘韻，之後不再畫；收尾是同一條尾跡繼續推過目標，不重播。
  */
 function mapActionHdCells(special: SpecialActionPresentation): readonly MapActionHdCell[] {
   if (special.phase === "recoveryEffect") {
@@ -101,25 +124,14 @@ function mapActionHdCells(special: SpecialActionPresentation): readonly MapActio
     const rangeValue = iceFrameAtGlobalIndex(presentation, special.frame)?.rangeValue;
     return special.result.effectCells.filter(({ value }) => value === rangeValue).map(({ position }) => position);
   }
-  // the same per-cell frames the original branches below draw (`map-shoot-*`, `map-wd-*`)
-  if (special.phase === "shootLineGrow") {
-    const cells = special.result.effectCells.slice(0, special.frame + 1);
-    return cells.map(({ position }, index) => {
-      const age = cells.length - index - 1;
-      return { ...position, frame: Math.min(7, age), held: age > 7 };
-    });
-  }
-  if (special.phase === "wdGrowth") {
-    const path = special.result.effectCells;
-    const visible = path.slice(Math.max(0, path.length - special.frame - 1));
-    return visible.map(({ position }, index) => {
-      const age = visible.length - index - 1;
-      return { ...position, frame: Math.min(9, age), held: age > 9 };
-    });
-  }
-  if (special.phase === "shootLineFinish" || special.phase === "wdFinish") {
-    const frame = special.phase === "wdFinish" ? Math.min(9, special.frame) : special.frame;
-    return special.result.effectCells.map(({ position }) => ({ ...position, frame }));
+  // the same trail the original branch below draws (`map-shoot-*`, `map-wd-*`)
+  const trail = battleLineTrail(special);
+  if (trail) {
+    return trail.cells.map(({ cell, age }) => ({
+      ...cell,
+      frame: Math.min(age, trail.frames - 1),
+      afterglow: age >= trail.frames,
+    }));
   }
   if (special.phase === "lightningMain" || special.phase === "lightningHit" || special.phase === "lightningCleanup") {
     return battleLightningHdCells(special);
@@ -1456,11 +1468,12 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       if (context.stills) return this.syncMapActionHdStills(cast, context.actionId, context.stills);
       // one group per playing position: the cells of one clip on one frame share a video. A cell may name its own
       // clip (lightning's wave draws the sweep and the struck units' markers at once, `REMAKE-210`); a staggered clip
-      // (`REMAKE-208`) gives each cell its own frame, and the cells parked on its last frame form a group of their own
+      // (`REMAKE-208`) gives each cell its own frame, and the cells that finished their last frame on the step before
+      // (the original clears them with `82h`) play the clip's afterglow on a video of their own
       const active = cast.hd ? activeMapActionHdCast(context.actionId) : undefined;
       const segments = active?.segments.filter((candidate) => Object.hasOwn(candidate.phases, context.phase)) ?? [];
       const groups = new Map<string, {
-        segment: MapActionHdSegment; clip: MapActionHdClip; frame: number; held: boolean; cells: MapActionHdCell[];
+        segment: MapActionHdSegment; clip: MapActionHdClip; frame: number; afterglow: boolean; cells: MapActionHdCell[];
       }>();
       let missing = !active || segments.length === 0;
       for (const cell of context.cells) {
@@ -1470,19 +1483,25 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           missing = true;
           continue;
         }
+        const afterglow = Boolean(segment.staggered && cell.afterglow);
+        // a clip without an afterglow has nothing left to draw on a cleared cell
+        if (afterglow && !mapActionHdAfterglowSpan(clip)) continue;
         const frame = cell.frame ?? context.frame;
-        const held = Boolean(segment.staggered && cell.held);
-        const key = `${clip.clipId}:${frame}:${held ? "held" : "new"}`;
-        const group = groups.get(key) ?? { segment, clip, frame, held, cells: [] };
+        const key = afterglow ? `${clip.clipId}:afterglow` : `${clip.clipId}:${frame}`;
+        const group = groups.get(key) ?? { segment, clip, frame, afterglow, cells: [] };
         group.cells.push(cell);
         groups.set(key, group);
       }
-      // a growing line's cell on the last frame waits for the finish: it never runs into the afterglow
-      const growing = context.cells.some((cell) => cell.held !== undefined);
+      // on a line, a cell's last frame hands the afterglow to the next step's afterglow position instead of lingering
+      const trail = context.cells.some((cell) => cell.afterglow !== undefined);
       const spans = [...groups.entries()].map(([key, group]) => {
+        if (group.afterglow) {
+          const span = mapActionHdAfterglowSpan(group.clip);
+          return span && { key, group, clipFrame: group.clip.frameStartTicks.length, span };
+        }
         const clipFrame = mapActionHdClipFrame(group.segment, context.phase, group.frame);
         const span = clipFrame !== undefined ? mapActionHdFrameSpan(group.clip, clipFrame) : undefined;
-        return span && { key, group, clipFrame: clipFrame ?? 0, span: growing ? { ...span, limitTick: undefined } : span };
+        return span && { key, group, clipFrame: clipFrame ?? 0, span: trail ? { ...span, limitTick: undefined } : span };
       });
       const failed = [...groups.values()].find(({ clip }) => mapActionHdFailed(clip.clipId));
       if (!cast.hd || missing || spans.some((entry) => !entry) || failed) {
@@ -1503,23 +1522,21 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       const shows = spans.flatMap((entry) => {
         const clock = entry && cast.clocks.get(entry.key);
         if (!entry || !clock) return [];
-        const { cells, clip, segment, held } = entry.group;
+        const { cells, clip, segment } = entry.group;
         const target = (): MapActionHdPoint[] => cells.map((cell) => ({
           x: cell.x * TILE_WIDTH + TILE_WIDTH / 2 - camera.scrollX,
           y: (cell.y + 1) * TILE_HEIGHT - camera.scrollY,
         }));
-        // a parked cell holds the end of its frame; each other position plays its own frame on its own video
-        const instance = segment.staggered ? (held ? clip.frameStartTicks.length : entry.clipFrame) : 0;
-        return [held
-          ? { clip, instance, target, tick: () => clock.endTick - 1e-3, rate: 0, playing: false }
-          : {
-            clip,
-            instance,
-            target,
-            tick: () => mapActionHdTick(clock, programNow()),
-            rate: ((clock.endTick - clock.startTick) * 10) / clock.delayMs,
-            linger: clock.limitTick !== undefined,
-          }];
+        // each playing position of a staggered clip (a frame, or the afterglow after the last) has its own video
+        const instance = segment.staggered ? entry.clipFrame : 0;
+        return [{
+          clip,
+          instance,
+          target,
+          tick: () => mapActionHdTick(clock, programNow()),
+          rate: ((clock.endTick - clock.startTick) * 10) / clock.delayMs,
+          linger: clock.limitTick !== undefined,
+        }];
       });
       layer.setActive(shows);
       if (controller.isTestMode) {
@@ -1527,7 +1544,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         canvas.dataset.mapActionHd = "hd";
         canvas.dataset.mapActionHdFrameTicks = first ? `${first.startTick},${first.endTick}` : "";
         canvas.dataset.mapActionHdGroups = spans.flatMap((entry) => entry
-          ? [`${entry.group.clip.clipId}:${entry.clipFrame}${entry.group.held ? "h" : ""}x${entry.group.cells.length}`]
+          ? [`${entry.group.clip.clipId}:${entry.group.afterglow ? "afterglow" : entry.clipFrame}x${entry.group.cells.length}`]
           : []).join(",");
       }
       return true;
@@ -1896,40 +1913,18 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         let iceDistanceFromCenter: number | undefined;
         let texture: string | undefined;
         // shooting, 3V's line and WD's path go to the HD layer as a whole (`REMAKE-208`)
+        const lineTrail = battleLineTrail(special);
         if (special.phase === "shootHit" && !hdEffect) texture = `map-shoot-${special.frame}`;
-        else if ((special.phase === "shootLineGrow" || special.phase === "shootLineFinish") && !hdEffect) {
-          const cells = special.phase === "shootLineGrow"
-            ? special.result.effectCells.slice(0, special.frame + 1)
-            : special.result.effectCells;
-          for (let index = 0; index < cells.length; index += 1) {
-            const cell = cells[index];
-            if (!cell) continue;
-            const frame = special.phase === "shootLineGrow"
-              ? Math.min(7, Math.max(0, cells.length - index - 1))
-              : special.frame;
+        else if (lineTrail && !hdEffect) {
+          const textures = special.phase === "wdGrowth" || special.phase === "wdFinish" ? "map-wd" : "map-shoot";
+          for (const { cell, age } of lineTrail.cells) {
+            // `82h`: the original draws no tile there, the cell is only redrawn
+            if (age >= lineTrail.frames) continue;
             this.combatEffects.push(
               addMapActionImage(this,
-                cell.position.x * TILE_WIDTH + TILE_WIDTH / 2,
-                cell.position.y * TILE_HEIGHT + TILE_HEIGHT,
-                `map-shoot-${frame}`,
-              ).setOrigin(.5, 1).setDepth(8),
-            );
-          }
-        }
-        else if ((special.phase === "wdGrowth" || special.phase === "wdFinish") && !hdEffect) {
-          const path = special.result.effectCells;
-          const visible = special.phase === "wdGrowth"
-            ? path.slice(Math.max(0, path.length - special.frame - 1))
-            : path;
-          for (const [visibleIndex, cell] of visible.entries()) {
-            const frame = special.phase === "wdGrowth"
-              ? Math.min(9, visible.length - visibleIndex - 1)
-              : Math.min(9, special.frame);
-            this.combatEffects.push(
-              addMapActionImage(this,
-                cell.position.x * TILE_WIDTH + TILE_WIDTH / 2,
-                cell.position.y * TILE_HEIGHT + TILE_HEIGHT,
-                `map-wd-${frame}`,
+                cell.x * TILE_WIDTH + TILE_WIDTH / 2,
+                cell.y * TILE_HEIGHT + TILE_HEIGHT,
+                `${textures}-${age}`,
               ).setOrigin(.5, 1).setDepth(8),
             );
           }
