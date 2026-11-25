@@ -61,7 +61,7 @@ describe("stageEntryWithAttemptGrowth", () => {
     const attempt: CampaignState = {
       ...entry,
       roster: [
-        { slot: 0, classId: "knight", experience: 310, life: 4 },
+        { slot: 0, classId: "land-knight", experience: 310, life: 4 },
         { slot: 1, classId: "archer", experience: 66, life: 0 },
         // Never in the entry roster: a mid-stage join is not pre-written.
         { slot: 9, classId: "soldier", experience: 299, life: 60 },
@@ -74,7 +74,7 @@ describe("stageEntryWithAttemptGrowth", () => {
     expect(merged).toEqual({
       ...entry,
       roster: [
-        { slot: 0, classId: "knight", experience: 310, life: 70 },
+        { slot: 0, classId: "land-knight", experience: 310, life: 70 },
         { slot: 1, classId: "archer", experience: 66, life: 52 },
         { slot: 2, classId: "sister", experience: 10, life: 48 },
       ],
