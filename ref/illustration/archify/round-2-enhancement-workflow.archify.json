@@ -1,0 +1,93 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "《天使帝国 II》Web 重制版 · 第二轮：增强",
+    "output": "round-2-enhancement-workflow.html",
+    "locale": "zh-CN",
+    "visual_preset": "editorial",
+    "quality_profile": "showcase",
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "database": { "label": "原版锚点" },
+        "frontend": { "label": "玩家可见增强" },
+        "security": { "label": "人工决定与审阅" },
+        "messagebus": { "label": "自动筛查" },
+        "backend": { "label": "工作台生产" },
+        "cloud": { "label": "集成与发布" },
+        "external": { "label": "否决与取消" }
+      }
+    },
+    "views": [
+      {
+        "id": "track",
+        "label": "五类增强与压缩",
+        "focus": ["music", "voice", "portraits", "story", "map_fx", "encode"],
+        "note": "从耦合最少的交响音乐开始；语音的有声段驱动肖像口型；内容稳定后统一重编码。"
+      },
+      {
+        "id": "loop",
+        "label": "单项增强闭环",
+        "focus": ["proposal", "pilot", "decide", "batch", "screen", "review", "import", "integrate", "verify", "ship"],
+        "note": "先写评估、做小样，再批量生产；自动指标只筛查，人工逐轮审阅决定；生成器钉住原版身份。"
+      },
+      {
+        "id": "rejected",
+        "label": "否决与取消",
+        "focus": ["pilot", "decide", "reroute", "cancel"],
+        "note": "小样阶段就否决路线（程序特效换成原版帧加补间）；不如原版就取消并留痕（音效现代化）。"
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "track", "label": "增强主线 · 1.0 → 1.3" },
+    { "id": "rejected", "label": "否决与取消", "variant": "exception" },
+    { "id": "loop", "label": "单项增强闭环 · 提案 → 发布 → 复审" }
+  ],
+  "mainPath": ["music", "voice", "portraits", "story", "map_fx", "encode"],
+  "nodes": [
+    { "id": "music", "lane": "track", "col": 0, "type": "frontend", "label": "交响音乐", "sublabel": "36 首 · 1.0" },
+    { "id": "voice", "lane": "track", "col": 1, "type": "frontend", "label": "剧情语音", "sublabel": "2,127 段 · 1.1" },
+    { "id": "portraits", "lane": "track", "col": 2, "type": "frontend", "label": "高清肖像", "sublabel": "67 条 · 1.1" },
+    { "id": "story", "lane": "track", "col": 3, "type": "frontend", "label": "剧情画面", "sublabel": "插图·开场·尾声" },
+    { "id": "map_fx", "lane": "track", "col": 4, "type": "frontend", "label": "地图特效", "sublabel": "41 个动作 · 1.2" },
+    { "id": "encode", "lane": "track", "col": 5, "type": "cloud", "label": "统一重编码", "sublabel": "素材包 −37%" },
+    { "id": "reroute", "lane": "rejected", "col": 1, "type": "external", "label": "换路线", "sublabel": "程序特效被否决" },
+    { "id": "cancel", "lane": "rejected", "col": 2, "type": "external", "label": "取消并留痕", "sublabel": "音效现代化" },
+    { "id": "proposal", "lane": "loop", "col": 0, "yOffset": -30, "type": "database", "label": "提案评估", "sublabel": "范围·许可·体积" },
+    { "id": "pilot", "lane": "loop", "col": 1, "yOffset": -30, "type": "backend", "label": "小样", "sublabel": "最小一组" },
+    { "id": "decide", "lane": "loop", "col": 2, "yOffset": -30, "type": "security", "label": "用户决定", "sublabel": "选路线·授权" },
+    { "id": "batch", "lane": "loop", "col": 3, "yOffset": -30, "type": "backend", "label": "批量生产", "sublabel": "工作台·可续跑" },
+    { "id": "screen", "lane": "loop", "col": 4, "yOffset": -30, "type": "messagebus", "label": "自动筛查", "sublabel": "ASR·接缝·像素" },
+    { "id": "review", "lane": "loop", "col": 4, "yOffset": 30, "type": "security", "label": "人工审阅", "sublabel": "对照页·逐轮" },
+    { "id": "import", "lane": "loop", "col": 3, "yOffset": 30, "type": "database", "label": "导入清单", "sublabel": "原物一变就拒绝" },
+    { "id": "integrate", "lane": "loop", "col": 2, "yOffset": 30, "type": "cloud", "label": "可选层集成", "sublabel": "默认原版·可回退" },
+    { "id": "verify", "lane": "loop", "col": 1, "yOffset": 30, "type": "messagebus", "label": "定向验证", "sublabel": "零请求·战果一致" },
+    { "id": "ship", "lane": "loop", "col": 0, "yOffset": 30, "type": "cloud", "label": "发布复审", "sublabel": "素材仓库先推" }
+  ],
+  "edges": [
+    { "id": "music-voice", "from": "music", "to": "voice", "role": "main" },
+    { "id": "voice-portraits", "from": "voice", "to": "portraits", "role": "main" },
+    { "id": "portraits-story", "from": "portraits", "to": "story", "role": "main" },
+    { "id": "story-fx", "from": "story", "to": "map_fx", "role": "main" },
+    { "id": "fx-encode", "from": "map_fx", "to": "encode", "role": "main" },
+    { "id": "proposal-pilot", "from": "proposal", "to": "pilot", "variant": "emphasis", "role": "branch" },
+    { "id": "pilot-decide", "from": "pilot", "to": "decide", "variant": "emphasis", "role": "branch" },
+    { "id": "decide-batch", "from": "decide", "to": "batch", "variant": "emphasis", "role": "branch" },
+    { "id": "batch-screen", "from": "batch", "to": "screen", "variant": "emphasis", "role": "branch" },
+    { "id": "screen-review", "from": "screen", "to": "review", "variant": "emphasis", "role": "branch", "route": "outside-right", "fromSide": "right", "toSide": "right" },
+    { "id": "review-import", "from": "review", "to": "import", "variant": "emphasis", "role": "branch", "route": "straight", "fromSide": "left", "toSide": "right" },
+    { "id": "import-integrate", "from": "import", "to": "integrate", "variant": "emphasis", "role": "branch", "route": "straight", "fromSide": "left", "toSide": "right" },
+    { "id": "integrate-verify", "from": "integrate", "to": "verify", "variant": "emphasis", "role": "branch", "route": "straight", "fromSide": "left", "toSide": "right" },
+    { "id": "verify-ship", "from": "verify", "to": "ship", "variant": "emphasis", "role": "branch", "route": "straight", "fromSide": "left", "toSide": "right" },
+    { "id": "pilot-reroute", "from": "pilot", "to": "reroute", "label": "否决", "variant": "security", "role": "error", "fromSide": "top", "toSide": "bottom" },
+    { "id": "decide-cancel", "from": "decide", "to": "cancel", "label": "不如原版", "variant": "security", "role": "error", "fromSide": "top", "toSide": "bottom" },
+    { "id": "ship-next", "from": "ship", "to": "proposal", "variant": "dashed", "role": "return", "route": "return-left", "fromSide": "left", "toSide": "left" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "第一轮留下的底座", "items": ["原版证据身份：图集哈希、帧时间线、对白分页、旁白时长", "模拟与表现分离：增强全程不改存档身份（v133）", "私有素材仓库、资源清单与按关分包", "调试中心与实验室：单独重放每段剧情和特效"] },
+    { "dot": "amber", "title": "增强不变量（节选）", "items": ["可选，默认原版；关着就不发请求", "只换表现：控制器照原版逐帧等待", "原版帧与像素为锚，画框文字保留原样", "失败按完整单元可见地回退"] },
+    { "dot": "rose", "title": "人是验收者", "items": ["提示词、选角、路线和取消都由用户决定", "唇定位失败、多余月亮、男兵：看了才知道", "模型许可在全量之前读完"] }
+  ]
+}

@@ -1,0 +1,380 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "《天使帝国 II》Web 重制版 · 第一轮：复刻",
+    "output": "round-1-remake-workflow.html",
+    "locale": "zh-CN",
+    "visual_preset": "editorial",
+    "quality_profile": "showcase",
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "database": {
+          "label": "原版证据"
+        },
+        "frontend": {
+          "label": "玩家可见切片"
+        },
+        "security": {
+          "label": "门禁与决定"
+        },
+        "messagebus": {
+          "label": "共性能力"
+        },
+        "backend": {
+          "label": "实现与扩展"
+        },
+        "cloud": {
+          "label": "交付与运营"
+        },
+        "external": {
+          "label": "接受与里程碑"
+        }
+      }
+    },
+    "views": [
+      {
+        "id": "project-journey",
+        "label": "完整项目旅程",
+        "focus": [
+          "baseline",
+          "vertical_slice",
+          "architecture",
+          "capability_closure",
+          "campaign",
+          "hardening",
+          "first_release",
+          "operate",
+          "balance",
+          "gate_1_0"
+        ],
+        "note": "从原版证据基线出发，经真实切片、架构收口和共性能力闭合扩展完整战役，首发后再经 16 个版本的运营走到 1.0。"
+      },
+      {
+        "id": "slice-loop",
+        "label": "单个切片闭环",
+        "focus": [
+          "evidence",
+          "decision",
+          "contract",
+          "build",
+          "verify",
+          "accept"
+        ],
+        "note": "每个系统或关卡都重复同一条证据驱动的实现与接受链；首发后，试玩反馈也走这条链。"
+      },
+      {
+        "id": "scale-up",
+        "label": "从切片到全战役",
+        "focus": [
+          "vertical_slice",
+          "architecture",
+          "capability_closure",
+          "campaign"
+        ],
+        "note": "第二、三个真实变体暴露重复后再抽象；共性能力经实验室组合验收和空装配演练后，才批量推进。"
+      },
+      {
+        "id": "operate",
+        "label": "首发之后",
+        "focus": [
+          "hardening",
+          "first_release",
+          "operate",
+          "balance",
+          "gate_1_0"
+        ],
+        "note": "发布不是终点：版本化运营处理试玩反馈与证据误读，平衡靠扫描和数字，满足 1.0 门才转入第二轮。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "journey",
+      "label": "项目主线 · 原物 → 1.0"
+    },
+    {
+      "id": "slice",
+      "label": "单切片闭环 · 取证 → 接受 → 下一切片"
+    }
+  ],
+  "mainPath": [
+    "baseline",
+    "vertical_slice",
+    "architecture",
+    "capability_closure",
+    "campaign"
+  ],
+  "nodes": [
+    {
+      "id": "baseline",
+      "lane": "journey",
+      "col": 0,
+      "yOffset": -30,
+      "type": "database",
+      "label": "原版基线",
+      "sublabel": "原物·字节·证据"
+    },
+    {
+      "id": "vertical_slice",
+      "lane": "journey",
+      "col": 1,
+      "yOffset": -30,
+      "type": "frontend",
+      "label": "垂直切片",
+      "sublabel": "第 0 关真实通关"
+    },
+    {
+      "id": "architecture",
+      "lane": "journey",
+      "col": 2,
+      "yOffset": -30,
+      "type": "security",
+      "label": "架构收口",
+      "sublabel": "第 1–3 关变体"
+    },
+    {
+      "id": "capability_closure",
+      "lane": "journey",
+      "col": 3,
+      "yOffset": -30,
+      "type": "messagebus",
+      "label": "能力收口",
+      "sublabel": "实验室组合验收"
+    },
+    {
+      "id": "campaign",
+      "lane": "journey",
+      "col": 4,
+      "yOffset": -30,
+      "type": "backend",
+      "label": "战役扩展",
+      "sublabel": "内容占主导装配"
+    },
+    {
+      "id": "hardening",
+      "lane": "journey",
+      "col": 4,
+      "yOffset": 30,
+      "type": "cloud",
+      "label": "产品硬化",
+      "sublabel": "资源·存档·UI"
+    },
+    {
+      "id": "first_release",
+      "lane": "journey",
+      "col": 3,
+      "yOffset": 30,
+      "type": "cloud",
+      "label": "首次发布",
+      "sublabel": "Web·Windows·素材仓库"
+    },
+    {
+      "id": "operate",
+      "lane": "journey",
+      "col": 2,
+      "yOffset": 30,
+      "type": "cloud",
+      "label": "版本运营",
+      "sublabel": "16 版·试玩修补"
+    },
+    {
+      "id": "balance",
+      "lane": "journey",
+      "col": 1,
+      "yOffset": 30,
+      "type": "security",
+      "label": "平衡调整",
+      "sublabel": "扫描·多种子"
+    },
+    {
+      "id": "gate_1_0",
+      "lane": "journey",
+      "col": 0,
+      "yOffset": 30,
+      "type": "external",
+      "label": "1.0 门",
+      "sublabel": "转入第二轮"
+    },
+    {
+      "id": "evidence",
+      "lane": "slice",
+      "col": 0,
+      "yOffset": -30,
+      "type": "database",
+      "label": "取证",
+      "sublabel": "代码·数据·实机·反馈"
+    },
+    {
+      "id": "decision",
+      "lane": "slice",
+      "col": 2,
+      "yOffset": -30,
+      "type": "security",
+      "label": "决策",
+      "sublabel": "事实／修复／平衡"
+    },
+    {
+      "id": "contract",
+      "lane": "slice",
+      "col": 4,
+      "yOffset": -30,
+      "type": "frontend",
+      "label": "合同",
+      "sublabel": "顺序·TBD·验收"
+    },
+    {
+      "id": "build",
+      "lane": "slice",
+      "col": 4,
+      "yOffset": 30,
+      "type": "backend",
+      "label": "生成实现",
+      "sublabel": "模拟→表现"
+    },
+    {
+      "id": "verify",
+      "lane": "slice",
+      "col": 2,
+      "yOffset": 30,
+      "type": "security",
+      "label": "验证",
+      "sublabel": "自动·浏览器·视觉"
+    },
+    {
+      "id": "accept",
+      "lane": "slice",
+      "col": 0,
+      "yOffset": 30,
+      "type": "external",
+      "label": "接受",
+      "sublabel": "普通入口试玩"
+    }
+  ],
+  "edges": [
+    {
+      "id": "baseline-slice",
+      "from": "baseline",
+      "to": "vertical_slice",
+      "role": "main"
+    },
+    {
+      "id": "slice-architecture",
+      "from": "vertical_slice",
+      "to": "architecture",
+      "role": "main"
+    },
+    {
+      "id": "architecture-capability",
+      "from": "architecture",
+      "to": "capability_closure",
+      "role": "main"
+    },
+    {
+      "id": "capability-campaign",
+      "from": "capability_closure",
+      "to": "campaign",
+      "role": "main"
+    },
+    {
+      "id": "campaign-hardening",
+      "from": "campaign",
+      "to": "hardening",
+      "role": "main",
+      "route": "outside-right",
+      "fromSide": "right",
+      "toSide": "right"
+    },
+    {
+      "id": "hardening-release",
+      "from": "hardening",
+      "to": "first_release",
+      "role": "main",
+      "route": "straight",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "release-operate",
+      "from": "first_release",
+      "to": "operate",
+      "role": "main",
+      "route": "straight",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "operate-balance",
+      "from": "operate",
+      "to": "balance",
+      "role": "main",
+      "route": "straight",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "balance-gate",
+      "from": "balance",
+      "to": "gate_1_0",
+      "role": "main",
+      "route": "straight",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "evidence-decision",
+      "from": "evidence",
+      "to": "decision",
+      "variant": "emphasis",
+      "role": "branch"
+    },
+    {
+      "id": "decision-contract",
+      "from": "decision",
+      "to": "contract",
+      "variant": "emphasis",
+      "role": "branch"
+    },
+    {
+      "id": "contract-build",
+      "from": "contract",
+      "to": "build",
+      "variant": "emphasis",
+      "role": "branch",
+      "route": "outside-right",
+      "fromSide": "right",
+      "toSide": "right"
+    },
+    {
+      "id": "build-verify",
+      "from": "build",
+      "to": "verify",
+      "variant": "emphasis",
+      "role": "branch",
+      "route": "straight",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "verify-accept",
+      "from": "verify",
+      "to": "accept",
+      "variant": "emphasis",
+      "role": "branch",
+      "route": "straight",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "accept-next",
+      "from": "accept",
+      "to": "evidence",
+      "variant": "dashed",
+      "role": "return",
+      "route": "return-left",
+      "fromSide": "left",
+      "toSide": "left"
+    }
+  ]
+}

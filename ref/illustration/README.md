@@ -1,63 +1,114 @@
-# 复刻项目工作流演示图
+# 两轮开发的工作流示意图
 
-本目录用同一组项目事实分别生成两套演示图，便于比较工具的表达方式。图中内容来自
-`ref/next-project/RETROSPECTIVE.md` 与 `ref/next-project/README.md`。
+本目录为《天使帝国 II》Web 重制版的两轮开发各画一张工作流图，每张都用两个工具各出一版，方便比较表达方式，
+也可以直接用在文章和视频里。图中内容来自 [`../next-project/`](../next-project/README.md) 的蓝图与复盘：
 
-## 1. Archify
+| | 第一轮：复刻 | 第二轮：增强 |
+| --- | --- | --- |
+| 依据 | `round-1-remake-blueprint.md`、`round-1-remake-retrospective.md` | `round-2-enhancement-blueprint.md`、`round-2-enhancement-retrospective.md` |
+| 文件名前缀 | `round-1-remake-workflow` | `round-2-enhancement-workflow` |
 
-目录：`archify/`
+## 1. 第一轮：复刻
 
-- `angel2-remake-workflow.archify.json`：可编辑的 typed JSON 源；
-- `angel2-remake-workflow.html`：带章节、路径动画、亮暗主题和演示模式的自包含版本；
-- `angel2-remake-workflow.png`：用于直接对比的 1440 × 900 浅色主图；
-- `angel2-remake-workflow.visual-check.*.png`：浅色／深色、两种桌面尺寸的演示截图；
-- `angel2-remake-workflow.visual-check.*`：边界检查与截图回执。
-
-来源工具：`tt-a1i/archify`，审阅版本
-`9a5060566c832832fb843e457e58c8ee6bac82fd`，MIT。
-
-## 2. Fireworks Tech Graph
-
-目录：`fireworks-tech-graph/`
-
-- `angel2-remake-workflow.fireworks.json`：可编辑的图表源；
-- `angel2-remake-workflow.svg`：Blueprint 矢量主文件；
-- `angel2-remake-workflow.png`：1920px 演示图片；
-- `angel2-remake-workflow.layout.json`：布局与质量报告。
-
-来源工具：`yizhiyanhua-ai/fireworks-tech-graph`，审阅版本
-`d56d45a286f16439a0fba2e66ff85f598c42ef41`，MIT。
-
-## 共同叙事结构
-
-上层主线：
+上层主线（两行蛇形）：
 
 ```text
-原版基线 → 垂直切片 → 架构收口 → 能力收口 → 战役扩展 → 产品硬化 → 发布归档
+原版基线 → 垂直切片 → 架构收口 → 能力收口 → 战役扩展
+                                              ↓
+1.0 门 ← 平衡调整 ← 版本运营 ← 首次发布 ← 产品硬化
 ```
-
-其中“能力收口”指根据完整战役能力矩阵，先闭合高频共性技能、职业、状态、转职和普通 AI，
-通过 Arena／技能／转职／调试场景的组合验收与后续关卡空装配演练，再冻结接口进入批量扩展；
-稀有与 Boss 专属机制仍在首次消费关卡闭环。
 
 下层切片闭环：
 
 ```text
-Evidence → Decision → Contract → Generate → Implement → Verify → Accept
+取证 → 决策 → 合同 → 生成实现 → 验证 → 接受 → 下一切片（首发后也接收试玩反馈）
 ```
 
-## 对比建议
+与 2026-08-30 的旧版相比，主线在“发布”之后新增了“版本运营”“平衡调整”和“1.0 门”：首发不是终点，之后
+还有 16 个版本的试玩修补与平衡，满足 1.0 门才转入第二轮。
 
-- Archify：适合现场演示。HTML 可逐章播放项目主线、切片闭环、战役扩展和交付四段故事，
-  也能切换亮暗主题、聚焦节点和追踪路径；主图为适配单屏演示而采用两条蛇形泳道。
-- Fireworks Tech Graph：适合静态传播。SVG／PNG 在一页内保留更多阶段说明，并以 Blueprint
-  图框、工程标题栏和反馈回路强化“证据驱动开发”的工程感。
-- 比较时优先并排打开两个 `angel2-remake-workflow.png`；准备讲解时再打开 Archify HTML。
+## 2. 第二轮：增强
 
-## 验证结果
+增强主线：
 
-- Archify：结构、线路、composition、文字可读性、1440 × 900 至 2048 × 1320 单屏边界均通过；
-- Fireworks Tech Graph：XML、几何、箭头 marker 与 showcase composition 均通过；
-- 两张主图均已人工检查中文显示、节点遮挡、箭头方向和反馈回路。
+```text
+交响音乐（1.0）→ 剧情语音 → 高清肖像 → 剧情画面（1.1）→ 地图特效 → 统一重编码（1.2）
+```
 
-第三方仓库只作为只读工具来源；生成时不安装依赖、不联网、不读取 `.env`，所有产物仅写入本目录。
+单项增强闭环：
+
+```text
+提案评估 → 小样 → 用户决定 → 批量生产 → 自动筛查 → 人工审阅 → 导入清单 → 可选层集成 → 验证与发布
+              ↓否决        ↓不如原版                ↑下一轮审阅
+            换路线       取消并留痕
+```
+
+图中还标出两条否决路径（程序特效被否决后换路线、音效现代化取消），以及第一轮留下的底座：证据身份、模拟与
+表现分离、私有素材供应链、调试与实验室。
+
+## 3. 文件
+
+### Archify
+
+目录：`archify/`
+
+- `*.archify.json`：可编辑的 typed JSON 源（workflow，schema v2）；
+- `*.html`：自包含版本，带章节视图、路径动画、亮暗主题和演示模式，适合现场讲解；
+- `*.svg`：浅色静态矢量图，适合嵌入文章；
+- `*.png`：1440 × 900 浅色主图；
+- `*.visual-check.*.png`：浅色／深色、两种桌面尺寸的截图；
+- `*.visual-check.html`、`*.visual-check.json`：边界检查与截图回执。
+
+来源工具：`tt-a1i/archify` 3.3.1，审阅版本 `62f3a995eb26ee23f784bdea4a7992340078e9be`，MIT。
+
+### Fireworks Tech Graph
+
+目录：`fireworks-tech-graph/`
+
+- `*.fireworks.json`：可编辑的图表源（Blueprint 风格）；
+- `*.svg`：矢量主文件；
+- `*.png`：1920 px 宽的演示图片；
+- `*.layout.json`：布局与质量报告。
+
+来源工具：`yizhiyanhua-ai/fireworks-tech-graph` 1.2.0，审阅版本 `1ca1ff9cfcb67893a43d32b9ef3a1b782c44a46f`，MIT。
+
+PNG 只保存在本地（见仓库 `.gitignore`），需要时从 HTML 或 SVG 重新导出。
+
+## 4. 对比建议
+
+- Archify：适合现场演示。HTML 可以逐章播放（第一轮：完整旅程、切片闭环、从切片到全战役、首发之后；第二轮：
+  五类增强与压缩、单项增强闭环、否决与取消），也能切换亮暗主题、聚焦节点和追踪路径。第二轮图下方另有三张
+  卡片：第一轮留下的底座、增强不变量、人是验收者。
+- Fireworks Tech Graph：适合静态传播。SVG／PNG 在一页内放下更多阶段说明，用 Blueprint 图框、工程标题栏和
+  反馈回路强调工程感；两轮的标题栏分别标 `ROUND 1 · REPLICATION` 和 `ROUND 2 · ENHANCEMENT`。
+- 比较时并排打开同一轮的两个 `*.png`；讲解时打开 Archify 的 HTML。
+
+## 5. 验证结果（2026-11-25）
+
+- Archify：两张图的 `finalize`（validate、deliver、严格 check、真实浏览器 browser-check）全部通过；随后去掉
+  HTML／SVG 的行尾空白（3.3.1 版输出带行尾空白，`git diff --check` 会报），再在最终文件上重跑 `visual-check`
+  （containment、readability、viewer chrome、亮暗主题、截图），全部通过；
+- Fireworks Tech Graph：两张图的 validate、render（showcase 构图门槛）、check（XML、几何、箭头 marker、碰撞、
+  构图）全部通过；
+- 四张主图都已人工查看：中文显示、节点遮挡、箭头方向、换行箭头和反馈回路。
+
+第三方仓库只作为只读工具来源；生成时不安装依赖、不读取 `.env`，Archify 的更新检查已关闭
+（`ARCHIFY_UPDATE_CHECK_DISABLED=1`），所有产物只写入本目录。
+
+## 6. 重新生成
+
+在本目录的对应子目录里运行（工具路径换成本机的克隆位置）：
+
+```bash
+ARCHIFY_UPDATE_CHECK_DISABLED=1 node <archify>/bin/archify.mjs finalize workflow round-2-enhancement-workflow.archify.json round-2-enhancement-workflow.html --quality showcase --json
+```
+
+```bash
+python3 <fireworks-tech-graph>/scripts/fireworks.py render flowchart round-2-enhancement-workflow.fireworks.json round-2-enhancement-workflow.svg --report round-2-enhancement-workflow.layout.json
+```
+
+```bash
+python3 <fireworks-tech-graph>/scripts/fireworks.py export-png round-2-enhancement-workflow.svg round-2-enhancement-workflow.png --width 1920
+```
+
+第一轮把文件名中的 `round-2-enhancement` 换成 `round-1-remake`。

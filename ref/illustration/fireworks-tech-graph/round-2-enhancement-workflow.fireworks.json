@@ -1,0 +1,540 @@
+{
+  "schema_version": 1,
+  "mode": "flowchart",
+  "template_type": "flowchart",
+  "style": 3,
+  "quality_profile": "showcase",
+  "legend_orientation": "horizontal",
+  "legend_x": 48,
+  "legend_locked": true,
+  "width": 1400,
+  "height": 1050,
+  "title": "《天使帝国 II》Web 重制版 · 第二轮：增强",
+  "subtitle": "五类增强都只换表现、默认原版；每项先评估与小样，再批量生产、人工审阅，钉住原版身份后导入",
+  "containers": [
+    {
+      "id": "track",
+      "x": 30,
+      "y": 110,
+      "width": 1340,
+      "height": 160,
+      "label": "增强主线 / ENHANCEMENT TRACK",
+      "header_prefix": "01"
+    },
+    {
+      "id": "loop",
+      "x": 30,
+      "y": 310,
+      "width": 1340,
+      "height": 360,
+      "label": "单项增强闭环 / ENHANCEMENT LOOP",
+      "header_prefix": "02"
+    },
+    {
+      "id": "base",
+      "x": 30,
+      "y": 710,
+      "width": 1340,
+      "height": 165,
+      "label": "第一轮底座 / FOUNDATION",
+      "header_prefix": "03"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "music",
+      "kind": "rect",
+      "x": 55,
+      "y": 155,
+      "width": 178,
+      "height": 92,
+      "type_label": "MUSIC · 1.0",
+      "label": "交响音乐",
+      "sublabel": "36 首改编",
+      "fill": "#0a4b78",
+      "stroke": "#38bdf8",
+      "flat": true
+    },
+    {
+      "id": "voice",
+      "kind": "rect",
+      "x": 277,
+      "y": 155,
+      "width": 178,
+      "height": 92,
+      "type_label": "VOICE · 1.1",
+      "label": "剧情语音",
+      "sublabel": "2,127 段",
+      "fill": "#0a4b78",
+      "stroke": "#38bdf8",
+      "flat": true
+    },
+    {
+      "id": "portraits",
+      "kind": "double_rect",
+      "x": 499,
+      "y": 155,
+      "width": 178,
+      "height": 92,
+      "type_label": "PORTRAIT · 1.1",
+      "label": "高清肖像",
+      "sublabel": "67 条·口型随语音",
+      "fill": "#0a4b78",
+      "stroke": "#38bdf8",
+      "flat": true
+    },
+    {
+      "id": "story",
+      "kind": "rect",
+      "x": 721,
+      "y": 155,
+      "width": 178,
+      "height": 92,
+      "type_label": "STORY · 1.1",
+      "label": "剧情画面",
+      "sublabel": "插图·开场·尾声",
+      "fill": "#0a4b78",
+      "stroke": "#38bdf8",
+      "flat": true
+    },
+    {
+      "id": "mapfx",
+      "kind": "double_rect",
+      "x": 943,
+      "y": 155,
+      "width": 178,
+      "height": 92,
+      "type_label": "MAP FX · 1.2",
+      "label": "地图特效",
+      "sublabel": "41 个动作",
+      "fill": "#0a4b78",
+      "stroke": "#38bdf8",
+      "flat": true
+    },
+    {
+      "id": "encode",
+      "kind": "hexagon",
+      "x": 1165,
+      "y": 155,
+      "width": 178,
+      "height": 92,
+      "type_label": "ENCODE · 1.2",
+      "label": "统一重编码",
+      "sublabel": "素材包 −37%",
+      "fill": "#0b3b5e",
+      "stroke": "#06d6a0",
+      "flat": true
+    },
+    {
+      "id": "proposal",
+      "kind": "rect",
+      "x": 55,
+      "y": 370,
+      "width": 178,
+      "height": 92,
+      "type_label": "PROPOSAL",
+      "label": "提案评估",
+      "sublabel": "范围·许可·体积",
+      "fill": "#0b3b5e",
+      "stroke": "#67e8f9",
+      "flat": true
+    },
+    {
+      "id": "pilot",
+      "kind": "rect",
+      "x": 277,
+      "y": 370,
+      "width": 178,
+      "height": 92,
+      "type_label": "PILOT",
+      "label": "小样",
+      "sublabel": "最小一组",
+      "fill": "#0a4b78",
+      "stroke": "#38bdf8",
+      "flat": true
+    },
+    {
+      "id": "decide",
+      "kind": "hexagon",
+      "x": 499,
+      "y": 370,
+      "width": 178,
+      "height": 92,
+      "type_label": "DECIDE",
+      "label": "用户决定",
+      "sublabel": "选路线·授权",
+      "fill": "#0b3b5e",
+      "stroke": "#fde047",
+      "flat": true
+    },
+    {
+      "id": "batch",
+      "kind": "rect",
+      "x": 721,
+      "y": 370,
+      "width": 178,
+      "height": 92,
+      "type_label": "BATCH",
+      "label": "批量生产",
+      "sublabel": "工作台·可续跑",
+      "fill": "#0a4b78",
+      "stroke": "#38bdf8",
+      "flat": true
+    },
+    {
+      "id": "screen",
+      "kind": "rect",
+      "x": 943,
+      "y": 370,
+      "width": 178,
+      "height": 92,
+      "type_label": "SCREEN",
+      "label": "自动筛查",
+      "sublabel": "ASR·接缝·像素",
+      "fill": "#0a4b78",
+      "stroke": "#22d3ee",
+      "flat": true
+    },
+    {
+      "id": "review",
+      "kind": "hexagon",
+      "x": 1165,
+      "y": 370,
+      "width": 178,
+      "height": 92,
+      "type_label": "REVIEW",
+      "label": "人工审阅",
+      "sublabel": "对照页·逐轮",
+      "fill": "#0b3b5e",
+      "stroke": "#fde047",
+      "flat": true
+    },
+    {
+      "id": "reroute",
+      "kind": "rect",
+      "x": 277,
+      "y": 505,
+      "width": 178,
+      "height": 92,
+      "type_label": "REJECT",
+      "label": "换路线",
+      "sublabel": "程序特效被否决",
+      "fill": "#0b3b5e",
+      "stroke": "#f87171",
+      "flat": true
+    },
+    {
+      "id": "cancel",
+      "kind": "rect",
+      "x": 499,
+      "y": 505,
+      "width": 178,
+      "height": 92,
+      "type_label": "CANCEL",
+      "label": "取消并留痕",
+      "sublabel": "音效现代化",
+      "fill": "#0b3b5e",
+      "stroke": "#f87171",
+      "flat": true
+    },
+    {
+      "id": "ship",
+      "kind": "double_rect",
+      "x": 721,
+      "y": 505,
+      "width": 178,
+      "height": 92,
+      "type_label": "VERIFY + SHIP",
+      "label": "验证与发布",
+      "sublabel": "战果一致·素材先推",
+      "fill": "#0a4b78",
+      "stroke": "#06d6a0",
+      "flat": true
+    },
+    {
+      "id": "integrate",
+      "kind": "rect",
+      "x": 943,
+      "y": 505,
+      "width": 178,
+      "height": 92,
+      "type_label": "INTEGRATE",
+      "label": "可选层集成",
+      "sublabel": "默认原版·可回退",
+      "fill": "#0a4b78",
+      "stroke": "#38bdf8",
+      "flat": true
+    },
+    {
+      "id": "import",
+      "kind": "rect",
+      "x": 1165,
+      "y": 505,
+      "width": 178,
+      "height": 92,
+      "type_label": "IMPORT",
+      "label": "导入清单",
+      "sublabel": "原物一变就拒绝",
+      "fill": "#0b3b5e",
+      "stroke": "#67e8f9",
+      "flat": true
+    },
+    {
+      "id": "evidence_id",
+      "kind": "rect",
+      "x": 55,
+      "y": 752,
+      "width": 285,
+      "height": 92,
+      "type_label": "EVIDENCE ID",
+      "label": "证据身份",
+      "sublabel": "哈希·时间线·分页·时长",
+      "fill": "#0b3b5e",
+      "stroke": "#67e8f9",
+      "flat": true
+    },
+    {
+      "id": "sim_split",
+      "kind": "rect",
+      "x": 390,
+      "y": 752,
+      "width": 285,
+      "height": 92,
+      "type_label": "SIM / VIEW",
+      "label": "模拟与表现分离",
+      "sublabel": "存档身份全程 v133",
+      "fill": "#0b3b5e",
+      "stroke": "#67e8f9",
+      "flat": true
+    },
+    {
+      "id": "supply",
+      "kind": "rect",
+      "x": 725,
+      "y": 752,
+      "width": 285,
+      "height": 92,
+      "type_label": "SUPPLY CHAIN",
+      "label": "私有素材供应链",
+      "sublabel": "清单·分包·下载门",
+      "fill": "#0b3b5e",
+      "stroke": "#67e8f9",
+      "flat": true
+    },
+    {
+      "id": "labs",
+      "kind": "rect",
+      "x": 1060,
+      "y": 752,
+      "width": 285,
+      "height": 92,
+      "type_label": "LABS",
+      "label": "调试与实验室",
+      "sublabel": "单独重放每段演出",
+      "fill": "#0b3b5e",
+      "stroke": "#67e8f9",
+      "flat": true
+    }
+  ],
+  "arrows": [
+    {
+      "id": "track-1",
+      "source": "music",
+      "target": "voice",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "track-2",
+      "source": "voice",
+      "target": "portraits",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "track-3",
+      "source": "portraits",
+      "target": "story",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "track-4",
+      "source": "story",
+      "target": "mapfx",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "track-5",
+      "source": "mapfx",
+      "target": "encode",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "loop-1",
+      "source": "proposal",
+      "target": "pilot",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "data"
+    },
+    {
+      "id": "loop-2",
+      "source": "pilot",
+      "target": "decide",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "data"
+    },
+    {
+      "id": "loop-3",
+      "source": "decide",
+      "target": "batch",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "data"
+    },
+    {
+      "id": "loop-4",
+      "source": "batch",
+      "target": "screen",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "data"
+    },
+    {
+      "id": "loop-5",
+      "source": "screen",
+      "target": "review",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "data"
+    },
+    {
+      "id": "next-round",
+      "source": "review",
+      "target": "batch",
+      "source_port": "top",
+      "target_port": "top",
+      "route_points": [
+        [
+          1254.0,
+          344
+        ],
+        [
+          810.0,
+          344
+        ]
+      ],
+      "flow": "feedback",
+      "label": "下一轮审阅",
+      "label_style": "offset"
+    },
+    {
+      "id": "accept-review",
+      "source": "review",
+      "target": "import",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "data",
+      "label": "选定",
+      "label_style": "offset"
+    },
+    {
+      "id": "import-integrate",
+      "source": "import",
+      "target": "integrate",
+      "source_port": "left",
+      "target_port": "right",
+      "flow": "data"
+    },
+    {
+      "id": "integrate-ship",
+      "source": "integrate",
+      "target": "ship",
+      "source_port": "left",
+      "target_port": "right",
+      "flow": "data"
+    },
+    {
+      "id": "pilot-reject",
+      "source": "pilot",
+      "target": "reroute",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "neutral",
+      "label": "否决",
+      "label_style": "offset"
+    },
+    {
+      "id": "decide-cancel",
+      "source": "decide",
+      "target": "cancel",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "neutral",
+      "label": "不如原版",
+      "label_style": "offset"
+    },
+    {
+      "id": "next-enh",
+      "source": "ship",
+      "target": "proposal",
+      "source_port": "bottom",
+      "target_port": "bottom",
+      "route_points": [
+        [
+          810.0,
+          640
+        ],
+        [
+          144.0,
+          640
+        ]
+      ],
+      "flow": "feedback",
+      "label": "复审与下一项增强",
+      "label_style": "offset"
+    }
+  ],
+  "legend": [
+    {
+      "flow": "control",
+      "label": "增强顺序"
+    },
+    {
+      "flow": "data",
+      "label": "单项闭环"
+    },
+    {
+      "flow": "feedback",
+      "label": "审阅与复审"
+    },
+    {
+      "flow": "neutral",
+      "label": "否决与取消"
+    }
+  ],
+  "legend_y": 905,
+  "blueprint_title_block": {
+    "title": "ANGEL2 WEB REMAKE",
+    "subtitle": "ROUND 2 · ENHANCEMENT",
+    "center_caption": "WORKFLOW",
+    "left_caption": "REV: 1.0",
+    "right_caption": "DWG: ROUND-2",
+    "width": 280,
+    "height": 76,
+    "x": 1090,
+    "y": 935
+  },
+  "footer": "Proposal → Pilot → Decide → Batch → Screen → Review → Import → Integrate → Verify → Ship",
+  "footer_x": 48,
+  "footer_y": 1025
+}

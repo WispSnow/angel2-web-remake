@@ -1,6 +1,6 @@
 {
   "canvas": {
-    "height": 760.0,
+    "height": 960.0,
     "width": 1400.0
   },
   "composition": {
@@ -33,27 +33,27 @@
       "bends": 0,
       "bridges": [],
       "crossings": [],
-      "id": "phase-1",
-      "length": 42.0,
+      "id": "build-1",
+      "length": 65.0,
       "route": [
         [
-          200.0,
+          270.0,
           201.0
         ],
         [
-          242.0,
+          335.0,
           201.0
         ]
       ],
       "route_stretch": 1.0,
       "source": "baseline",
       "source_port": [
-        200.0,
+        270.0,
         201.0
       ],
       "target": "vertical",
       "target_port": [
-        242.0,
+        335.0,
         201.0
       ],
       "waypoints": []
@@ -62,27 +62,27 @@
       "bends": 0,
       "bridges": [],
       "crossings": [],
-      "id": "phase-2",
-      "length": 41.0,
+      "id": "build-2",
+      "length": 65.0,
       "route": [
         [
-          392.0,
+          535.0,
           201.0
         ],
         [
-          433.0,
+          600.0,
           201.0
         ]
       ],
       "route_stretch": 1.0,
       "source": "vertical",
       "source_port": [
-        392.0,
+        535.0,
         201.0
       ],
       "target": "architecture",
       "target_port": [
-        433.0,
+        600.0,
         201.0
       ],
       "waypoints": []
@@ -91,27 +91,27 @@
       "bends": 0,
       "bridges": [],
       "crossings": [],
-      "id": "phase-3",
-      "length": 42.0,
+      "id": "build-3",
+      "length": 65.0,
       "route": [
         [
-          583.0,
+          800.0,
           201.0
         ],
         [
-          625.0,
+          865.0,
           201.0
         ]
       ],
       "route_stretch": 1.0,
       "source": "architecture",
       "source_port": [
-        583.0,
+        800.0,
         201.0
       ],
       "target": "capability",
       "target_port": [
-        625.0,
+        865.0,
         201.0
       ],
       "waypoints": []
@@ -120,27 +120,27 @@
       "bends": 0,
       "bridges": [],
       "crossings": [],
-      "id": "phase-4",
-      "length": 42.0,
+      "id": "build-4",
+      "length": 65.0,
       "route": [
         [
-          775.0,
+          1065.0,
           201.0
         ],
         [
-          817.0,
+          1130.0,
           201.0
         ]
       ],
       "route_stretch": 1.0,
       "source": "capability",
       "source_port": [
-        775.0,
+        1065.0,
         201.0
       ],
       "target": "campaign",
       "target_port": [
-        817.0,
+        1130.0,
         201.0
       ],
       "waypoints": []
@@ -149,28 +149,28 @@
       "bends": 0,
       "bridges": [],
       "crossings": [],
-      "id": "phase-5",
-      "length": 41.0,
+      "id": "wrap",
+      "length": 118.0,
       "route": [
         [
-          967.0,
-          201.0
+          1230.0,
+          247.0
         ],
         [
-          1008.0,
-          201.0
+          1230.0,
+          365.0
         ]
       ],
       "route_stretch": 1.0,
       "source": "campaign",
       "source_port": [
-        967.0,
-        201.0
+        1230.0,
+        247.0
       ],
       "target": "hardening",
       "target_port": [
-        1008.0,
-        201.0
+        1230.0,
+        365.0
       ],
       "waypoints": []
     },
@@ -178,28 +178,115 @@
       "bends": 0,
       "bridges": [],
       "crossings": [],
-      "id": "phase-6",
-      "length": 42.0,
+      "id": "ship-1",
+      "length": 65.0,
       "route": [
         [
-          1158.0,
-          201.0
+          1130.0,
+          411.0
         ],
         [
-          1200.0,
-          201.0
+          1065.0,
+          411.0
         ]
       ],
       "route_stretch": 1.0,
       "source": "hardening",
       "source_port": [
-        1158.0,
-        201.0
+        1130.0,
+        411.0
       ],
       "target": "release",
       "target_port": [
-        1200.0,
-        201.0
+        1065.0,
+        411.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "ship-2",
+      "length": 65.0,
+      "route": [
+        [
+          865.0,
+          411.0
+        ],
+        [
+          800.0,
+          411.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "release",
+      "source_port": [
+        865.0,
+        411.0
+      ],
+      "target": "operate",
+      "target_port": [
+        800.0,
+        411.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "ship-3",
+      "length": 65.0,
+      "route": [
+        [
+          600.0,
+          411.0
+        ],
+        [
+          535.0,
+          411.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "operate",
+      "source_port": [
+        600.0,
+        411.0
+      ],
+      "target": "balance",
+      "target_port": [
+        535.0,
+        411.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "ship-4",
+      "length": 65.0,
+      "route": [
+        [
+          335.0,
+          411.0
+        ],
+        [
+          270.0,
+          411.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "balance",
+      "source_port": [
+        335.0,
+        411.0
+      ],
+      "target": "gate",
+      "target_port": [
+        270.0,
+        411.0
       ],
       "waypoints": []
     },
@@ -212,23 +299,23 @@
       "route": [
         [
           200.0,
-          451.0
+          661.0
         ],
         [
           242.0,
-          451.0
+          661.0
         ]
       ],
       "route_stretch": 1.0,
       "source": "evidence",
       "source_port": [
         200.0,
-        451.0
+        661.0
       ],
       "target": "decision",
       "target_port": [
         242.0,
-        451.0
+        661.0
       ],
       "waypoints": []
     },
@@ -241,23 +328,23 @@
       "route": [
         [
           392.0,
-          451.0
+          661.0
         ],
         [
           433.0,
-          451.0
+          661.0
         ]
       ],
       "route_stretch": 1.0,
       "source": "decision",
       "source_port": [
         392.0,
-        451.0
+        661.0
       ],
       "target": "contract",
       "target_port": [
         433.0,
-        451.0
+        661.0
       ],
       "waypoints": []
     },
@@ -270,23 +357,23 @@
       "route": [
         [
           583.0,
-          451.0
+          661.0
         ],
         [
           625.0,
-          451.0
+          661.0
         ]
       ],
       "route_stretch": 1.0,
       "source": "contract",
       "source_port": [
         583.0,
-        451.0
+        661.0
       ],
       "target": "generate",
       "target_port": [
         625.0,
-        451.0
+        661.0
       ],
       "waypoints": []
     },
@@ -299,23 +386,23 @@
       "route": [
         [
           775.0,
-          451.0
+          661.0
         ],
         [
           817.0,
-          451.0
+          661.0
         ]
       ],
       "route_stretch": 1.0,
       "source": "generate",
       "source_port": [
         775.0,
-        451.0
+        661.0
       ],
       "target": "implement",
       "target_port": [
         817.0,
-        451.0
+        661.0
       ],
       "waypoints": []
     },
@@ -328,23 +415,23 @@
       "route": [
         [
           967.0,
-          451.0
+          661.0
         ],
         [
           1008.0,
-          451.0
+          661.0
         ]
       ],
       "route_stretch": 1.0,
       "source": "implement",
       "source_port": [
         967.0,
-        451.0
+        661.0
       ],
       "target": "verify",
       "target_port": [
         1008.0,
-        451.0
+        661.0
       ],
       "waypoints": []
     },
@@ -357,23 +444,23 @@
       "route": [
         [
           1158.0,
-          451.0
+          661.0
         ],
         [
           1200.0,
-          451.0
+          661.0
         ]
       ],
       "route_stretch": 1.0,
       "source": "verify",
       "source_port": [
         1158.0,
-        451.0
+        661.0
       ],
       "target": "accept",
       "target_port": [
         1200.0,
-        451.0
+        661.0
       ],
       "waypoints": []
     },
@@ -386,40 +473,40 @@
       "route": [
         [
           1275.0,
-          497.0
+          707.0
         ],
         [
           1275.0,
-          530.0
+          740.0
         ],
         [
           125.0,
-          530.0
+          740.0
         ],
         [
           125.0,
-          497.0
+          707.0
         ]
       ],
       "route_stretch": 1.057,
       "source": "accept",
       "source_port": [
         1275.0,
-        497.0
+        707.0
       ],
       "target": "evidence",
       "target_port": [
         125.0,
-        497.0
+        707.0
       ],
       "waypoints": [
         [
           1275.0,
-          530.0
+          740.0
         ],
         [
           125.0,
-          530.0
+          740.0
         ]
       ]
     }
@@ -428,22 +515,34 @@
   "issues": [],
   "mode": "flowchart",
   "ok": true,
+  "palette": {
+    "below_target": [],
+    "minimum_target": 4.5,
+    "ratios": {
+      "section_sub_fill": 8.32,
+      "text_muted": 8.32,
+      "text_primary": 12.1,
+      "text_secondary": 10.46
+    },
+    "scope": "default opaque canvas text tokens; not a full rendered accessibility audit",
+    "unsupported_tokens": []
+  },
   "placements": {
     "legend": {
       "actual": [
         48.0,
-        620.0
+        812.0
       ],
       "bounds": [
         38.0,
-        606.0,
+        798.0,
         504.0,
-        652.0
+        844.0
       ],
       "moved": false,
       "requested": [
         48.0,
-        620.0
+        812.0
       ]
     }
   },
@@ -461,8 +560,14 @@
   },
   "summary": {
     "bridged_crossings": 0,
-    "edges": 13,
-    "nodes": 14
+    "edges": 16,
+    "nodes": 17
   },
-  "text_metrics": "heuristic-v1"
+  "text_metrics": "heuristic-v1",
+  "typography": {
+    "complete_text": true,
+    "hint": null,
+    "metrics": "heuristic widths; inspect the actual rendered font",
+    "truncated": []
+  }
 }
