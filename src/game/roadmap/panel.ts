@@ -61,7 +61,7 @@ function renderTab(tab: RoadmapTab): string {
 const panel = createOverlayPanel<RoadmapTab>({
   testid: "roadmap",
   eyebrow: "RoadMap",
-  heading: "《天使帝國 II》Web 復刻版",
+  heading: "《天使帝國 II》Web 重製版",
   footer: "RoadMap 僅展示未來規劃探討方向，不代表確定排期或發行日期承諾。",
   tabs: ROADMAP_TABS,
   render: renderTab,

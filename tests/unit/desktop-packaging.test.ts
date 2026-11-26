@@ -69,7 +69,7 @@ describe("desktop packaging contract", () => {
     expect(windows).toHaveLength(1);
     expect(windows[0]).toMatchObject({
       label: "main",
-      title: "天使帝國 II Web 復刻版",
+      title: "天使帝國 II Web 重製版",
       width: 1280,
       height: 800,
       // 桌面殼預設關掉頁面縮放熱鍵，網頁版玩家卻一直有 `Ctrl +/-`。三個參考面板是

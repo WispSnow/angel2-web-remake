@@ -197,7 +197,7 @@ function renderControls(): string {
 const panel = createOverlayPanel<RemakeNotesTab>({
   testid: "remake-notes",
   eyebrow: "復刻說明",
-  heading: "《天使帝國 II》Web 復刻版",
+  heading: "《天使帝國 II》Web 重製版",
   footer: "遊戲在選單打開期間保持暫停；關閉本說明會回到選單，視窗內的按鍵不會誤觸戰場指令。",
   tabs: REMAKE_NOTES_TABS,
   render: (tab) => tab === "disclaimer"
