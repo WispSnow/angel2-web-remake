@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createDebugScenarioController } from "../../src/game/debug-scenarios";
+import { setProgramPaused } from "../../src/game/program-clock";
 import { ruleOptions, setRuleOption } from "../../src/game/rule-options";
 import { stageEntryWithAttemptGrowth } from "../../src/game/simulation/retry-growth";
 import type { CampaignState } from "../../src/game/types";
@@ -39,6 +40,10 @@ afterEach(() => {
 });
 
 afterAll(() => {
+  // A retreat rebuilds stage 0 and starts its opening move, which nobody awaits. Pausing the
+  // program clock disarms its timers while the stubbed window still exists, so the rest of the
+  // move cannot reach for a missing window after the stubs are removed.
+  setProgramPaused(true);
   vi.unstubAllGlobals();
 });
 
