@@ -1,5 +1,5 @@
 ================================================================
-AI AGENT TOKEN USAGE — 项目: 天使帝国 II Web 复刻
+AI AGENT TOKEN USAGE — 项目: 天使帝国 II Web 重制版
 工作目录: /Users/ziyu/WorkSpace/GameDev/WebTest/TS2
 ================================================================
 

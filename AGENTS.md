@@ -1,10 +1,10 @@
-# 《天使帝国 II》Web 复刻项目协作规范
+# 《天使帝国 II》Web 重制版项目协作规范
 
 本文件适用于仓库根目录及其全部子目录。`CLAUDE.md` 是指向本文件的符号链接；项目级代理约定只维护这一份，避免 Codex、Claude 与其他工具读取到不同规则。
 
 ## 项目目标
 
-本项目通过逆向《天使帝国 II》（Empire of the Angel II）制作 Web 复刻版。默认目标是：
+本项目通过逆向《天使帝国 II》（Empire of the Angel II）制作 Web 重制版。默认目标是：
 
 - 复现原版可达战役、规则、剧情节奏、像素素材、音乐音效与主要 UI 构图；
 - 在有证据和明确决策的前提下修复原版明显 bug；
@@ -22,7 +22,7 @@
    - 原版事实：`reverse/gdd/original-gdd.md`
    - 证据登记：`reverse/gdd/evidence-register.md`
    - 规则修复决策：`reverse/gdd/web-remake-rule-decisions.md`
-   - Web 复刻设计入口：`design/remake-gdd/README.md`
+   - Web 重制版设计入口：`design/remake-gdd/README.md`
    - 设计解冻门槛：`design/remake-gdd/09-design-acceptance.md`
    - 第 0 关合同：`design/remake-gdd/vertical-slices/stage-00.md`
    - 第 0 关 UI 状态：`design/remake-gdd/ui/stage-00-ui-flow.md`

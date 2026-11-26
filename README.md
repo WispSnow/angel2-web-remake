@@ -1,4 +1,4 @@
-# 《天使帝国 II》Web 复刻
+# 《天使帝国 II》Web 重制版
 
 [![CI](https://github.com/WispSnow/angel2-web-remake/actions/workflows/ci.yml/badge.svg)](https://github.com/WispSnow/angel2-web-remake/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE)

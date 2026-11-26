@@ -1,4 +1,4 @@
-# AI Agent Token Usage — 天使帝国 II Web 复刻
+# AI Agent Token Usage — 天使帝国 II Web 重制版
 
 > 本文件记录本项目截至 **2026-08-23** 累计被 AI Agent 消耗的 token 量。
 > 数据来源是本机 `~/.claude/projects/.../...jsonl` 与 `~/.codex/{archived_sessions,sessions}/...jsonl` 的 runtime 日志,逐会话、逐模型、逐日聚合,无估算。
