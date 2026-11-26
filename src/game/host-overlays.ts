@@ -62,7 +62,7 @@ export const HOST_OVERLAYS: readonly HostOverlayEntry[] = [
   {
     id: "roadmap",
     label: "RoadMap",
-    hint: "復刻版候選願景與 QQ 交流群。",
+    hint: "重製版候選願景與 QQ 交流群。",
     load: async () => {
       const panel = await import("./roadmap/panel");
       return {

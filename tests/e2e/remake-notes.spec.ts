@@ -131,7 +131,7 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
   await expect(page.getByTestId("remake-notes-tabs").getByRole("tab"))
     .toHaveText(["Bug 修復", "功能增強", "平衡性調整", "操作說明", "免責聲明"]);
   await expect(body.locator(".rn-intro")).toHaveText(
-    "本頁整理了復刻版針對原版已知問題與缺陷所做的修復。每項均對照說明原版行為與復刻調整；"
+    "本頁整理了重製版針對原版已知問題與缺陷所做的修復。每項均對照說明原版行為與復刻調整；"
       + "戰鬥動畫、音效與加速等設置僅影響視聽演出，不改變實際數值與結算規則。",
   );
   await expect(page.locator(".rn-foot")).toHaveText(

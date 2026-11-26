@@ -43,7 +43,7 @@ function renderTab(tab: RoadmapTab): string {
       </main>
       <aside class="rn-roadmap-community" aria-labelledby="roadmap-community-title">
         <p class="rn-roadmap-community-kicker">COMMUNITY</p>
-        <h3 id="roadmap-community-title">共同參與復刻版的下一步</h3>
+        <h3 id="roadmap-community-title">共同參與重製版的下一步</h3>
         <p>歡迎分享您最期待的改進、玩法腦洞、原版考據線索與實機測試反饋！</p>
         <div class="rn-roadmap-group-number" data-testid="roadmap-qq-group">
           <span>QQ 交流群</span>
