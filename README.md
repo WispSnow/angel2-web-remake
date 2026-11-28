@@ -379,18 +379,23 @@ pnpm dev:debug
   `sound=1|0`。它们优先于设备偏好、只对这一页生效，不写回 `localStorage`；`capture=1` 时这一页对
   任何偏好的修改都只留在内存。非法值和调试场景一样换成「無效錄製參數」错误页。
 - **干净画面与版面**：不挂 DEBUG 工具条、不显示右下角宝石与宿主游标（画面内指针精灵照常），
-  画面按视窗放大并上下置中；夹具自己的「調試場景：…」状态列清空。按 P 打开宿主选单照常可用。
+  画面按视窗放大并上下置中；夹具自己的「調試場景：…」「自動驗收：…」状态列清空。按 P 打开宿主选单照常可用。
 - **准备门与起跑门**：场景挂载前冻结程序时钟（不显示暂停层），等 Phaser 第一帧、当前曲目解码、
   页面上的高清视频第一帧、图片与字型都备妥后 `status` 变成 `ready`；`start()` 才放开时钟。
 - **事件标记**：起跑后按顺序记 `{ t, perf, type, … }`（`t` 是程序时钟毫秒，暂停时不走），同时派发
   `window` 的 `angel2-capture` 事件。类型有 `scene`、`phase`、`dialogue-page`、`story-art`、`story-end`、
   `voice-start/end`、`music-start`、`title-shown`、`technique-start/end`、`combat-start/end`、
-  `menu-open/close`、`sequence-end`、`credits-end` 与 `done`；起跑前已在画面上的状态以 `t = 0`、
+  `battle-line/battle-line-end`（战场短句窗口：`kind` 为 `technique` 的 AI 技术台词或 `contextual` 的其余短句，
+  带 `line`、`speaker`、`unit`）、`menu-open/close`、`sequence-end`、`credits-end` 与 `done`；起跑前已在画面上的状态以 `t = 0`、
   `preStart: true` 记在 `scene` 之后。`until=<事件>[+毫秒]` 满足时记 `done`。
 - **入口**：`/?capture=1&startup=enter|title` 跳过开场方框直接从开场或标题第一帧开始；调试场景另有
   `focus=<单位 id、名字或职业名|x,y>`、`select=<单位>`（等同点那一格，`panel=detail` 保证右栏单位
   详情打开）与 `open=settings|roadmap|notes|compendium[/classes|characters[/<条目>]]`（等同按宝石再点
   选单列，起跑后画面仍停在选单上）。
+- **短句必现**：`lines=always`（只在 `capture=1` 时有效）让每个会掷 REMAKE-161 六成硬币的战场短句窗口
+  都出现，录制不必为台词重拍；只换硬币的表现随机源，战斗 PRNG 与结算不变，「ＡＩ對話」开关照常
+  先决定。默认 `lines=coin`。要录敌方技术台词可用 `stage-01-enemy-sister`：起跑后按 F1 全员休息，
+  第一个敌方阶段修女对妮雅施展初级炎暴。
 - **实验室**：每个实验室都有干净画面与准备门；`technique-lab.html` 另收 `preset=example`、
   `sequence=4F,3C,…`、`autoplay=1|0`、`sound=1`，`combat-lab.html` 收 `autoplay=1|0`，
   `portrait-lab.html` 收 `filter`、`eyes`、`mouth`、`redEye`、`scrollTo`。录制模式下 `autoplay=1`

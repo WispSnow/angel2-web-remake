@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { pinNativeLineCoin } from "./native-line-coin";
 
 /**
  * 開發構建的錄製模式（`capture=1`）：視頻倉庫的錄製工具照鏡頭清單開網址，等 `ready`、起跑、
@@ -201,6 +202,41 @@ test("the combat lab holds its first frame and plays once on start with autoplay
   await page.evaluate(() => window.__ANGEL2_CAPTURE__?.start());
   await page.evaluate(() => window.__ANGEL2_CAPTURE__?.done);
   expect((await captureEvents(page)).map(({ type }) => type)).toEqual(["scene", "combat-start", "combat-end", "done"]);
+});
+
+test("lines=always opens the enemy technique line even when the native coin stays shut", async ({ page }) => {
+  test.setTimeout(90_000);
+  // 每一次 Math.random 都落在 REMAKE-161 不開窗的四成裡；`lines=always` 換掉的是硬幣的表現隨機源。
+  await pinNativeLineCoin(page, "closed");
+  await page.goto("/?debugScenario=stage-01-enemy-sister&capture=1&art=hd&lines=always&until=battle-line-end");
+  await waitForCaptureReady(page);
+  // 夾具的「自動驗收：…」提示和「調試場景：…」一樣不進畫面。
+  expect(await page.evaluate(() => (window.__ANGEL2_CAPTURE__?.state() as { statusMessage?: string }).statusMessage))
+    .toBe("");
+  await page.evaluate(() => window.__ANGEL2_CAPTURE__?.start());
+  // 全員休息結束我方回合；敵方修女在第一個敵方階段對妮雅施展初級炎暴。
+  await page.keyboard.press("F1");
+  await page.evaluate(() => window.__ANGEL2_CAPTURE__?.done);
+  const events = await captureEvents(page);
+  expect(events[0]).toMatchObject({ type: "scene", entry: "stage-01-enemy-sister", lines: "always" });
+  const line = { kind: "technique", line: "fire-1", speaker: "騎士團修女", unit: "2:43" };
+  expect(events.filter(({ type }) => type.startsWith("battle-line")))
+    .toEqual([expect.objectContaining({ type: "battle-line", ...line }), expect.objectContaining({ type: "battle-line-end", ...line })]);
+  const types = events.map(({ type }) => type);
+  expect(types.indexOf("phase")).toBeLessThan(types.indexOf("battle-line"));
+  // 窗口一關法術就開始，`done` 可能落在 `technique-start` 之後幾毫秒。
+  expect(types.indexOf("done")).toBeGreaterThan(types.indexOf("battle-line-end"));
+
+  // 不加 `lines=always` 時同一枚關著的硬幣讓台詞不出現，法術照常施展。
+  await page.goto("/?debugScenario=stage-01-enemy-sister&capture=1&art=hd&until=technique-end");
+  await waitForCaptureReady(page);
+  await page.evaluate(() => window.__ANGEL2_CAPTURE__?.start());
+  await page.keyboard.press("F1");
+  await page.evaluate(() => window.__ANGEL2_CAPTURE__?.done);
+  const shut = await captureEvents(page);
+  expect(shut[0]).toMatchObject({ type: "scene", lines: "coin" });
+  expect(shut.map(({ type }) => type)).not.toContain("battle-line");
+  expect(shut).toContainEqual(expect.objectContaining({ type: "technique-start", action: "fire-1", caster: "2:43" }));
 });
 
 test("the ready gate waits for a surface that mounts behind its own route gate", async ({ page }) => {

@@ -771,6 +771,12 @@ export class GameController {
   aiTechniqueDialogue?: AiTechniqueDialoguePresentation;
   contextualLineDialogue?: ContextualLineDialoguePresentation;
   /**
+   * REMAKE-161's presentation-only source for the `0000:CAC3` window coin. It
+   * never touches the battle PRNG; the dev capture mode's `lines=always`
+   * replaces it so a recorded take always shows the line.
+   */
+  lineWindowCoin: () => number = () => Math.random();
+  /**
    * A modal battle-map dialogue. Pages turn in place, like a story's KY waits,
    * so a window open on both pages never collapses between them; `resume` runs
    * once the last page closes.
@@ -4170,7 +4176,7 @@ export class GameController {
    */
   private nativeLineWindowOpens(selector: number): boolean {
     return !nativeContextualSelectorRollsCoin(selector)
-      || nativeContextualLineCoinPasses(Math.random());
+      || nativeContextualLineCoinPasses(this.lineWindowCoin());
   }
 
   /**

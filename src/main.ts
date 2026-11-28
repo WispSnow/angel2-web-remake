@@ -461,8 +461,8 @@ else if (!releaseBuild && debugScenario) {
     );
     if (captureMode) {
       // 錄製模式：凍結程式時鐘後才掛載，場景停在第一幀；音訊當作已解鎖，不掛調試工具條。
-      // 夾具自己的「調試場景：…」狀態列只是給開發者看的提示，錄進畫面就不乾淨了。
-      if (controller.statusMessage.startsWith("調試場景")) controller.statusMessage = "";
+      // 夾具自己的「調試場景：…」「自動驗收：…」狀態列只是給開發者看的提示，錄進畫面就不乾淨了。
+      if (/^(?:調試|自動驗收)/u.test(controller.statusMessage)) controller.statusMessage = "";
       // 先載好模組：鏡頭與選取要在掛載後同步套用，趕在 Phaser 畫第一幀之前。
       const { applyBoardDirectives, applyOpenDirective, CaptureDirectiveError } =
         await import("./game/capture/directives");

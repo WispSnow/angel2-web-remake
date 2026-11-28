@@ -43,6 +43,8 @@ export const CAPTURE_EVENT_TYPES = [
   "technique-end",
   "combat-start",
   "combat-end",
+  "battle-line",
+  "battle-line-end",
   "menu-open",
   "menu-close",
   "phase",
@@ -64,6 +66,12 @@ export interface CaptureUntil {
 
 export type CaptureStartup = "enter" | "title";
 
+/**
+ * 戰場短句窗口（AI 技術台詞、規劃器短句、玩家反饋）的開窗方式：`coin` 照 REMAKE-161 六成機會，
+ * `always` 讓每個窗口都出現。只換表現隨機源，不碰戰鬥 PRNG；「ＡＩ對話」開關照常在硬幣之前決定。
+ */
+export type CaptureLineWindows = "coin" | "always";
+
 export type CaptureOpenTarget =
   | { readonly kind: "roadmap" }
   | { readonly kind: "settings" }
@@ -81,6 +89,7 @@ export interface CaptureOptions {
   readonly focus?: CaptureFocus;
   readonly select?: string;
   readonly panel?: "detail";
+  readonly lines?: CaptureLineWindows;
 }
 
 export interface CaptureRequest {
@@ -101,7 +110,7 @@ export type CaptureParseResult =
   | { readonly ok: false; readonly error: CaptureParameterError };
 
 /** 只在 `capture=1` 時才有意義的參數；單獨出現時報錯，不默默忽略。 */
-const CAPTURE_ONLY_PARAMETERS = ["until", "startup", "open", "focus", "select", "panel"] as const;
+const CAPTURE_ONLY_PARAMETERS = ["until", "startup", "open", "focus", "select", "panel", "lines"] as const;
 
 const MAX_UNTIL_DELAY_MS = 600_000;
 
@@ -207,11 +216,15 @@ function parseOptions(parameters: URLSearchParams): CaptureOptions {
   const focus = parameters.get("focus");
   const select = parameters.get("select");
   const panel = parameters.get("panel");
+  const lines = parameters.get("lines");
   if (startup !== null && startup !== "enter" && startup !== "title") {
     throw new ParameterError("startup", startup, "只接受 enter 或 title。");
   }
   if (panel !== null && panel !== "detail") throw new ParameterError("panel", panel, "只接受 detail。");
   if (panel !== null && select === null) throw new ParameterError("panel", panel, "要和 select 一起用。");
+  if (lines !== null && lines !== "coin" && lines !== "always") {
+    throw new ParameterError("lines", lines, "只接受 always 或 coin。");
+  }
   return {
     ...(until !== null ? { until: parseCaptureUntil(until) } : {}),
     ...(startup !== null ? { startup } : {}),
@@ -219,6 +232,7 @@ function parseOptions(parameters: URLSearchParams): CaptureOptions {
     ...(focus !== null ? { focus: parseFocus(focus) } : {}),
     ...(select !== null ? { select: parseUnitId("select", select) } : {}),
     ...(panel !== null ? { panel } : {}),
+    ...(lines !== null ? { lines } : {}),
   };
 }
 

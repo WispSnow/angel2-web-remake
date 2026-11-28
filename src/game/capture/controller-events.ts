@@ -49,6 +49,33 @@ function dialogueSnapshot(controller: GameController): DialogueSnapshot | undefi
   };
 }
 
+/**
+ * 戰場上自己關閉的短句窗口：AI 技術台詞與其餘 DS:84BB 短句（含取得經驗）。兩者不會同時開著；
+ * 同一物件就是同一個窗口。
+ */
+interface BattleLineSnapshot {
+  readonly window: object;
+  readonly detail: Readonly<{ [key: string]: unknown }>;
+}
+
+function battleLine(controller: GameController): BattleLineSnapshot | undefined {
+  const technique = controller.aiTechniqueDialogue;
+  if (technique) {
+    return {
+      window: technique,
+      detail: { kind: "technique", line: technique.actionId, speaker: technique.actor.name, unit: technique.actor.id },
+    };
+  }
+  const contextual = controller.contextualLineDialogue;
+  if (contextual) {
+    return {
+      window: contextual,
+      detail: { kind: "contextual", line: contextual.line, speaker: contextual.actor.name, unit: contextual.actor.id },
+    };
+  }
+  return undefined;
+}
+
 /** 控制器自己的選單；宿主選單與參考面板另外觀察。 */
 function openControllerMenus(controller: GameController): Set<string> {
   const open = new Set<string>();
@@ -88,6 +115,7 @@ export function observeControllerEvents(controller: GameController, record: Reco
   let backgroundId = dialogue?.backgroundId;
   let combat = controller.combatPresentation;
   let technique = controller.specialActionPresentation;
+  let line = battleLine(controller);
   let menus = openControllerMenus(controller);
   let creditsEnded = controller.credits?.section === "the-end";
 
@@ -141,6 +169,12 @@ export function observeControllerEvents(controller: GameController, record: Reco
       }
     }
     technique = nextTechnique;
+    const nextLine = battleLine(controller);
+    if (nextLine?.window !== line?.window) {
+      if (line) record("battle-line-end", line.detail);
+      if (nextLine) record("battle-line", nextLine.detail);
+    }
+    line = nextLine;
     const nextMenus = openControllerMenus(controller);
     diffMenus(record, menus, nextMenus);
     menus = nextMenus;

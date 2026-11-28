@@ -135,7 +135,11 @@ export function createCaptureMode(request: CaptureRequest, entry: string): Captu
       release = undefined;
       for (const callback of startCallbacks.splice(0)) callback();
     },
-    describeScene: () => ({ entry, presentation: effectivePresentation() }),
+    describeScene: () => ({
+      entry,
+      presentation: effectivePresentation(),
+      lines: request.options.lines ?? "coin",
+    }),
   });
   onPresentationProbe(({ type, ...detail }) => session.record(type, detail));
 
@@ -174,6 +178,8 @@ export function createCaptureMode(request: CaptureRequest, entry: string): Captu
       if (next === controller) return;
       detachController?.();
       controller = next;
+      // `lines=always`：硬幣的表現隨機源恆給 0（`0..5` 開窗那一側），窗口每次都出現。
+      if (request.options.lines === "always") next.lineWindowCoin = () => 0;
       detachController = observeControllerEvents(next, (type, detail) => session.record(type, detail));
     },
     settle,

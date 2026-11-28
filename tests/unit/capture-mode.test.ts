@@ -95,6 +95,17 @@ describe("capture URL parameters", () => {
     expect(parseError("?startup=enter")).toMatchObject({ parameter: "startup" });
   });
 
+  it("reads the line-window mode and waits on battle-line events", () => {
+    expect(parse("?capture=1&lines=always&until=battle-line-end+1500").options).toEqual({
+      lines: "always",
+      until: { type: "battle-line-end", delayMs: 1500 },
+    });
+    expect(parse("?capture=1&lines=coin").options).toEqual({ lines: "coin" });
+    expect(parse("?capture=1&until=battle-line").options).toEqual({ until: { type: "battle-line", delayMs: 0 } });
+    // 玩家實際遊玩時沒有這個參數：不錄製就不能讓短句必現。
+    expect(parseError("?lines=always")).toMatchObject({ parameter: "lines" });
+  });
+
   it("treats the portrait lab's style as an alias of art and accepts unit names", () => {
     expect(parse("?style=hd").presentation).toEqual({ portraitStyle: "hd" });
     expect(parse("?style=hd&art=hd").presentation).toEqual({ portraitStyle: "hd" });
@@ -129,6 +140,7 @@ describe("capture URL parameters", () => {
       ["?capture=1&focus=a%20b", "focus"],
       ["?capture=1&panel=detail", "panel"],
       ["?capture=1&select=x&panel=stats", "panel"],
+      ["?capture=1&lines=never", "lines"],
     ] as const) {
       expect(parseError(search), search).toMatchObject({ parameter });
     }
