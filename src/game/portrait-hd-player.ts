@@ -17,6 +17,14 @@ const STALL_MS = 900;
 /** 畫布底圖的最小邊長；隱藏或量不到尺寸時用它，不讓畫布變成 0×0。 */
 const MIN_BACKING_SIZE = 16;
 
+/** 停下並清掉這支視訊的來源，讓瀏覽器馬上拆掉它的媒體管線與解碼器；沒有來源時什麼都不做。 */
+export function releaseHdVideoDecoder(video: HTMLVideoElement): void {
+  if (!video.hasAttribute("src")) return;
+  video.pause();
+  video.removeAttribute("src");
+  video.load();
+}
+
 export interface PortraitHdFrame {
   readonly paused: boolean;
   readonly visible: boolean;
@@ -52,6 +60,14 @@ export class PortraitHdPlayer {
   private lastNow?: number;
   private stall?: { time: number; since: number; tries: number };
   private playRequested = false;
+  private readonly onEnded = () => {
+    this.video.currentTime = 0;
+    void this.video.play().catch(() => undefined);
+  };
+  private readonly onError = () => {
+    const { error } = this.video;
+    this.onFailure(error?.message || `media error ${error?.code ?? "unknown"}`);
+  };
 
   constructor(
     readonly element: HTMLElement,
@@ -72,13 +88,20 @@ export class PortraitHdPlayer {
     this.compose.height = PORTRAIT_HD_SIZE;
     this.composeContext = this.compose.getContext("2d");
     // 理論上 `loop` 就夠了；個別瀏覽器循環沒接上時 `ended` 會觸發，從頭再播一次。
-    video.addEventListener("ended", () => {
-      video.currentTime = 0;
-      void video.play().catch(() => undefined);
-    });
-    video.addEventListener("error", () => {
-      this.onFailure(video.error?.message || `media error ${video.error?.code ?? "unknown"}`);
-    });
+    video.addEventListener("ended", this.onEnded);
+    video.addEventListener("error", this.onError);
+  }
+
+  /**
+   * 這張臉不再上場（換了單位、戰鬥收起、圖鑑換角色）：卸下監聽並立刻放掉解碼器。離開文件的
+   * 視訊要等垃圾回收才會釋放媒體管線，在 Windows 的硬體解碼下每一個都佔著一個 D3D11 解碼器
+   * （`REMAKE-217`）。移除 `src` 再 `load()` 不會觸發 `error`（空字串的 `src` 才會）。
+   */
+  dispose(): void {
+    const { video } = this;
+    video.removeEventListener("ended", this.onEnded);
+    video.removeEventListener("error", this.onError);
+    releaseHdVideoDecoder(video);
   }
 
   sync(frame: PortraitHdFrame): void {

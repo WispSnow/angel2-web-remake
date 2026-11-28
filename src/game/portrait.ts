@@ -10,7 +10,7 @@ import type { PortraitHdEntry } from "./content/portrait-hd";
 import { PORTRAIT_HD_SIZE } from "./content/portrait-hd.generated";
 import { stagedRenderAssetSource } from "./staged-render-asset-cache";
 import { isProgramPaused, programNow } from "./program-clock";
-import { PortraitHdPlayer } from "./portrait-hd-player";
+import { PortraitHdPlayer, releaseHdVideoDecoder } from "./portrait-hd-player";
 import { SPEECH_PUNCTUATION_QUIET_MS, speechGlyphIsPunctuation, SyllableClock } from "./portrait-speech";
 import { activePortraitHd, markPortraitHdFailed } from "./portrait-style";
 
@@ -126,6 +126,12 @@ const PORTRAIT_UNDERLAY = '<i class="dialogue-portrait-underlay" aria-hidden="tr
  * `REMAKE-192` 高清肖像的圖層：封面（循環第 0 幀）墊底，畫布疊在上面由播放器逐幀繪製，
  * 視訊本身只當解碼來源，縮成 2 px 透明留在版面裡（`display:none` 的視訊不保證會播放）。
  * 封面沿用 `.portrait-base` 與原本的測試 id，靜止圖記錄（`D/67`）就只有封面。
+ *
+ * `REMAKE-217` 視訊標記裡沒有 `src`，網址只寫在 `data-source-url`，等這張臉真的上場（動畫迴圈第一次
+ * 看到它，或對白層等它就緒）才由 `attachHdVideoSource` 接上。右欄這類表面每次通知都整段重寫
+ * `innerHTML`，再由 `adoptAnimatedPortraits` 把舊節點搬回去；新解析出來的那份隨即丟掉，可是帶著
+ * `src` 的 `<video>` 一解析就開始載入、建立解碼器並解出第一幀，丟掉了也照做。全景戰鬥時右欄每幀
+ * 重建，一秒多出約五十個解碼器，Windows 的硬體解碼下就是地圖與戰鬥的明顯卡頓。
  */
 function hdPortraitLayers(entry: PortraitHdEntry, alt: string, baseTestId?: string): string {
   const base = `${PORTRAIT_UNDERLAY}<img class="portrait-base portrait-hd-poster" ${baseTestId ? `data-testid="${baseTestId}"` : ""} src="${stagedRenderAssetSource(entry.poster)}" data-source-url="${entry.poster}" alt="${alt}" />`;
@@ -133,7 +139,38 @@ function hdPortraitLayers(entry: PortraitHdEntry, alt: string, baseTestId?: stri
   return `${base}
     <canvas class="portrait-hd-canvas" width="${PORTRAIT_HD_SIZE}" height="${PORTRAIT_HD_SIZE}" aria-hidden="true"></canvas>
     <video class="portrait-hd-video" muted loop playsinline disablepictureinpicture disableremoteplayback preload="auto"
-      src="${stagedRenderAssetSource(entry.video.source)}" data-source-url="${entry.video.source}" aria-hidden="true"></video>`;
+      data-source-url="${entry.video.source}" aria-hidden="true"></video>`;
+}
+
+/** 已經接上來源、還沒放掉的高清肖像視訊；動畫迴圈每幀把離開文件的放掉。 */
+const liveHdVideos = new Set<HTMLVideoElement>();
+
+/** 這張臉上場了：接上視訊來源（已接上就不動）。 */
+function attachHdVideoSource(video: HTMLVideoElement): void {
+  if (video.hasAttribute("src")) return;
+  const url = video.dataset.sourceUrl;
+  if (!url) return;
+  video.src = stagedRenderAssetSource(url);
+  liveHdVideos.add(video);
+}
+
+/** 放掉一支高清肖像視訊的解碼器與播放器；之後若又上場，`attachHdVideoSource` 會重新接上。 */
+function releaseHdVideo(video: HTMLVideoElement): void {
+  liveHdVideos.delete(video);
+  const player = hdPlayers.get(video);
+  hdPlayers.delete(video);
+  if (player) player.dispose();
+  else releaseHdVideoDecoder(video);
+}
+
+/**
+ * 整段重寫 `innerHTML` 的表面丟掉舊肖像時不會通知這裡（換了單位的右欄、收起的全景戰鬥、重建的
+ * 對白窗）。搬回去的節點在同一個 task 內就回到文件裡，到下一幀還不在文件裡的才是真的丟掉了。
+ */
+function releaseDetachedHdVideos(): void {
+  for (const video of liveHdVideos) {
+    if (!video.isConnected) releaseHdVideo(video);
+  }
 }
 
 function portraitLayers(
@@ -244,6 +281,7 @@ export function configureAnimatedPortrait(
       element.dataset.speechDriver = "glyph";
       speechStates.delete(element);
     }
+    for (const video of element.querySelectorAll<HTMLVideoElement>("video.portrait-hd-video")) releaseHdVideo(video);
     element.innerHTML = portraitLayers(portrait, alt, baseTestId, redEyes, element.dataset.originalStill === "true");
     return;
   }
@@ -260,6 +298,7 @@ export function prepareAnimatedPortrait(element: HTMLElement): Promise<void> {
   delete element.dataset.portraitError;
   const images = [...element.querySelectorAll<HTMLImageElement>("img")];
   const video = element.querySelector<HTMLVideoElement>("video.portrait-hd-video");
+  if (video) attachHdVideoSource(video);
   const pending = Promise.all([
     ...images.map(async (image) => {
       await image.decode();
@@ -490,6 +529,7 @@ export function startPortraitAnimations(
     if (!video || !canvas) return;
     const entry = activePortraitHd(portrait, { redEyes: element.dataset.redEyes === "true" });
     if (!entry) return;
+    attachHdVideoSource(video);
     let player = hdPlayers.get(video);
     if (!player || player.canvas !== canvas) {
       player = new PortraitHdPlayer(element, portrait, entry, video, canvas, testMode);
@@ -533,6 +573,7 @@ export function startPortraitAnimations(
   const tick = (now: number) => {
     const paused = shouldPause();
     const clockNow = programNow();
+    releaseDetachedHdVideos();
     for (const element of root.querySelectorAll<HTMLElement>("[data-portrait-channel]")) {
       const channel = element.dataset.portraitChannel;
       const portrait = Number(element.dataset.portraitRecord);

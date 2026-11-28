@@ -163,6 +163,10 @@ describe("REMAKE-192 portrait style resolution", () => {
     expect(hd).toContain('data-portrait-style="hd"');
     expect(hd).toContain("canvas class=\"portrait-hd-canvas\"");
     expect(hd).toContain("/assets/original/portraits/hd/0046/portrait.mp4");
+    // REMAKE-217: the markup names the video without loading it; the source is attached once the face is on screen,
+    // so a copy an `innerHTML` rebuild parses and throws away never starts a decoder.
+    expect(hd).toMatch(/<video\b[^>]*\sdata-source-url="\/assets\/original\/portraits\/hd\/0046\/portrait\.mp4"/u);
+    expect(hd).not.toMatch(/<video\b[^>]*\ssrc=/u);
     // REMAKE-195: the possessed face plays its red-eye loop, like its unit detail.
     const possessed = panel(2, true);
     expect(possessed).toContain('data-portrait-style="hd"');

@@ -53,10 +53,8 @@ export function mountCharacterPortrait(
   return {
     destroy() {
       stop();
-      video.pause();
       // 換角色或關閉圖鑑後放掉解碼器，不讓離開文件的視訊繼續佔著它。
-      video.removeAttribute("src");
-      video.load();
+      player.dispose();
     },
   };
 }

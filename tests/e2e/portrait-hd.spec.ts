@@ -307,6 +307,77 @@ test("REMAKE-194: in HD the full-screen combat panels play the idle loop with th
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/full-combat-hd-idle-loop.png" });
 });
 
+/**
+ * `REMAKE-217` Every controller notification rewrites the right HUD's `innerHTML` and adopts the old
+ * portrait back, and full combat notifies every frame. Each rewrite parses a fresh HD portrait that is
+ * thrown away in the same task, so it never reaches an observer as an added node; the observer also
+ * walks removed nodes to see it. A `<video src>` in that markup used to start a media pipeline and
+ * decode a frame even after it was discarded (about 280 in this fight), which stuttered the map and
+ * the fight under Windows hardware decoding.
+ */
+const trackHdPortraitVideos = (page: Page) => page.addInitScript(() => {
+  const seen = new Set<HTMLVideoElement>();
+  const started = new Set<HTMLVideoElement>();
+  let hudRebuilds = 0;
+  const collect = (node: Node) => {
+    if (!(node instanceof Element)) return;
+    const videos = node.matches("video.portrait-hd-video")
+      ? [node as HTMLVideoElement]
+      : [...node.querySelectorAll<HTMLVideoElement>("video.portrait-hd-video")];
+    for (const video of videos) {
+      if (seen.has(video)) continue;
+      seen.add(video);
+      video.addEventListener("loadstart", () => started.add(video));
+    }
+  };
+  new MutationObserver((records) => {
+    for (const record of records) {
+      if (record.target instanceof Element && record.target.matches(".unit-hud")) hudRebuilds += 1;
+      record.addedNodes.forEach(collect);
+      record.removedNodes.forEach(collect);
+    }
+  }).observe(document, { childList: true, subtree: true });
+  (window as unknown as { __hdPortraitVideos: () => unknown }).__hdPortraitVideos = () => ({
+    parsed: seen.size,
+    started: started.size,
+    hudRebuilds,
+    // A face that left the document must not keep its decoder until garbage collection.
+    detachedWithSource: [...seen].filter((video) => !video.isConnected && video.hasAttribute("src")).length,
+  });
+});
+
+interface HdPortraitVideoCounts {
+  readonly parsed: number;
+  readonly started: number;
+  readonly hudRebuilds: number;
+  readonly detachedWithSource: number;
+}
+
+const hdPortraitVideoCounts = (page: Page) => page.evaluate(() =>
+  (window as unknown as { __hdPortraitVideos: () => HdPortraitVideoCounts }).__hdPortraitVideos());
+
+test("REMAKE-217: rebuilding the right HUD every frame of a fight starts no throwaway HD video", async ({ page }) => {
+  await trackHdPortraitVideos(page);
+  await usePreferences(page, { hd: true });
+  await openFullCombat(page);
+  await expect(page.getByTestId("full-left-portrait")).toHaveAttribute("data-portrait-hd-video", "playing");
+  const before = await hdPortraitVideoCounts(page);
+  await page.waitForTimeout(1_500);
+  const after = await hdPortraitVideoCounts(page);
+  // The fight really rebuilds the HUD (once per frame) and parses a portrait each time…
+  expect(after.hudRebuilds - before.hudRebuilds).toBeGreaterThan(20);
+  expect(after.parsed - before.parsed).toBeGreaterThan(20);
+  // …but only the faces on screen ever load: the HUD's, both combat panels' and any dialogue window's.
+  expect(after.started).toBeLessThanOrEqual(8);
+  expect(after.started - before.started).toBe(0);
+  // Faces that left the document (the HUD changes face as the fight opens) let go of their decoders.
+  expect(after.detachedWithSource).toBe(0);
+  // The adopted HUD face still plays.
+  const hud = page.getByTestId("unit-portrait-composite");
+  const time = Number(await hud.getAttribute("data-portrait-hd-video-time"));
+  await expect.poll(async () => Number(await hud.getAttribute("data-portrait-hd-video-time"))).not.toBe(time);
+});
+
 test("REMAKE-194: in 原版 the full-screen combat panels keep the still face the original draws once", async ({ page }) => {
   await usePreferences(page, {});
   await openFullCombat(page);
