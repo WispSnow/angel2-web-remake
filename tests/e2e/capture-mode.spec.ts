@@ -106,9 +106,12 @@ test("startup=title assembles the title from its first frame and finishes on unt
   await page.evaluate(() => window.__ANGEL2_CAPTURE__?.start());
   await page.evaluate(() => window.__ANGEL2_CAPTURE__?.done);
   const events = await captureEvents(page);
-  expect(events.map(({ type }) => type)).toEqual(["scene", "title-shown", "done"]);
+  // 標題曲約在 1725 ms 開始；機器忙時 `done` 的計時器晚到，它可能排在 `done` 前面，所以不比完整清單。
+  expect(events.slice(0, 2).map(({ type }) => type)).toEqual(["scene", "title-shown"]);
   expect(events[1]).toMatchObject({ preStart: true, style: "original" });
-  expect(events[2]?.t).toBeGreaterThanOrEqual(1_500);
+  const done = events.filter(({ type }) => type === "done");
+  expect(done).toHaveLength(1);
+  expect(done[0]?.t).toBeGreaterThanOrEqual(1_500);
 });
 
 test("URL presentation settings apply to this page only and are never written back", async ({ page, context }) => {
@@ -198,4 +201,13 @@ test("the combat lab holds its first frame and plays once on start with autoplay
   await page.evaluate(() => window.__ANGEL2_CAPTURE__?.start());
   await page.evaluate(() => window.__ANGEL2_CAPTURE__?.done);
   expect((await captureEvents(page)).map(({ type }) => type)).toEqual(["scene", "combat-start", "combat-end", "done"]);
+});
+
+test("the ready gate waits for a surface that mounts behind its own route gate", async ({ page }) => {
+  // 製作人員表、結局與部署表面都在路由門之後才掛載；準備門不能停在載入頁上就宣告備妥。
+  await page.goto("/?debugScenario=stage-38-cleared&capture=1&until=credits-end");
+  await waitForCaptureReady(page);
+  await expect(page.getByTestId("credits-screen")).toBeVisible();
+  await expect(page.getByTestId("resource-loading-progress")).toBeHidden();
+  expect(await page.evaluate(() => window.__ANGEL2_CAPTURE__?.rect())).toEqual({ x: 0, y: 15, width: 1920, height: 1050 });
 });

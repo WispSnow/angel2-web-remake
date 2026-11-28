@@ -48,6 +48,7 @@ import {
   type PreparedStartupMusic,
 } from "./game/startup-music";
 import { installProgramPause } from "./game/program-pause";
+import { trackPresentationWork } from "./game/presentation-probe";
 import { captureRequest } from "./game/capture/preload";
 import { describeCaptureParameterError } from "./game/capture/options";
 import type { CaptureMode } from "./game/capture/capture-mode";
@@ -300,7 +301,8 @@ const mountController = (
         audio.markRouteMusicReady("ending");
         destroySurface = mountStage49EndingUi(root, controller, audio);
       };
-      void mount();
+      // 錄製模式的準備門要等路由門與表面掛載完成，不能停在載入頁上。
+      trackPresentationWork(mount());
       return;
     }
     if (controller.phase === "credits") {
@@ -319,18 +321,18 @@ const mountController = (
         audio.markRouteMusicReady("credits");
         destroySurface = mountCreditsUi(root, controller);
       };
-      void mount();
+      trackPresentationWork(mount());
       return;
     }
     if (controller.phase === "deployment") {
       destroySurface = () => undefined;
-      void mountDeploymentSurface().then((destroy) => {
+      trackPresentationWork(mountDeploymentSurface().then((destroy) => {
         if (generation !== surfaceGeneration || controller.phase !== "deployment") {
           destroy();
           return;
         }
         destroySurface = destroy;
-      });
+      }));
       return;
     }
     destroySurface = mountBattleSurface();
