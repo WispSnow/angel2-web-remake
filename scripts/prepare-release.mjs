@@ -291,10 +291,23 @@ if (legacyMusic.length > 0) {
 const forbidden = files.filter((file) => {
   const name = path.basename(file);
   if (/^deployment-lab-.*\.css$/u.test(name)) return false;
-  return /debug-scenarios|debug-roster|(?:^|-)lab(?:-|\.)/u.test(name);
+  return /debug-scenarios|debug-roster|capture-|(?:^|-)lab(?:-|\.)/u.test(name);
 });
 if (forbidden.length > 0) {
   throw new Error(`release build contains development-only bundles: ${forbidden.map((file) => path.relative(releaseDirectory, file)).join(", ")}`);
+}
+// The development capture mode (`capture=1`, `src/game/capture/`) must fold away entirely; its
+// window API and page event name appear nowhere else.
+const captureMarkers = ["__ANGEL2_CAPTURE__", "angel2-capture"];
+const captureLeaks = [];
+for (const file of files.filter((candidate) => /\.(?:js|html)$/u.test(candidate))) {
+  const text = await readFile(file, "utf8");
+  for (const marker of captureMarkers) {
+    if (text.includes(marker)) captureLeaks.push(`${path.relative(releaseDirectory, file)} (${marker})`);
+  }
+}
+if (captureLeaks.length > 0) {
+  throw new Error(`release build contains the development capture mode: ${captureLeaks.join(", ")}`);
 }
 
 const indexPath = path.join(releaseDirectory, "index.html");

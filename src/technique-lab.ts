@@ -1,3 +1,4 @@
+import "./capture-preload";
 import "./styles.css";
 import "./technique-lab.css";
 import {
@@ -69,6 +70,13 @@ import {
   onProgramPauseChange,
   programNow,
 } from "./game/program-clock";
+import { trackPresentationWork } from "./game/presentation-probe";
+import {
+  assertCaptureParameters,
+  beginLabCapture,
+  labAutoplayParameter,
+  renderCaptureLoadError,
+} from "./game/capture/lab-capture";
 
 interface LabPlaybackState {
   readonly actionCode: TechniqueLabNativeCode;
@@ -85,6 +93,35 @@ interface LabPlaybackState {
 const rootCandidate = document.querySelector<HTMLElement>("#app");
 if (!rootCandidate) throw new Error("#app not found");
 const root: HTMLElement = rootCandidate;
+assertCaptureParameters(root);
+const capture = beginLabCapture("technique-lab");
+
+/**
+ * 錄製用的網址參數：`preset=example` 先恢復示例配置；`sequence=4F,3C,…` 依序對每個技能
+ * 「從頭 → 播放」，播完換下一個，全部放完記 `sequence-end`；`autoplay=1` 載入後（錄製模式為
+ * 起跑後）開始，`0` 停在第一幀；`sound=1` 打開技能原聲音效。
+ */
+const labParameters = new URLSearchParams(location.search);
+const presetParameter = labParameters.get("preset");
+if (presetParameter !== null && presetParameter !== "example") {
+  renderCaptureLoadError(root, "無效實驗室參數", `preset=${presetParameter}：只接受 example。`);
+}
+const playableCodes = new Set<string>(TECHNIQUE_LAB_CATALOG
+  .filter(({ implementationId }) => implementationId !== null)
+  .map(({ nativeCode }) => nativeCode));
+const isPlayableCode = (code: string): code is TechniqueLabNativeCode => playableCodes.has(code);
+const sequenceParameter = labParameters.get("sequence");
+const sequenceCodes: readonly TechniqueLabNativeCode[] = sequenceParameter === null ? [] : sequenceParameter
+  .split(",")
+  .map((code) => code.trim().toUpperCase())
+  .map((code) => isPlayableCode(code)
+    ? code
+    : renderCaptureLoadError(root, "無效實驗室參數", `sequence=${sequenceParameter}：${code || "（空白）"} 不是已實現的技能代碼。`));
+const autoplayParameter = labAutoplayParameter(root, labParameters);
+const soundParameter = labParameters.get("sound");
+if (soundParameter !== null && soundParameter !== "1" && soundParameter !== "0") {
+  renderCaptureLoadError(root, "無效實驗室參數", `sound=${soundParameter}：只接受 1 或 0。`);
+}
 
 const classOptions = CLASS_IDS.map((classId) => {
   const record = TECHNIQUE_LAB_UNIT_ASSETS[classId].nativeRecord;
@@ -111,7 +148,7 @@ root.innerHTML = `
 
     <div class="technique-lab-layout">
       <section class="technique-lab-stage-card" aria-label="技能地圖預覽">
-        <div class="technique-lab-canvas-frame">
+        <div class="technique-lab-canvas-frame" data-capture-target>
           <div id="technique-lab-canvas" class="technique-lab-canvas" data-testid="technique-lab-canvas"></div>
         </div>
         <div class="technique-lab-transport">
@@ -266,12 +303,19 @@ root.addEventListener("pointerdown", () => soundEffects.unlock(), { capture: tru
 // missing at the moment the page already reported itself loaded — every
 // `setActionCode` and `pause` from a freshly opened page was silently dropped.
 // Sound readiness stays observable through `data-sound-effect-ready`.
-void prepareSoundEffectBuffers(Object.values(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS)).then(() => {
+const soundBuffersReady = prepareSoundEffectBuffers(Object.values(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS)).then(() => {
   root.dataset.soundEffectReady = "true";
   soundInput.disabled = false;
+  if (soundParameter === "1" && !soundInput.checked) {
+    soundInput.checked = true;
+    soundInput.dispatchEvent(new Event("change"));
+  }
 }).catch((error: unknown) => {
   root.dataset.soundEffectError = error instanceof Error ? error.message : String(error);
 });
+trackPresentationWork(soundBuffersReady);
+// 錄製模式沒有點擊手勢；錄製工具以免手勢自動播放開瀏覽器，這裡直接解鎖。
+if (capture) soundEffects.unlock();
 
 function iceFrozenUnitIds(): readonly string[] {
   if (!session.state.actionCode.endsWith("C")) return [];
@@ -1100,6 +1144,46 @@ artStyleSelect.addEventListener("change", () => {
   render();
 });
 
+/** 錄製事件：從第一幀播放算 `technique-start`，播到時間軸終點算 `technique-end`。 */
+let recordedRun: TechniqueLabNativeCode | undefined;
+const recordRunStart = () => {
+  if (!capture || timeMs > 0) return;
+  recordedRun = session.state.actionCode;
+  capture.session.record("technique-start", {
+    action: recordedRun,
+    caster: session.state.actorId ?? null,
+    art: artStyle,
+  });
+};
+let sequenceQueue: TechniqueLabNativeCode[] = [];
+let sequenceRunning = false;
+
+function playNextInSequence(): void {
+  const code = sequenceQueue.shift();
+  if (!code) {
+    sequenceRunning = false;
+    capture?.session.record("sequence-end", { sequence: sequenceCodes });
+    return;
+  }
+  if (session.state.actionCode !== code) {
+    timeMs = 0;
+    session.setActionCode(code);
+  }
+  restart(true);
+  recordRunStart();
+}
+
+function startPlayback(): void {
+  if (sequenceCodes.length > 0) {
+    sequenceQueue = [...sequenceCodes];
+    sequenceRunning = true;
+    playNextInSequence();
+    return;
+  }
+  restart(true);
+  recordRunStart();
+}
+
 function animate(): void {
   const now = programNow();
   if (playing) {
@@ -1110,14 +1194,34 @@ function animate(): void {
     const elapsedMs = Math.max(0, now - lastAnimationTime);
     timeMs = Math.min(timelineEndMs(), timeMs + elapsedMs * speed);
     playAudioBetween(previous, timeMs);
-    if (timeMs >= timelineEndMs()) playing = false;
+    if (timeMs >= timelineEndMs()) {
+      playing = false;
+      if (recordedRun) capture?.session.record("technique-end", { action: recordedRun });
+      recordedRun = undefined;
+      if (sequenceRunning) playNextInSequence();
+    }
     render();
   }
   lastAnimationTime = now;
   requestAnimationFrame(animate);
 }
 
-restart(true);
+if (presetParameter === "example") {
+  frozenUnitIds = new Set();
+  iceOutcomeApplied = false;
+  session.reset();
+}
+if (sequenceCodes[0] && session.state.actionCode !== sequenceCodes[0]) session.setActionCode(sequenceCodes[0]);
+// 錄製模式停在第一幀等起跑；`autoplay=1` 起跑後才開始播放。沒有錄製時沿用「載入即播放」。
+if (capture) {
+  restart(false);
+  if (autoplayParameter === true) capture.onStart(startPlayback);
+  void capture.becomeReady();
+} else if (autoplayParameter === false) {
+  restart(false);
+} else {
+  startPlayback();
+}
 requestAnimationFrame(animate);
 
 window.addEventListener("pagehide", () => {

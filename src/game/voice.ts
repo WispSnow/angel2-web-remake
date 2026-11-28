@@ -1,3 +1,4 @@
+import { probePresentation } from "./presentation-probe";
 import type { GameController } from "./controller";
 import {
   VOICE_CLIPS,
@@ -260,6 +261,7 @@ export class VoiceDirector {
     if (!page) return;
     page.started = true;
     const played = this.transport.play(page.cue.source, () => {
+      probePresentation("voice-end", { voice: page.cue.key });
       if (this.page !== page) return;
       page.ended = true;
       page.settle();
@@ -271,6 +273,7 @@ export class VoiceDirector {
       this.abandon(page);
       return;
     }
+    probePresentation("voice-start", { voice: page.cue.key, kind: page.cue.kind });
     this.updateDebugState();
   }
 

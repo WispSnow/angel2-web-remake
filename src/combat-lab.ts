@@ -1,3 +1,4 @@
+import "./capture-preload";
 import "./styles.css";
 import "./combat-lab.css";
 import { ASSETS } from "./game/content/stage0";
@@ -36,6 +37,12 @@ import {
   onProgramPauseChange,
   programNow,
 } from "./game/program-clock";
+import { trackPresentationWork } from "./game/presentation-probe";
+import {
+  assertCaptureParameters,
+  beginLabCapture,
+  labAutoplayParameter,
+} from "./game/capture/lab-capture";
 
 const LAB_CLASSES = [
   "soldier",
@@ -138,6 +145,10 @@ declare global {
 const rootCandidate = document.querySelector<HTMLElement>("#app");
 if (!rootCandidate) throw new Error("#app not found");
 const root: HTMLElement = rootCandidate;
+assertCaptureParameters(root);
+const capture = beginLabCapture("combat-lab");
+/** `autoplay=1`：載入後（錄製模式為起跑後）播放一次；`0` 停在第一幀。沒寫時沿用載入即播放。 */
+const autoplayParameter = labAutoplayParameter(root, new URLSearchParams(location.search));
 
 const isLabClass = (value: string | null): value is LabClassId =>
   value !== null && (LAB_CLASSES as readonly string[]).includes(value);
@@ -458,12 +469,14 @@ root.addEventListener("pointerdown", () => soundEffects.unlock(), { capture: tru
 // ran on without ever receiving a seek or a pause. Sound readiness stays
 // observable through `data-sound-effect-ready`, which is what the sound
 // acceptance waits on, so nothing that needs the buffers loses its gate.
-void prepareSoundEffectBuffers(soundEffectUrls).then(() => {
+trackPresentationWork(prepareSoundEffectBuffers(soundEffectUrls).then(() => {
   root.dataset.soundEffectReady = "true";
   soundInput.disabled = false;
 }).catch((error: unknown) => {
   root.dataset.soundEffectError = error instanceof Error ? error.message : String(error);
-});
+}));
+// 錄製模式沒有點擊手勢；錄製工具以免手勢自動播放開瀏覽器，這裡直接解鎖。
+if (capture) soundEffects.unlock();
 
 const renderSource: CombatPresentationRenderSource = {
   battlePresentation: "full",
@@ -786,6 +799,7 @@ function tick(): void {
     currentTime = Math.min(script.duration, currentTime + elapsed * config.speed);
     crossedCues(before, currentTime);
     if (currentTime >= script.duration) {
+      capture?.session.record("combat-end", { attacker: config.attackerClass, defender: config.defenderClass });
       if (config.loop) {
         currentTime = 0;
         stopAudio();
@@ -825,7 +839,24 @@ window.__ANGEL2_COMBAT_LAB__ = {
   pause: () => setPlaying(false),
 };
 
-buildScenario(playing);
+const recordCombatStart = () => capture?.session.record("combat-start", {
+  attacker: config.attackerClass,
+  defender: config.defenderClass,
+  reaction: config.reaction,
+  death: config.death,
+});
+if (capture) {
+  // 停在第一幀等起跑；`autoplay=1` 起跑後播放一次。
+  buildScenario(false);
+  if (autoplayParameter === true) {
+    capture.onStart(() => {
+      restart();
+      recordCombatStart();
+    });
+  }
+} else {
+  buildScenario(autoplayParameter ?? playing);
+}
 configureGameScaling(
   required<HTMLElement>("#combat-lab-viewport"),
   required<HTMLElement>("#combat-lab-screen"),
@@ -833,6 +864,7 @@ configureGameScaling(
 );
 updateToggleLabel();
 requestAnimationFrame(tick);
+if (capture) void capture.becomeReady();
 window.addEventListener("pagehide", () => {
   stopAudio();
   unsubscribeProgramPause();

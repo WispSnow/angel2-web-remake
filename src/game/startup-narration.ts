@@ -1,3 +1,4 @@
+import { probePresentation, trackPresentationWork } from "./presentation-probe";
 import {
   VOICE_FADE_OUT_SECONDS,
   VOICE_GAIN_BY_VOLUME,
@@ -67,6 +68,7 @@ export class StartupNarration {
         await Promise.all(urls.map((url) => this.transport.prepare(url)));
       })
       .catch(() => undefined);
+    trackPresentationWork(this.downloads);
   }
 
   /** 進入遊戲的手勢裡呼叫：解鎖 Web Audio。 */
@@ -114,6 +116,7 @@ export class StartupNarration {
       if (!this.transport.isReady(sentence.source)) return;
       this.next += 1;
       const played = this.transport.play(sentence.source, () => {
+        probePresentation("voice-end", { voice: sentence.source.split("/").at(-1) ?? sentence.source });
         this.playing = false;
         this.justEnded = true;
         this.emit();
@@ -121,6 +124,7 @@ export class StartupNarration {
       if (played) {
         this.playing = true;
         this.started += 1;
+        probePresentation("voice-start", { voice: sentence.source.split("/").at(-1) ?? sentence.source, kind: "narration" });
       }
       this.emit();
       return;

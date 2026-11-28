@@ -3,6 +3,7 @@ import {
   buildLoopMusicSchedule,
 } from "./music-schedule";
 import { loadEncodedMusic, releaseEncodedMusic } from "./music-resource-cache";
+import { probePresentation, trackPresentationWork } from "./presentation-probe";
 
 export type MusicPart = "entry" | "loop";
 
@@ -146,7 +147,10 @@ export class MusicTransport {
       boundaryDbfs: undefined,
       error: undefined,
     });
-    if (this.unlocked) void this.schedule(program, request);
+    if (this.unlocked) {
+      if (this.suspended) this.prime(program);
+      void this.schedule(program, request);
+    }
   }
 
   unlock(): void {
@@ -155,7 +159,10 @@ export class MusicTransport {
     // resume() is invoked synchronously from the user gesture. Loading and
     // decoding may finish later without losing the browser activation grant.
     void context.resume().then(() => {
-      if (this.suspended) return context.suspend();
+      if (this.suspended) {
+        if (this.desired) this.prime(this.desired);
+        return context.suspend();
+      }
       const desired = this.desired;
       if (desired) void this.schedule(desired, this.requestSequence);
     }).catch((error: unknown) => {
@@ -203,6 +210,20 @@ export class MusicTransport {
     this.context = context;
     this.masterGain = masterGain;
     return context;
+  }
+
+  /**
+   * Decodes a program while the transport is suspended, so the resume that
+   * follows a program pause (or the capture readiness hold) starts it without a
+   * decode delay. Scheduling still waits for the resume.
+   */
+  private prime(program: MusicProgram): void {
+    const buffers = program.kind === "loop"
+      ? [this.loadBuffer(program.source), this.loadBuffer(program.seamlessLoop, true)]
+      : program.kind === "intro-loop"
+        ? [this.loadBuffer(program.entry), this.loadBuffer(program.seamlessLoop, true)]
+        : [this.loadBuffer(program.source)];
+    trackPresentationWork(Promise.allSettled(buffers));
   }
 
   private preloadUrl(url: string): Promise<ArrayBuffer> {
@@ -262,6 +283,12 @@ export class MusicTransport {
       this.active = scheduled;
       if (previous) this.fadeOut(previous, startAt);
       this.state.playRequestCount += 1;
+      probePresentation("music-start", {
+        track: this.state.track ?? null,
+        program: program.id,
+        style: program.kind === "remix-loop" ? "orchestral" : "original",
+        loop: this.state.loop,
+      });
       this.updateState({
         playing: true,
         seamlessLoop: true,

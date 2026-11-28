@@ -1,3 +1,4 @@
+import "./capture-preload";
 import "./styles.css";
 import "./portrait-lab.css";
 import {
@@ -16,9 +17,50 @@ import {
 } from "./game/portrait";
 import { PORTRAIT_HD_AVAILABLE } from "./game/content/portrait-hd";
 import { onPortraitPresentationChange, portraitStyle, setPortraitStyle } from "./game/portrait-style";
+import {
+  assertCaptureParameters,
+  beginLabCapture,
+  renderCaptureLoadError,
+} from "./game/capture/lab-capture";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
+assertCaptureParameters(root);
+const capture = beginLabCapture("portrait-lab");
+
+/**
+ * 網址可以設定頁面上的每個選項（錄製用，也方便直接分享某個檢查狀態）：`filter`、`eyes`、
+ * `mouth`、`redEye`、`scrollTo`。風格用通用的 `art`（或沿用頁面叫法的 `style`），只對這一頁生效。
+ */
+interface PortraitLabUrlOptions {
+  readonly filter?: "current" | "all";
+  readonly blink?: "auto" | "2" | "3";
+  readonly mouth?: "auto" | "1" | "2" | "3";
+  readonly redEyes?: boolean;
+  readonly scrollTo?: PortraitRecord;
+}
+
+function portraitLabUrlOptions(page: HTMLElement, parameters: URLSearchParams): PortraitLabUrlOptions {
+  const fail = (name: string, value: string, accepted: string): never =>
+    renderCaptureLoadError(page, "無效實驗室參數", `${name}=${value}：只接受 ${accepted}。`);
+  const pick = <T extends string>(name: string, aliases: Readonly<Record<string, T>>): T | undefined => {
+    const value = parameters.get(name);
+    if (value === null) return undefined;
+    return aliases[value] ?? fail(name, value, Object.keys(aliases).join("、"));
+  };
+  const scrollTo = parameters.get("scrollTo");
+  const record = scrollTo === null ? undefined : Number(scrollTo);
+  if (scrollTo !== null && !isPortraitRecord(record)) fail("scrollTo", scrollTo, "0–67 的肖像記錄號");
+  const redEye = pick("redEye", { normal: "normal", controlled: "controlled" });
+  return {
+    filter: pick("filter", { current: "current", all: "all" }),
+    blink: pick("eyes", { auto: "auto", half: "2", closed: "3", 2: "2", 3: "3" }),
+    mouth: pick("mouth", { talk: "auto", auto: "auto", closed: "1", small: "2", full: "3", 1: "1", 2: "2", 3: "3" }),
+    ...(redEye ? { redEyes: redEye === "controlled" } : {}),
+    ...(isPortraitRecord(record) ? { scrollTo: record } : {}),
+  };
+}
+const urlOptions = portraitLabUrlOptions(root, new URLSearchParams(location.search));
 
 const CURRENT_STAGE_RECORDS = new Set<PortraitRecord>([0, 15, 42, 43, 44, 45, 46, 47, 48]);
 const displayName = (record: PortraitRecord): string =>
@@ -73,7 +115,8 @@ root.innerHTML = `
       </fieldset>
     </section>
     <p class="portrait-lab-summary" data-testid="portrait-lab-summary">68 筆主肖像 · 67 筆具完整眨眼與口型 · D/63 原版無覆蓋幀及布局</p>
-    <section class="portrait-grid" data-testid="portrait-lab" data-filter="current" aria-label="角色肖像目錄">
+    <section class="portrait-grid" data-testid="portrait-lab" data-filter="current" data-capture-target
+      aria-label="角色肖像目錄">
       ${PORTRAIT_RECORDS.map((record) => {
         const entry = PORTRAIT_CATALOG[record];
         const animation: PortraitAnimationAssets | null = entry.animation;
@@ -174,6 +217,20 @@ const speechTimer = window.setInterval(() => {
     portrait.dataset.talkCount = String(Number(portrait.dataset.talkCount ?? "0") + 1);
   }
 }, 180);
+
+// 網址選項照「按下對應按鈕」套用，與手動操作走同一段程式。
+if (urlOptions.filter) {
+  filter.value = urlOptions.filter;
+  filter.dispatchEvent(new Event("change"));
+}
+const press = (selector: string) => root.querySelector<HTMLButtonElement>(selector)?.click();
+if (urlOptions.blink) press(`[data-blink="${urlOptions.blink}"]`);
+if (urlOptions.mouth) press(`[data-mouth="${urlOptions.mouth}"]`);
+if (urlOptions.redEyes !== undefined) press(`button[data-red-eyes="${urlOptions.redEyes}"]`);
+if (urlOptions.scrollTo !== undefined) {
+  root.querySelector(`[data-testid=portrait-record-${urlOptions.scrollTo}]`)?.scrollIntoView({ block: "start" });
+}
+if (capture) void capture.becomeReady();
 
 window.addEventListener("pagehide", () => {
   stopBlinking();

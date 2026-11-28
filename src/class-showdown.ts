@@ -1,4 +1,6 @@
+import "./capture-preload";
 import "./styles.css";
+import { assertCaptureParameters, beginLabCapture } from "./game/capture/lab-capture";
 import "./class-showdown.css";
 import { AudioManager } from "./game/audio";
 import type { ArenaLevel } from "./game/arena-session";
@@ -24,6 +26,9 @@ function requiredDocumentElement<T extends HTMLElement>(selector: string): T {
 }
 
 const root = requiredDocumentElement<HTMLElement>("#app");
+assertCaptureParameters(root);
+/** 錄製模式（`capture=1`）：乾淨畫面與準備門；操作由錄製工具自己做。 */
+const capture = beginLabCapture("class-showdown");
 const toolbar = requiredDocumentElement<HTMLElement>("#class-showdown-toolbar");
 
 let mode: "setup" | "battle" = "setup";
@@ -155,6 +160,7 @@ function startBattle(): void {
     createArenaRuntime(placements, CLASS_SHOWDOWN_ENVIRONMENT),
     `全職業對陣開始：${CLASS_SHOWDOWN_CLASS_IDS.length} 組、${placements.length} 名單位。`,
   );
+  capture?.attachController(controller);
   const audio = new AudioManager(controller, root, true);
   const destroyUi = mountUi(root, controller, audio);
   const game = startPhaser(controller);
@@ -214,3 +220,5 @@ window.addEventListener("pagehide", () => {
   destroySetup();
   destroyBattle();
 }, { once: true });
+
+if (capture) void capture.becomeReady();

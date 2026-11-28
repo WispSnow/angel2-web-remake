@@ -311,3 +311,14 @@
     grid-column: 1 / -1;
   }
 }
+
+/* 錄製模式（`capture=1`）：全景畫面和遊戲一樣鋪滿視窗寬度並上下置中（倍率由 `scaling.ts` 放開）。 */
+html[data-capture="true"] .combat-lab-viewport {
+  position: fixed;
+  z-index: 100;
+  left: 0;
+  top: 50%;
+  width: 100vw;
+  max-width: none;
+  transform: translateY(-50%);
+}

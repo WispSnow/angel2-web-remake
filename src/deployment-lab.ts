@@ -1,4 +1,6 @@
+import "./capture-preload";
 import "./styles.css";
+import { assertCaptureParameters, beginLabCapture } from "./game/capture/lab-capture";
 import "./deployment-lab.css";
 import { STAGE1_DEFINITION, STAGE1_DEPLOYMENT_PREVIEW_ROSTER } from "./game/content/stage1";
 import { STAGE1, STAGE1_ASSETS, STAGE1_DEPLOYMENT_UI, STAGE1_SEMANTIC_ENEMY_UNITS, STAGE1_TERRAIN_TOKENS } from "./game/content/stage1";
@@ -9,6 +11,9 @@ import { configureGameScaling } from "./game/scaling";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
+assertCaptureParameters(root);
+/** 錄製模式（`capture=1`）：乾淨畫面與準備門；操作由錄製工具自己做。 */
+const capture = beginLabCapture("deployment-lab");
 
 root.innerHTML = `
   <div class="deployment-lab-shell">
@@ -83,3 +88,5 @@ declare global {
 window.__ANGEL2_DEPLOYMENT_LAB__ = {
   getState: () => session.state,
 };
+
+if (capture) void capture.becomeReady();

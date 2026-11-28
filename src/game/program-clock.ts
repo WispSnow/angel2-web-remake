@@ -133,6 +133,31 @@ export const setProgramTimeout = (
 export const clearProgramTimeout = (id: ProgramTimeout): void => programClock.clearTimeout(id);
 export const programDelay = (milliseconds: number): Promise<void> => programClock.delay(milliseconds);
 
+let silentHold = false;
+
+/** True while `holdProgramSilently` keeps the clock frozen without the pause overlay. */
+export const isProgramHeldSilently = (): boolean => silentHold;
+
+/**
+ * Freezes the program clock without presenting the pause overlay, for the
+ * development capture mode's readiness gate: the surface mounts and loads behind
+ * the hold, then the recorder releases it to start the scene from its first
+ * frame. Every pause subscriber (Phaser, audio, video) sees an ordinary pause;
+ * only the overlay and its input boundary stay out of it. Returns the release.
+ */
+export function holdProgramSilently(): () => void {
+  if (silentHold || programClock.isPaused) throw new Error("program clock is already paused");
+  silentHold = true;
+  programClock.setPaused(true);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    programClock.setPaused(false);
+    silentHold = false;
+  };
+}
+
 /** Keeps an explicitly-created Web Animation on the same pause boundary. */
 export function bindProgramAnimation(animation: Animation): () => void {
   let pausedByProgram = false;

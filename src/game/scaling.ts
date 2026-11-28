@@ -65,6 +65,13 @@ export function computeGameOffset(
   return Math.floor((slack / 2) * ratio) / ratio;
 }
 
+/**
+ * 開發構建的錄製模式（`capture=1`）和桌面版一樣讓畫面鋪滿視窗：錄製工具以 1920×1080 CSS 像素
+ * 的視窗錄，網頁版平常的 1 倍上限會讓畫面只佔一角。發布構建折疊成 `false`。
+ */
+const captureFillsViewport = (): boolean =>
+  import.meta.env.MODE !== "release" && document.documentElement.dataset.capture === "true";
+
 export interface GameScalingOptions {
   /**
    * `REMAKE-174` 的「原版Debug」開關屬於正式遊戲表面；實驗室各有自己的內存場景，
@@ -121,9 +128,11 @@ export function configureGameScaling(
   const resize = () => {
     const mode = imageScalingMode();
     const ratio = window.devicePixelRatio || 1;
+    const fill = !desktop && captureFillsViewport();
     const scale = computeGameScale(viewport.clientWidth, ratio, mode, {
-      availableHeight: desktop ? availableDesktopHeight() : undefined,
-      allowUpscale: desktop,
+      // 錄製時畫面在視窗裡上下置中，可用高度是整個視窗，不扣畫面上緣。
+      availableHeight: desktop ? availableDesktopHeight() : fill ? document.documentElement.clientHeight : undefined,
+      allowUpscale: desktop || fill,
     });
     const offset = computeGameOffset(viewport.clientWidth, ratio, scale);
     viewport.style.height = `${LOGICAL_SCREEN_HEIGHT * scale}px`;

@@ -155,7 +155,7 @@ Playwright 失败视频需要匹配版本的 ffmpeg；本机缺失时运行：
 pnpm exec playwright install ffmpeg
 ```
 
-不要在普通功能代码中依赖 `?test=1`、`?skipStartup`、调试 API 或测试夹具。真实通关验收必须从普通 `/` 启动，并只使用玩家可见控件。
+不要在普通功能代码中依赖 `?test=1`、`?skipStartup`、`?capture=1`（视频录制模式，见 README「录制模式」）、调试 API 或测试夹具。真实通关验收必须从普通 `/` 启动，并只使用玩家可见控件。
 
 ## 目录职责
 

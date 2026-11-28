@@ -1,3 +1,4 @@
+import { trackPresentationWork } from "./presentation-probe";
 import { STARTUP_TITLE } from "./content/startup.generated";
 import {
   STORY_HD_INTRO,
@@ -44,8 +45,8 @@ export class StartupHd {
   request(): void {
     if (this.requested || this.disposed || !this.options.loader) return;
     this.requested = true;
-    if (STORY_HD_INTRO) void this.loadIntro(STORY_HD_INTRO, this.options.loader);
-    if (STORY_HD_TITLE) void this.loadTitle(STORY_HD_TITLE, this.options.loader);
+    if (STORY_HD_INTRO) trackPresentationWork(this.loadIntro(STORY_HD_INTRO, this.options.loader));
+    if (STORY_HD_TITLE) trackPresentationWork(this.loadTitle(STORY_HD_TITLE, this.options.loader));
   }
 
   private async loadIntro(spec: StoryHdIntro, loader: (urls: readonly string[]) => Promise<void>): Promise<void> {

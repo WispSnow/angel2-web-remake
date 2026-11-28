@@ -1,3 +1,4 @@
+import "./capture-preload";
 import "./styles.css";
 import "./stage49-ending.css";
 import "./resource-loading.css";
@@ -47,6 +48,9 @@ import {
   type PreparedStartupMusic,
 } from "./game/startup-music";
 import { installProgramPause } from "./game/program-pause";
+import { captureRequest } from "./game/capture/preload";
+import { describeCaptureParameterError } from "./game/capture/options";
+import type { CaptureMode } from "./game/capture/capture-mode";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
@@ -176,12 +180,15 @@ const stage0PresentationAssets = classPresentationAssetUrls(stage0ClassRequireme
 
 /** 換一局（重新掛載控制器）時換掉上一局的訂閱，不讓舊控制器繼續下載。 */
 let stopHdPortraitDownloads: (() => void) | undefined;
+/** 開發構建的錄製模式（`capture=1`）；發布構建恆為 `undefined`。 */
+let activeCapture: CaptureMode | undefined;
 
 const mountController = (
   controller: GameController,
   userActivated: boolean,
   stagedResources?: ResourcePackLoader,
 ) => {
+  activeCapture?.attachController(controller);
   const audio = new AudioManager(
     controller,
     root,
@@ -373,7 +380,7 @@ const startGame = async (selection: StartupSelection) => {
     controller = new GameController(selection.difficulty, stageAssetGate);
     await stageAssetGate("stage-00", async () => controllerAssetRequirements(controller));
   }
-  mountController(controller, selection.userActivated, resourceLoader);
+  mountController(controller, selection.userActivated || activeCapture !== undefined, resourceLoader);
 };
 
 const renderDebugLoadError = (title: string, message: string) => {
@@ -392,7 +399,21 @@ const renderDebugLoadError = (title: string, message: string) => {
 
 const parameters = new URLSearchParams(location.search);
 const debugScenario = releaseBuild ? null : parameters.get("debugScenario");
-if (!releaseBuild && debugScenario) {
+const capture = releaseBuild ? undefined : captureRequest();
+/** 錄製模式先掛上 `window.__ANGEL2_CAPTURE__`，錄製工具在載入期間就能等 `ready`。 */
+const enterCaptureMode = async (entry: string): Promise<CaptureMode | undefined> => {
+  if (releaseBuild || !capture?.ok || !capture.value.capture) return undefined;
+  const { createCaptureMode } = await import("./game/capture/capture-mode");
+  activeCapture = createCaptureMode(capture.value, entry);
+  return activeCapture;
+};
+if (!releaseBuild && capture && !capture.ok) {
+  renderDebugLoadError("無效錄製參數", describeCaptureParameterError(capture.error));
+}
+else if (!releaseBuild && capture?.ok && capture.value.capture && capture.value.options.startup && debugScenario) {
+  renderDebugLoadError("無效錄製參數", "startup 只用於普通入口，不能和 debugScenario 一起用。");
+}
+else if (!releaseBuild && debugScenario) {
   void import("./game/debug-scenarios").then(async (debug) => {
     if (!debug.isDebugScenarioId(debugScenario)) {
       renderDebugLoadError("未知調試場景", debugScenario);
@@ -420,6 +441,7 @@ if (!releaseBuild && debugScenario) {
     }
     // 隨機職業成長每次進入都抽新種子，並寫回網址，重新整理才會重現同一陣容。
     const rosterSource = debug.withDebugGrowthSeed(parsedRosterSource, perStageGrowth, growthSeed);
+    const captureMode = await enterCaptureMode(debugScenario);
     if (rosterSource.kind === "profile" && rosterSource.seed !== undefined && growthSeed === undefined) {
       parameters.set("seed", String(rosterSource.seed));
       history.replaceState(history.state, "", `${location.pathname}?${parameters.toString()}${location.hash}`);
@@ -435,6 +457,29 @@ if (!releaseBuild && debugScenario) {
       controller.battle.stage.id,
       async () => controllerAssetRequirements(controller),
     );
+    if (captureMode) {
+      // 錄製模式：凍結程式時鐘後才掛載，場景停在第一幀；音訊當作已解鎖，不掛調試工具條。
+      // 夾具自己的「調試場景：…」狀態列只是給開發者看的提示，錄進畫面就不乾淨了。
+      if (controller.statusMessage.startsWith("調試場景")) controller.statusMessage = "";
+      // 先載好模組：鏡頭與選取要在掛載後同步套用，趕在 Phaser 畫第一幀之前。
+      const { applyBoardDirectives, applyOpenDirective, CaptureDirectiveError } =
+        await import("./game/capture/directives");
+      captureMode.hold();
+      mountController(controller, true, resourceLoader);
+      try {
+        applyBoardDirectives(controller, captureMode.request.options);
+        if (captureMode.request.options.open) {
+          await captureMode.settle();
+          await applyOpenDirective(captureMode.request.options, captureMode);
+        }
+      } catch (error: unknown) {
+        if (!(error instanceof CaptureDirectiveError)) throw error;
+        renderDebugLoadError("無效錄製參數", error.message);
+        return;
+      }
+      await captureMode.becomeReady();
+      return;
+    }
     // 從調試頁點連結進來時瀏覽器已允許出聲，照已解鎖掛上，第一頁劇情就有語音。
     const { debugEntryAudioAllowed } = await import("./game/debug-audio-activation");
     mountController(controller, await debugEntryAudioAllowed(), resourceLoader);
@@ -456,11 +501,15 @@ else if (!releaseBuild && parameters.has("skipStartup")) {
 }
 else {
   let startupMusic: PreparedStartupMusic | undefined;
-  void resourceLoader.ensureBoot(async () => {
-    startupMusic?.dispose();
-    startupMusic = await prepareStartupMusic((urls, onPercent) => resourceLoader.ensureMusic(urls, onPercent));
-  }).then(() => {
+  const captureStartup = !releaseBuild && capture?.ok ? capture.value.options.startup : undefined;
+  void enterCaptureMode(captureStartup ? `startup:${captureStartup}` : "startup").then(() =>
+    resourceLoader.ensureBoot(async () => {
+      startupMusic?.dispose();
+      startupMusic = await prepareStartupMusic((urls, onPercent) => resourceLoader.ensureMusic(urls, onPercent));
+    }),
+  ).then(() => {
     if (!startupMusic) throw new Error("開場音樂沒有通過資源準備門。");
+    const captureMode = activeCapture;
     // Waits for the entry gesture: started with the panel, this pack took the
     // connection from the two startup remixes.
     mountStartup(root, startGame, startupMusic, () => {
@@ -471,6 +520,17 @@ else {
         ...mapActionHdUrlsForStyle(stagePresentationActionIds(stage0ClassRequirements)),
         ...stageRemixMusicUrls(STAGE0_DEFINITION.music, loadMusicPreferences(localStorage).musicStyle),
       ]);
-    }, (urls) => resourceLoader.ensureVoice(urls), (urls) => resourceLoader.extendActiveStage(urls));
+    }, (urls) => resourceLoader.ensureVoice(urls), (urls) => resourceLoader.extendActiveStage(urls),
+    captureMode && captureStartup ? {
+      entry: captureStartup,
+      // 方框流程（交響下載、高清開場與標題）完成後先等背景解碼，再凍結程式時鐘切到第一幀。
+      beforeOpening: async () => {
+        await captureMode.settle();
+        captureMode.hold();
+      },
+      opened: () => void captureMode.becomeReady(),
+    } : undefined);
+    // 沒有 `startup=` 時停在方框，由錄製工具自己操作；方框本身不隨時間變化。
+    if (captureMode && !captureStartup) void captureMode.becomeReady();
   });
 }

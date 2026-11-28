@@ -202,3 +202,13 @@
   .technique-lab-controls { grid-template-columns: 1fr; }
   .technique-lab-controls > * { grid-column: 1 !important; }
 }
+
+/* 錄製模式（`capture=1`）：畫布按 640×484 比例鋪滿視窗並置中，錄製工具照 `rect()` 裁切。 */
+html[data-capture="true"] .technique-lab-canvas-frame {
+  position: fixed;
+  z-index: 100;
+  left: 50%;
+  top: 50%;
+  width: min(100vw, calc(100vh * 640 / 484));
+  transform: translate(-50%, -50%);
+}

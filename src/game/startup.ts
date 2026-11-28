@@ -66,6 +66,7 @@ import {
 } from "./preferences";
 import { isTauriDesktopRuntime } from "./desktop-runtime";
 import { isProgramPaused, onProgramPauseChange, programNow } from "./program-clock";
+import { probePresentation } from "./presentation-probe";
 
 /**
  * 規則集在存檔裡是代號（`stableRemake`），而發行版只有遊戲本體、不附任何決定記錄或設計
@@ -94,6 +95,18 @@ export interface ContinueGameSelection {
 }
 
 export type StartupSelection = NewGameSelection | ContinueGameSelection;
+
+/**
+ * 開發構建錄製模式（`capture=1&startup=…`）的自動進入：不等玩家按「進入遊戲」，照網址的表現
+ * 設定直接走完方框流程。`enter` 從開場第一幀開始，`title` 直接組成標題。
+ */
+export interface StartupAutoEntry {
+  readonly entry: "enter" | "title";
+  /** 方框流程完成、開場第一幀之前：錄製模式在這裡等資源並凍結程式時鐘。 */
+  readonly beforeOpening: () => Promise<void>;
+  /** 第一幀的階段已經切好。 */
+  readonly opened: () => void;
+}
 
 const TITLE_OPTIONS = ["遊戲開始", "繼續遊戲"] as const;
 const NATIVE_TICK_MS = 10;
@@ -168,6 +181,7 @@ export function mountStartup(
   voiceLoader?: VoiceUrlLoader,
   /** `REMAKE-197`／`REMAKE-198`：把高清標題與開場的檔案下載進開場的資源租約；沒有時一律照原版畫。 */
   hdLoader?: (urls: readonly string[]) => Promise<void>,
+  autoEntry?: StartupAutoEntry,
 ): () => void {
   applyStagedNativeUiAssets(root);
   const testMode = new URLSearchParams(location.search).has("test");
@@ -415,6 +429,8 @@ export function mountStartup(
    * separates "still the same playback" from "restarted from the top".
    */
   let titleMusicPlays = 0;
+  /** 開場目前畫的那張背景；換張時回報一次 `story-art`。 */
+  let introPlate: string | undefined;
   const updateStartupMusicDebugState = () => {
     screen.dataset.startupMusicReady = "true";
     screen.dataset.startupMusicContext = startupMusic.contextState;
@@ -506,6 +522,7 @@ export function mountStartup(
     startupMusic.playTitle(() => {
       updateStartupMusicDebugState();
     });
+    probePresentation("music-start", { track: "title", style: musicStyle, loop: false });
     updateStartupMusicDebugState();
   };
   const stopTitleMusic = () => {
@@ -642,8 +659,10 @@ export function mountStartup(
     phaseStartedAt = programNow();
     screen.dataset.startupPhase = "intro";
     startupMusic.playIntro();
+    probePresentation("music-start", { track: "intro", style: musicStyle, loop: false });
     narration.start();
     hd.startIntro(portraitStyleChoice === "hd");
+    introPlate = undefined;
     updateStartupMusicDebugState();
   };
 
@@ -664,6 +683,7 @@ export function mountStartup(
     title.hidden = false;
     titleReveal = { upper: -1, lower: -1 };
     hd.startTitle(portraitStyleChoice === "hd");
+    probePresentation("title-shown", { style: screen.dataset.titleStyle ?? "original", natural });
     // 0000:19F2 draws the BK/40 surround together with the labels, so nothing of
     // the menu may show while the art is still dissolving in.
     titleMenuFrame.hidden = true;
@@ -715,12 +735,18 @@ export function mountStartup(
       }
       awaitingRemix = false;
       onEntered();
+      if (autoEntry) {
+        await autoEntry.beforeOpening();
+        if (abandoned()) return;
+      }
       activation.hidden = true;
       phase = "pretitle";
       screen.dataset.startupPhase = phase;
       updateStartupMusicDebugState();
       phaseStartedAt = programNow();
+      if (autoEntry?.entry === "title") enterTitle();
       animationFrame = requestAnimationFrame(animate);
+      autoEntry?.opened();
     }).catch((error: unknown) => {
       if (abandoned()) return;
       returnToEntryPanel(error instanceof Error
@@ -749,8 +775,10 @@ export function mountStartup(
     hd.hideTitle();
     intro.hidden = false;
     startupMusic.playIntro();
+    probePresentation("music-start", { track: "intro", style: musicStyle, loop: false });
     narration.start();
     hd.startIntro(portraitStyleChoice === "hd");
+    introPlate = undefined;
     updateStartupMusicDebugState();
   };
 
@@ -1184,6 +1212,13 @@ export function mountStartup(
   const paintIntro = (scrollUpdate: number) => {
     clearScreen();
     const { plate, level } = introBackgroundAt(scrollUpdate);
+    if (plate.src !== introPlate) {
+      introPlate = plate.src;
+      probePresentation("story-art", {
+        background: plate.src.split("/").at(-1) ?? plate.src,
+        style: screen.dataset.introStyle ?? "original",
+      });
+    }
     const background = loadedImages.get(plate.src);
     if (background) {
       drawFadedImage(
@@ -1309,6 +1344,7 @@ export function mountStartup(
     activationButton.disabled = false;
     activationDetail.textContent = "";
     activationButton.focus({ preventScroll: true });
+    if (autoEntry) activateStartup();
   }).catch((error: unknown) => {
     screen.dataset.startupAssetsReady = "false";
     activationDetail.textContent = "開場圖像未能完成準備，請重新整理後再試。";

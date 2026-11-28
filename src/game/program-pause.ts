@@ -1,4 +1,5 @@
 import {
+  isProgramHeldSilently,
   isProgramPaused,
   onProgramPauseChange,
   setProgramPaused,
@@ -103,6 +104,8 @@ const syncMode = () => {
 
 const applyPausedUi = (paused: boolean) => {
   if (!overlay) return;
+  // A capture readiness hold freezes the clock with nothing on screen.
+  if (isProgramHeldSilently()) return;
   document.documentElement.dataset.programPaused = String(paused);
   overlay.hidden = !paused;
   overlay.setAttribute("aria-hidden", String(!paused));
@@ -165,6 +168,12 @@ export function installProgramPause(): void {
     }
   });
   window.addEventListener("keydown", (event) => {
+    // Nothing may move the scene off its first frame before the recorder starts it.
+    if (isProgramHeldSilently()) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
     // P／Pause toggle from anywhere, including inside the menu or an open panel,
     // so one key always means "back to the game".
     if (isToggleKey(event)) {
