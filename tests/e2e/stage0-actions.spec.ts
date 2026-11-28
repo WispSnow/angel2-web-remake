@@ -1246,6 +1246,41 @@ test("REMAKE-210: in 高清 the magician's 1L plays the storm cloud, the wave an
   expect(Math.max(...await recordedClipTicks(page, "lightning-1-main"))).toBeGreaterThan(mainEnd);
 });
 
+/**
+ * `REMAKE-218` A stage preloads every HD effect video its units can cast (71 in stage 0 with the staggered copies).
+ * They used to be created in one frame, so Chromium built 71 media pipelines and decoders at once — a burst of D3D11
+ * decoders in the Windows build's GPU process — and suspended each about 0.1 s after its first frame anyway. Each time
+ * videos are inserted it samples how many are still without a first frame; the layer inserts the next one from inside
+ * the previous one's `loadeddata`, whose `readyState` is already 2 by then.
+ */
+test("REMAKE-218: in 高清 a stage's HD effect videos load at most four at a time and all decode", async ({ page }) => {
+  await useHdArtStyle(page);
+  await page.addInitScript(() => {
+    const counts = { inserted: 0, peak: 0 };
+    (window as unknown as { __mapActionHdPreload: typeof counts }).__mapActionHdPreload = counts;
+    new MutationObserver((records) => {
+      const added = records.flatMap((record) => [...record.addedNodes])
+        .filter((node) => node instanceof HTMLVideoElement && node.classList.contains("map-action-hd-video"));
+      if (added.length === 0) return;
+      counts.inserted += added.length;
+      const loading = [...document.querySelectorAll<HTMLVideoElement>("video.map-action-hd-video")]
+        .filter((video) => video.readyState < 2 && !video.error).length;
+      counts.peak = Math.max(counts.peak, loading);
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  const preload = () => page.evaluate(() =>
+    (window as unknown as { __mapActionHdPreload: { inserted: number; peak: number } }).__mapActionHdPreload);
+  // Every queued video is eventually created and decodes its first frame…
+  await expect.poll(async () => (await preload()).inserted > 40
+    && page.evaluate(() => [...document.querySelectorAll<HTMLVideoElement>("video.map-action-hd-video")]
+      .every((video) => video.readyState >= 2)), { timeout: 30_000 }).toBe(true);
+  const { inserted, peak } = await preload();
+  expect(await page.locator("video.map-action-hd-video").count()).toBe(inserted);
+  // …but never more than four are loading at once.
+  expect(peak).toBeLessThanOrEqual(4);
+});
+
 test("REMAKE-203: a 1F HD clip that cannot be decoded falls back to the original frames for the whole cast", async ({ page }) => {
   await useHdArtStyle(page);
   // the clip's bytes arrive, but the video element is handed something it cannot decode

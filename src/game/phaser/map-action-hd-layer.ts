@@ -110,6 +110,15 @@ const RESYNC_PLAYING_TICKS_PER_RATE = 5;
 const SEEK_LEAD_TICKS_PER_RATE = 3;
 /** seek 期間沿用這支視訊上一幀的畫面，只要它離要畫的那一幀不超過這麼多 tick；更遠（換了位置重播）就寧可空一兩幀。 */
 const HOLD_TICKS = 8;
+/**
+ * `REMAKE-218` 同時在載入（還沒解出第一幀）的視訊最多幾支。一關要預載的視訊連逐格錯開的副本可達七十多支，以前在第一幀
+ * 一起建立：每支都要建一條媒體管線與一個解碼器，Windows 版（WebView2）的 D3D11 硬體解碼就在 GPU 行程裡一口氣建七十多個。
+ * 預載也留不住解碼器——Chromium 閒置的播放器超過 8 個就立即全部暫停（`RendererWebMediaPlayerDelegate` 的積極清理），
+ * 每支解出第一幀後約 0.1 秒就被拆掉，施法時本來就要重新接上。所以分批載入不失去什麼，只把那一下尖峰攤平。
+ */
+const PRELOAD_CONCURRENCY = 4;
+/** 一支視訊最多佔著載入名額這麼久；載入卡住（例如頁面隱藏）的視訊不擋後面的。 */
+const PRELOAD_SLOT_MS = 4_000;
 
 const VERTEX_SHADER = `
 attribute vec2 corner;
@@ -269,6 +278,11 @@ export class MapActionHdLayer {
   private readonly textures = new Map<string, { readonly texture: WebGLTexture; mediaTime: number }>();
   /** 解碼出過一幀的視訊：之後 seek 時 `readyState` 會暫時掉到 1，仍算可畫（見 `ready`）。 */
   private readonly decoded = new WeakSet<HTMLVideoElement>();
+  /** 排隊等著建立的視訊（`REMAKE-218`），依 `prepare` 的先後；`queued` 是它們的鍵。 */
+  private preloadQueue: { readonly clip: MapActionHdClip; readonly instance: number }[] = [];
+  private readonly queued = new Set<string>();
+  /** 正佔著載入名額的視訊與它的逾時計時器。 */
+  private readonly preloading = new Map<HTMLVideoElement, ReturnType<typeof setTimeout>>();
   /** 正在跟隨控制器的片段（通常一段；逐格錯開的片段每個播放位置一段）。 */
   private active: MapActionHdShow[] = [];
   /** 已被換下、還在播餘韻的片段，依開始順序。 */
@@ -313,21 +327,53 @@ export class MapActionHdLayer {
     this.glState = createGl(canvas);
   }
 
-  /** 預先建立並載入這些片段的視訊（靜音、暫停），施法時才能從第一幀就畫高清。 */
+  /**
+   * 預先建立並載入這些片段的視訊（靜音、暫停），施法時才能從第一幀就畫高清。靜態片段的圖立刻建立；視訊排隊，同時最多
+   * `PRELOAD_CONCURRENCY` 支在載入（`REMAKE-218`）。每幀重複呼叫無妨：已建立或已排隊的不再加入。
+   */
   prepare(clips: Iterable<MapActionHdClip>): void {
     for (const clip of clips) {
       for (let instance = 0; instance < mapActionHdInstanceCount(clip.clipId); instance += 1) {
-        this.prepareVideo(clip, instance);
+        const key = videoKey(clip.clipId, instance);
+        if (this.videos.has(key) || this.images.has(key) || this.queued.has(key)) continue;
+        if (clip.still) {
+          this.prepareVideo(clip, instance);
+          continue;
+        }
+        this.queued.add(key);
+        this.preloadQueue.push({ clip, instance });
       }
+    }
+    this.pumpPreload();
+  }
+
+  /** 名額有空就從佇列建立下一支視訊。 */
+  private pumpPreload(): void {
+    while (this.preloading.size < PRELOAD_CONCURRENCY) {
+      const next = this.preloadQueue.shift();
+      if (!next) return;
+      this.queued.delete(videoKey(next.clip.clipId, next.instance));
+      const video = this.prepareVideo(next.clip, next.instance);
+      if (video) this.preloading.set(video, setTimeout(() => this.preloadSettled(video), PRELOAD_SLOT_MS));
     }
   }
 
-  private prepareVideo(clip: MapActionHdClip, instance: number): void {
+  /** 這支視訊解出第一幀、失敗或逾時：讓出名額。 */
+  private preloadSettled(video: HTMLVideoElement): void {
+    const timer = this.preloading.get(video);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    this.preloading.delete(video);
+    this.pumpPreload();
+  }
+
+  /** 建立一支視訊（靜態片段建立圖）並開始載入；回傳新建的視訊，其餘情況（已存在、靜態片段、沒有 WebGL）回傳 `undefined`。 */
+  private prepareVideo(clip: MapActionHdClip, instance: number): HTMLVideoElement | undefined {
     const key = videoKey(clip.clipId, instance);
-    if (this.videos.has(key) || this.images.has(key)) return;
+    if (this.videos.has(key) || this.images.has(key)) return undefined;
     if (!this.glState) {
       this.onFailure(clip.clipId, "WebGL is not available for the HD effect layer");
-      return;
+      return undefined;
     }
     if (clip.still) {
       // a still has no timeline: one decoded picture, uploaded whenever it is drawn
@@ -339,7 +385,7 @@ export class MapActionHdLayer {
       });
       image.src = stagedRenderAssetSource(clip.video.source);
       this.images.set(key, image);
-      return;
+      return undefined;
     }
     const video = document.createElement("video");
     video.muted = true;
@@ -348,8 +394,12 @@ export class MapActionHdLayer {
     video.preload = "auto";
     video.disablePictureInPicture = true;
     video.dataset.sourceUrl = clip.video.source;
-    video.addEventListener("loadeddata", () => this.decoded.add(video));
+    video.addEventListener("loadeddata", () => {
+      this.decoded.add(video);
+      this.preloadSettled(video);
+    });
     video.addEventListener("error", () => {
+      this.preloadSettled(video);
       this.onFailure(clip.clipId, video.error?.message || `media error ${video.error?.code ?? "unknown"}`);
       if (this.active.some((show) => show.clip.clipId === clip.clipId)) this.setShow(undefined);
       this.lingering = this.lingering.filter((show) => show.clip.clipId !== clip.clipId);
@@ -364,6 +414,7 @@ export class MapActionHdLayer {
     this.canvas.after(video);
     video.load();
     this.videos.set(key, video);
+    return video;
   }
 
   /**
@@ -454,6 +505,10 @@ export class MapActionHdLayer {
     this.lingering = [];
     this.overlays = [];
     this.occluders = [];
+    this.preloadQueue = [];
+    this.queued.clear();
+    for (const timer of this.preloading.values()) clearTimeout(timer);
+    this.preloading.clear();
     for (const video of this.videos.values()) {
       video.pause();
       video.removeAttribute("src");
