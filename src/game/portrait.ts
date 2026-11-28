@@ -8,7 +8,7 @@ import {
 import type { PortraitRecord } from "./types";
 import type { PortraitHdEntry } from "./content/portrait-hd";
 import { PORTRAIT_HD_SIZE } from "./content/portrait-hd.generated";
-import { stagedRenderAssetSource } from "./staged-render-asset-cache";
+import { stagedRenderAssetAvailable, stagedRenderAssetSource } from "./staged-render-asset-cache";
 import { isProgramPaused, programNow } from "./program-clock";
 import { PortraitHdPlayer, releaseHdVideoDecoder } from "./portrait-hd-player";
 import { SPEECH_PUNCTUATION_QUIET_MS, speechGlyphIsPunctuation, SyllableClock } from "./portrait-speech";
@@ -144,14 +144,59 @@ function hdPortraitLayers(entry: PortraitHdEntry, alt: string, baseTestId?: stri
 
 /** 已經接上來源、還沒放掉的高清肖像視訊；動畫迴圈每幀把離開文件的放掉。 */
 const liveHdVideos = new Set<HTMLVideoElement>();
+/** 這次執行解碼出過第一幀的高清肖像檔案（`data-source-url`）：檔案本身沒問題，之後的錯誤都是暫時的。 */
+const decodedHdSources = new Set<string>();
+/** 暫時錯誤之後的重試：第幾次，以及最早什麼時候（`performance.now()`）再接上來源。 */
+const hdVideoRetries = new WeakMap<HTMLVideoElement, { readonly count: number; readonly notBefore: number }>();
+const HD_VIDEO_RETRY_BASE_MS = 1_000;
+const HD_VIDEO_RETRY_MAX_MS = 30_000;
 
-/** 這張臉上場了：接上視訊來源（已接上就不動）。 */
+const hdVideoDecoded = (event: Event): void => {
+  const video = event.currentTarget;
+  if (!(video instanceof HTMLVideoElement)) return;
+  if (video.dataset.sourceUrl) decodedHdSources.add(video.dataset.sourceUrl);
+  hdVideoRetries.delete(video);
+};
+
+/**
+ * 這張臉上場了：接上視訊來源（已接上就不動）。檔案不在目前的資源租約裡（租約剛換手）時不接，免得繞過資源門去要
+ * 原始網址；暫時錯誤後的退避期間也不接。
+ */
 function attachHdVideoSource(video: HTMLVideoElement): void {
   if (video.hasAttribute("src")) return;
   const url = video.dataset.sourceUrl;
-  if (!url) return;
+  if (!url || !stagedRenderAssetAvailable(url)) return;
+  const retry = hdVideoRetries.get(video);
+  if (retry && performance.now() < retry.notBefore) return;
+  // 同一個函式重複加入不會重複觸發。
+  video.addEventListener("loadeddata", hdVideoDecoded);
   video.src = stagedRenderAssetSource(url);
   liveHdVideos.add(video);
+}
+
+/**
+ * `REMAKE-219` 一支高清肖像視訊出錯時怎麼辦。以前任何一次錯誤都把整條記錄在本次執行退回原版，切換美術風格也救不回來，
+ * 玩家於是看到同一個畫面裡新舊肖像混在一起。可是錯誤多半與檔案無關：表面已經拆掉、租約換手後舊的物件網址被撤銷、或解碼器
+ * 一時不夠（Windows 版的硬體解碼）。只有這次執行從沒解碼成功過、而且來源仍是目前租約那份的檔案才退回原版；其餘放掉這支
+ * 視訊，由動畫迴圈稍後重新接上（退避 1、2、4… 秒，最多 30 秒），期間畫面停在這張臉的高清畫面上。
+ */
+function handleHdVideoError(element: HTMLElement, video: HTMLVideoElement): void {
+  // 播放器與就緒等待都聽 `error`，同一次錯誤只處理一次：放掉之後就沒有來源了。
+  if (!video.hasAttribute("src")) return;
+  const url = video.dataset.sourceUrl;
+  const current = url !== undefined && stagedRenderAssetAvailable(url)
+    && video.getAttribute("src") === stagedRenderAssetSource(url);
+  if (video.isConnected && current && !decodedHdSources.has(url)) {
+    const record = Number(element.dataset.portraitRecord);
+    if (isPortraitRecord(record)) {
+      markPortraitHdFailed(record, video.error?.message || `media error ${video.error?.code ?? "unknown"}`);
+    }
+    return;
+  }
+  const count = (hdVideoRetries.get(video)?.count ?? 0) + 1;
+  const delay = current ? Math.min(HD_VIDEO_RETRY_MAX_MS, HD_VIDEO_RETRY_BASE_MS * 2 ** (count - 1)) : 0;
+  hdVideoRetries.set(video, { count, notBefore: performance.now() + delay });
+  releaseHdVideo(video);
 }
 
 /** 放掉一支高清肖像視訊的解碼器與播放器；之後若又上場，`attachHdVideoSource` 會重新接上。 */
@@ -328,7 +373,7 @@ export function prepareAnimatedPortrait(element: HTMLElement): Promise<void> {
 
 /**
  * 高清視訊的就緒條件：有第一幀可畫（`loadeddata`）。逾時不算失敗——封面就是第 0 幀，先照常
- * 開始逐字，播放器在視訊就緒後自行接上；真正的載入錯誤才把這條記錄退回原版。
+ * 開始逐字，播放器在視訊就緒後自行接上；載入錯誤交給 `handleHdVideoError`，只有檔案本身壞了才退回原版。
  */
 function hdVideoReady(element: HTMLElement, video: HTMLVideoElement): Promise<void> {
   if (video.readyState >= 2) return Promise.resolve();
@@ -340,10 +385,7 @@ function hdVideoReady(element: HTMLElement, video: HTMLVideoElement): Promise<vo
       resolve();
     };
     const failed = () => {
-      const record = Number(element.dataset.portraitRecord);
-      if (isPortraitRecord(record)) {
-        markPortraitHdFailed(record, video.error?.message || `media error ${video.error?.code ?? "unknown"}`);
-      }
+      handleHdVideoError(element, video);
       done();
     };
     const timer = setTimeout(done, HD_VIDEO_READY_TIMEOUT_MS);
@@ -530,9 +572,11 @@ export function startPortraitAnimations(
     const entry = activePortraitHd(portrait, { redEyes: element.dataset.redEyes === "true" });
     if (!entry) return;
     attachHdVideoSource(video);
+    // 退避中或檔案還不在租約裡：沒有來源可播，畫布留著上一幀、底下是封面。
+    if (!video.hasAttribute("src")) return;
     let player = hdPlayers.get(video);
     if (!player || player.canvas !== canvas) {
-      player = new PortraitHdPlayer(element, portrait, entry, video, canvas, testMode);
+      player = new PortraitHdPlayer(element, portrait, entry, video, canvas, testMode, () => handleHdVideoError(element, video));
       hdPlayers.set(video, player);
     }
     const state = speechStateFor(element);

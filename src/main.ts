@@ -16,7 +16,11 @@ import { mountStage49EndingUi } from "./game/stage49-ending-ui";
 import { mountCreditsUi } from "./game/credits-ui";
 import "./credits.css";
 import { ResourcePackLoader } from "./game/resource-loader";
-import { classPresentationAssetUrls, stagePresentationActionIds } from "./game/content/class-presentation-assets";
+import {
+  classPresentationAssetUrls,
+  stagePortraitRecords,
+  stagePresentationActionIds,
+} from "./game/content/class-presentation-assets";
 import { originalDebugEditorAssetUrls } from "./game/original-debug-mode";
 import { ASSETS as STAGE0_ASSETS, createStage0Units } from "./game/content/stage0";
 import { stageDialoguePortraitRecords } from "./game/content/portrait-assets";
@@ -114,8 +118,8 @@ const stageAssetGate: StageAssetGate = (stageId, resolveRequirements) => {
         ...originalDebugEditorAssetUrls(),
         ...requirements.musicUrls ?? [],
         // `REMAKE-192`：選了高清才把本關各張臉的高清檔案放進資源門；原版模式不發任何高清請求。
-        // `REMAKE-195`：這一關被操控的角色另外帶上紅眼版。
-        ...portraitHdUrlsForStyle(requirements.portraitRecords, undefined, requirements.nativeStage),
+        // `REMAKE-195`：這一關被操控的角色另外帶上紅眼版。`REMAKE-219`：與原版主圖同一份清單，連轉職後的通用肖像。
+        ...portraitHdUrlsForStyle(stagePortraitRecords(requirements), undefined, requirements.nativeStage),
         // `REMAKE-196`：高清劇情插圖同一規則，只帶本關劇情用到、而且有高清版的那幾張。
         ...storyHdUrlsForStyle(requirements.storyBackgroundUrls ?? []),
         // `REMAKE-203`：高清技術特效也一樣，只帶本關職業施放得出、而且有高清版的技術。
@@ -355,9 +359,9 @@ const mountController = (
       urls = theEndHdUrlsForStyle(style);
     } else {
       const requirements = controllerAssetRequirements(controller);
-      const { portraitRecords, nativeStage, storyBackgroundUrls } = requirements;
+      const { nativeStage, storyBackgroundUrls } = requirements;
       urls = [
-        ...portraitHdUrlsForStyle(portraitRecords, style, nativeStage),
+        ...portraitHdUrlsForStyle(stagePortraitRecords(requirements), style, nativeStage),
         // `REMAKE-196`：本關劇情插圖的高清循環一併補進租約。
         ...storyHdUrlsForStyle(storyBackgroundUrls ?? [], style),
         // `REMAKE-203`：本關職業施放得出的技術特效也是。

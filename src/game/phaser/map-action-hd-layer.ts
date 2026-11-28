@@ -1,5 +1,5 @@
 import { mapActionHdInstanceCount, type MapActionHdClip } from "../content/map-action-hd";
-import { mapActionHdClipEnd } from "../map-action-hd";
+import { mapActionHdClipEnd, mapActionHdFailed } from "../map-action-hd";
 import { isProgramPaused } from "../program-clock";
 import { stagedRenderAssetSource } from "../staged-render-asset-cache";
 
@@ -335,6 +335,9 @@ export class MapActionHdLayer {
     for (const clip of clips) {
       for (let instance = 0; instance < mapActionHdInstanceCount(clip.clipId); instance += 1) {
         const key = videoKey(clip.clipId, instance);
+        const existing = this.videos.get(key);
+        // `REMAKE-219` 出錯的視訊在片段被標成失敗期間保持原樣；玩家切換美術風格清掉失敗標記後重建一次。
+        if (existing?.error && !mapActionHdFailed(clip.clipId)) this.discardVideo(key, existing);
         if (this.videos.has(key) || this.images.has(key) || this.queued.has(key)) continue;
         if (clip.still) {
           this.prepareVideo(clip, instance);
@@ -345,6 +348,19 @@ export class MapActionHdLayer {
       }
     }
     this.pumpPreload();
+  }
+
+  /** 拆掉一支視訊（放掉解碼器、移出文件與紋理），讓 `prepare` 之後重新建立。 */
+  private discardVideo(key: string, video: HTMLVideoElement): void {
+    this.preloadSettled(video);
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    video.remove();
+    this.videos.delete(key);
+    const texture = this.textures.get(key);
+    if (texture) this.glState?.gl.deleteTexture(texture.texture);
+    this.textures.delete(key);
   }
 
   /** 名額有空就從佇列建立下一支視訊。 */

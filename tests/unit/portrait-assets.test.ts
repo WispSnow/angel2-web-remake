@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { classPresentationAssetUrls } from "../../src/game/content/class-presentation-assets";
+import { classPresentationAssetUrls, stagePortraitRecords } from "../../src/game/content/class-presentation-assets";
+import { portraitHdAssetUrls } from "../../src/game/content/portrait-hd";
+import { portraitHdUrlsForStyle } from "../../src/game/portrait-style";
 import {
   classFallbackPortraitFor,
   promotionReachableClassIds,
@@ -82,6 +84,24 @@ describe("stage-scoped portrait assets", () => {
         .map((url) => `${classId}: ${url}`);
     });
     expect(missing).toEqual([]);
+  });
+
+  test("REMAKE-219: the HD gate covers the same promotion closure as the original portraits", () => {
+    // 士兵A 在第 0 關轉成修女就換上 D/50。原版主圖早就按轉職閉包進資源門，高清以前只帶在場的臉，
+    // 高清模式下轉職後的通用肖像於是退回原版。
+    const requirements = { allyClassIds: ["soldier"] as const, portraitRecords: [46, 47] as const };
+    const records = stagePortraitRecords({ allyClassIds: [...requirements.allyClassIds], portraitRecords: [...requirements.portraitRecords] });
+    const urls = new Set(portraitHdUrlsForStyle(records, "hd"));
+    const missing = promotionReachableClassIds(["soldier"]).flatMap((classId) => {
+      const record = classFallbackPortraitFor(classId, 1);
+      if (record === undefined) return [];
+      return portraitHdAssetUrls(record).filter((url) => !urls.has(url)).map((url) => `${classId}: ${url}`);
+    });
+    expect(missing).toEqual([]);
+    expect(urls).toContain("/assets/original/portraits/hd/0050/portrait.mp4");
+    // 在場與劇情的臉照舊，原版模式仍不帶任何高清檔案。
+    expect(urls).toContain("/assets/original/portraits/hd/0046/portrait.mp4");
+    expect(portraitHdUrlsForStyle(records, "original")).toEqual([]);
   });
 
   test("retains ending dialogue layers and roster bases without taking the full portrait stream", () => {

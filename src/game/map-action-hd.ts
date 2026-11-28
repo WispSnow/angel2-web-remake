@@ -7,7 +7,7 @@ import {
   type MapActionHdClip,
   type MapActionHdSegment,
 } from "./content/map-action-hd";
-import { portraitStyle } from "./portrait-style";
+import { onPortraitStyleChange, portraitStyle } from "./portrait-style";
 import type { PortraitStyle } from "./preferences";
 import { stagedRenderAssetAvailable } from "./staged-render-asset-cache";
 
@@ -22,6 +22,8 @@ import { stagedRenderAssetAvailable } from "./staged-render-asset-cache";
  */
 
 const failed = new Set<string>();
+// `REMAKE-219` 切換美術風格時，本次執行退回原版的片段重新嘗試（畫布層會重建出錯的視訊）。
+onPortraitStyleChange(() => failed.clear());
 
 /** 這個動作此刻可以走高清的分段與片段；任何一條回退條件成立時回傳 `undefined`（視訊是否就緒由畫布層另外判斷）。 */
 export function activeMapActionHdCast(

@@ -144,6 +144,20 @@ describe("REMAKE-192 portrait style resolution", () => {
     setPortraitStyle("original");
   });
 
+  it("REMAKE-219: switching the art style gives a record that fell back to the original another try", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    setPortraitStyle("hd");
+    markPortraitHdFailed(7, "decode error");
+    expect(activePortraitHd(7)).toBeUndefined();
+    // Toggling 原版 → 高清 in the menu is the player's way to retry: the failure no longer sticks for the run.
+    setPortraitStyle("original");
+    setPortraitStyle("hd");
+    expect(activePortraitHd(7)?.mode).toBe(portraitHdEntry(7)?.mode);
+    takePortraitHdFailureNotice();
+    setPortraitStyle("original");
+    warn.mockRestore();
+  });
+
   it("REMAKE-194: the full-screen combat panel stays the original still, loops in HD, and plays a possessed face's red-eye loop", () => {
     const panel = (record: number, redEyes = false) => animatedPortraitMarkup(record as PortraitRecord, {
       alt: "肖像",

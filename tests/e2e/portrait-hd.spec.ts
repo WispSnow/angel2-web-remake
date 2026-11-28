@@ -400,6 +400,74 @@ test("REMAKE-194: in 原版 the full-screen combat panels keep the still face th
  * blink while stage 30 is undecided (S30-L); in HD the possessed face plays a
  * red-eye loop with the same layout and mouth strip and no blink.
  */
+/**
+ * `REMAKE-219` A generic unit takes its new class's generic portrait the moment it promotes (S00-V: 士兵A becomes
+ * a 修女 and shows D/50). The original layers were staged for the allies' whole promotion closure, but the HD files
+ * only for the faces on the board, so in HD the promoted soldier fell back to the original pixel portrait.
+ */
+test("REMAKE-219: in HD a generic soldier promoted in stage 0 keeps an HD face from the staged pack", async ({ page }) => {
+  const requests = hdRequests(page);
+  await usePreferences(page, { hd: true });
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  await page.waitForFunction(() => window.__ANGEL2__?.getState().phase === "player");
+  await page.evaluate(() => window.__ANGEL2__?.forcePromotionThreshold("1:40"));
+  await page.getByTestId("battle-canvas").focus();
+  await page.keyboard.press(" ");
+  await page.getByTestId("unit-command-rest").click();
+  await expect(page.getByTestId("promotion-layer")).toBeVisible();
+  await page.getByTestId("promotion-target-sister").click();
+  await expect(page.getByTestId("promotion-layer")).toBeHidden();
+  const hud = page.getByTestId("unit-portrait-composite");
+  await expect(hud).toHaveAttribute("data-portrait-record", "50");
+  await expect(hud).toHaveAttribute("data-portrait-style", "hd");
+  await expect(hud.locator("video")).toHaveAttribute("data-source-url", "/assets/original/portraits/hd/0050/portrait.mp4");
+  await expect(hud).toHaveAttribute("data-portrait-hd-video", "playing");
+  // The gate brought D/50's files along with the stage; nothing was fetched again when the face appeared.
+  expect(requests).toContain("/assets/original/portraits/hd/0050/portrait.mp4");
+  expect(new Set(requests).size).toBe(requests.length);
+});
+
+/**
+ * `REMAKE-219` Any `error` on an HD portrait video used to turn that record original for the rest of the run, and
+ * switching 美術風格 could not bring it back — the player saw old and new faces side by side. An error on a file that
+ * already decoded this run (a decoder hiccup, a lease that swapped under a surviving node) now drops the video and
+ * attaches it again; only a file that never decoded falls back.
+ */
+test("REMAKE-219: a runtime error on an HD face that already played retries it instead of turning it original", async ({ page }) => {
+  const fallbacks: string[] = [];
+  page.on("console", (message) => {
+    if (message.text().includes("falls back to the original")) fallbacks.push(message.text());
+  });
+  await usePreferences(page, { hd: true });
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  const hud = page.getByTestId("unit-portrait-composite");
+  await expect(hud).toHaveAttribute("data-portrait-hd-video", "playing");
+  const playsAgain = async () => {
+    const time = Number(await hud.getAttribute("data-portrait-hd-video-time"));
+    await expect.poll(async () => Number(await hud.getAttribute("data-portrait-hd-video-time")), { timeout: 10_000 }).not.toBe(time);
+  };
+  await playsAgain();
+
+  // A decode error on the current source (what a Windows hardware decoder that runs out reports).
+  await hud.locator("video").evaluate((video) => video.dispatchEvent(new Event("error")));
+  await page.waitForTimeout(100);
+  await expect(hud).toHaveAttribute("data-portrait-style", "hd");
+  await expect(hud.locator("video")).toHaveAttribute("src", /^blob:/u, { timeout: 5_000 });
+  await playsAgain();
+
+  // A source whose object URL was revoked under the surviving node (a resource lease that changed hands).
+  await hud.locator("video").evaluate((video: HTMLVideoElement) => {
+    const dead = URL.createObjectURL(new Blob([new Uint8Array(16)], { type: "video/mp4" }));
+    URL.revokeObjectURL(dead);
+    video.src = dead;
+  });
+  await expect.poll(() => hud.locator("video").evaluate((video: HTMLVideoElement) => video.error === null && video.readyState >= 2),
+    { timeout: 10_000 }).toBe(true);
+  await expect(hud).toHaveAttribute("data-portrait-style", "hd");
+  await playsAgain();
+  expect(fallbacks).toEqual([]);
+});
+
 test("REMAKE-195: in HD the possessed 維絲塔 plays her red-eye loop, and only stage 30's red-eye files are fetched", async ({ page }) => {
   const requests = hdRequests(page);
   await usePreferences(page, { hd: true });

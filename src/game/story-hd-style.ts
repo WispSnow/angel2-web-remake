@@ -8,7 +8,7 @@ import {
   type StoryHdEpilogueSpread,
   type StoryHdTheEnd,
 } from "./content/story-hd";
-import { notifyPortraitPresentationChanged, portraitStyle } from "./portrait-style";
+import { notifyPortraitPresentationChanged, onPortraitStyleChange, portraitStyle } from "./portrait-style";
 import type { PortraitStyle } from "./preferences";
 import { stagedRenderAssetAvailable } from "./staged-render-asset-cache";
 
@@ -87,6 +87,13 @@ export function epilogueHdUrlsForStyle(
 }
 
 let theEndFailed = false;
+
+// `REMAKE-219` 切換美術風格時，本次執行退回原版的插圖、尾聲與「The end」都重新嘗試。
+onPortraitStyleChange(() => {
+  failedBackgrounds.clear();
+  failedEpilogueClips.clear();
+  theEndFailed = false;
+});
 
 /**
  * `REMAKE-201` 製作人員表之後的「The end」此刻要換成的高清循環；同一個「美術風格」偏好。偏好為原版、沒有高清版、

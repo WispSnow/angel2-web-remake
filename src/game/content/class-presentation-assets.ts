@@ -37,6 +37,24 @@ const fullCombatAtlasById = new Map<string, (typeof FULL_COMBAT_ATLASES)[number]
   FULL_COMBAT_ATLASES.map((atlas) => [atlas.id, atlas]),
 );
 
+/**
+ * 這一關的畫面可能出現的全部肖像記錄：在場、部署與劇情的臉，加上我方轉職閉包裡每個職業的 side 1 通用肖像。
+ * 通用單位（士兵A 等）按當前職業顯示通用肖像，轉職當場就換成新職業那張；肖像是 DOM 圖片，沒進資源門時會繞過
+ * 租約直接請求原始 URL，所以和棋子一樣按我方轉職閉包備好。敵方從不轉職，不需要 side 2 的那一套。
+ * 原版主圖與 `REMAKE-192` 高清檔案都按這份清單進資源門（`REMAKE-219`：高清以前只帶在場的臉，轉職後的通用肖像
+ * 在高清模式下退回原版）。
+ */
+export function stagePortraitRecords(
+  requirements: Pick<StageClassPresentationRequirements, "allyClassIds" | "portraitRecords">,
+): readonly PortraitRecord[] {
+  const portraitRecords = new Set<PortraitRecord>(requirements.portraitRecords ?? []);
+  for (const classId of promotionReachableClassIds(requirements.allyClassIds)) {
+    const portrait = classFallbackPortraitFor(classId, 1);
+    if (portrait !== undefined) portraitRecords.add(portrait);
+  }
+  return [...portraitRecords];
+}
+
 export function classPresentationAssetUrls(
   requirements: StageClassPresentationRequirements,
 ): readonly string[] {
@@ -49,15 +67,7 @@ export function classPresentationAssetUrls(
   ]);
   const urls = new Set<string>(allyMapUnitAssetsForClasses(requirements.allyClassIds).values());
   for (const url of requirements.unitSpriteUrls ?? []) urls.add(url);
-  // 通用单位（士兵A 等）按当前职业显示通用肖像，转职当场就换成新职业那张。肖像是 DOM
-  // 图片，没进资源门时会绕过租约直接请求原始 URL，所以和棋子一样按我方转职闭包备好。
-  // 敌方从不转职，不需要 side 2 的那一套。
-  const portraitRecords = new Set<PortraitRecord>(requirements.portraitRecords ?? []);
-  for (const classId of allyClasses) {
-    const portrait = classFallbackPortraitFor(classId, 1);
-    if (portrait !== undefined) portraitRecords.add(portrait);
-  }
-  for (const url of portraitAssetUrlsForRecords([...portraitRecords])) urls.add(url);
+  for (const url of portraitAssetUrlsForRecords(stagePortraitRecords(requirements))) urls.add(url);
   if (requirements.nativeStage !== undefined) {
     for (const url of fullCombatBackgroundAssetsForStage(requirements.nativeStage)) urls.add(url);
   }

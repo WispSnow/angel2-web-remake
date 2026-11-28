@@ -50,6 +50,8 @@ export function portraitStyle(): PortraitStyle {
 export function setPortraitStyle(style: PortraitStyle): void {
   if (portraitStyle() === style) return;
   current = style;
+  // `REMAKE-219` 玩家切換美術風格就是要重來一次：本次執行退回原版的記錄全部重新嘗試。
+  failedRecords.clear();
   const store = storage();
   // 宿主顯示偏好共用同一筆記錄，整筆覆寫會把其他選擇洗掉。
   if (store) saveDisplayPreferences(store, { ...loadDisplayPreferences(store), portraitStyle: style });
@@ -72,7 +74,10 @@ export function notifyPortraitPresentationChanged(): void {
   for (const listener of presentationListeners) listener();
 }
 
-/** 播放器在高清檔案載入或解碼失敗時呼叫：這條記錄本次執行改畫原版，並提示一次。 */
+/**
+ * 檔案本身載入或解碼失敗時呼叫（暫時的錯誤由 `portrait.ts` 自己重試，不走這裡）：這條記錄改畫原版並提示一次，
+ * 直到玩家切換美術風格（`REMAKE-219`）。
+ */
 export function markPortraitHdFailed(record: PortraitRecord, reason: string): void {
   if (failedRecords.has(record)) return;
   failedRecords.add(record);
