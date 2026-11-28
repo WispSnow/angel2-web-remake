@@ -309,6 +309,12 @@ pnpm dlx --allow-build=esbuild --allow-build=workerd \
 远程预览时，才可使用 `--branch=<preview-name>` 创建预览部署。预览部署不会自动成为生产版本，
 也不能作为 Cloudflare 的生产回滚目标。
 
+不传 `--branch` 时，Wrangler 按当前目录的 git 分支决定部署环境，只有在 `main` 分支上运行才是
+生产部署。在 `git worktree` 或其他分支上运行会变成以该分支命名的预览部署，输出里多一行
+`Deployment alias URL`（1.4.0 发布时就是这样）。从 worktree 发布时，到主检出（`main` 分支、
+与发布提交相同的 HEAD）里运行同一条命令，并把 `release` 换成 worktree 中 `release/` 的绝对路径。
+无论在哪里运行，都要按第 6 步确认生产部署列表的最新一条就是本次提交。
+
 当前发布目录通常超过 Cloudflare Dashboard 拖放方式的 1,000 文件上限，因此默认必须使用
 Wrangler；Direct Upload 的 Wrangler 与 Dashboard 上传虽然可以在同一项目内混用，但不要把
 拖放作为本项目的常规更新方案。
