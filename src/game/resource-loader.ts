@@ -5,7 +5,7 @@ import {
 } from "./content/resource-manifest.generated";
 import type { StageId } from "./types";
 import { isMusicResourceUrl, primeEncodedMusic } from "./music-resource-cache";
-import { isVoiceResourceUrl, primeEncodedVoice } from "./voice-transport";
+import { hasEncodedVoice, isVoiceResourceUrl, primeEncodedVoice } from "./voice-transport";
 import {
   isSoundEffectResourceUrl,
   prepareSoundEffectBuffers,
@@ -383,11 +383,13 @@ export class ResourcePackLoader {
 
   private loadAsset(asset: ResourceManifestAsset, manifest: ResourceManifest): Promise<void> {
     const current = this.states.get(asset.url);
+    if (current?.promise) return current.promise;
+    // 換關會逐出語音的編碼資料。完成旗標仍在時，從資源快取補回這份資料。
     if (current?.complete
-      && (!isStagedRenderAssetUrl(asset.url) || current.encodedRenderAsset)) {
+      && (!isStagedRenderAssetUrl(asset.url) || current.encodedRenderAsset)
+      && (!isVoiceResourceUrl(asset.url) || hasEncodedVoice(asset.url))) {
       return Promise.resolve();
     }
-    if (current?.promise) return current.promise;
     const state: AssetLoadState = current ?? { loadedBytes: 0, complete: false };
     const pending = this.responseForAsset(asset.url).then(async ({ response, cacheWrite }) => {
       if (!response.ok) throw new Error(`讀取失敗（${response.status}）：${asset.url}`);

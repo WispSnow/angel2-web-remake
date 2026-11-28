@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_CONTEXTUAL_BATTLE_LINES } from "../../src/game/content/ai-technique-dialogue.generated";
+import { OUTCOME_FEEDBACK_TEXT } from "../../src/game/content/outcome-feedback";
 import { VOICE_PORTRAIT_VOICES, voiceLineSource, voiceTextHash } from "../../src/game/content/voice-catalog";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -39,6 +40,30 @@ const openPrebattleStory = async (page: Page) => {
 };
 
 const typingDone = (page: Page) => expect(dialogue(page)).toHaveAttribute("data-typing", "false");
+
+const quitVoiceUrl = voiceLineSource(VOICE_PORTRAIT_VOICES[46], voiceTextHash(OUTCOME_FEEDBACK_TEXT.quit));
+
+const openQuitConfirmation = async (page: Page) => {
+  await page.getByTestId("battle-canvas").focus();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("system-menu")).toBeVisible();
+  await page.getByTestId("system-command-quit").click();
+  await expect(page.getByTestId("quit-confirm")).toBeVisible();
+};
+
+const cancelQuitConfirmation = async (page: Page) => {
+  await page.getByTestId("quit-confirm-menu").getByRole("menuitem", { name: /取/u }).click();
+  await expect(page.getByTestId("quit-confirm")).toBeHidden();
+  if (await page.getByTestId("system-menu").isVisible()) await page.keyboard.press("Escape");
+};
+
+const useBattleRecord = async (page: Page, action: "save" | "load", slot: number) => {
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  await page.getByTestId(`${action}-hotspot`).click();
+  await page.getByTestId(`record-slot-${slot}`).click();
+  await expect(page.getByTestId("record-menu")).toBeHidden();
+  if (action === "load") await expect(page.getByTestId("status-strip")).toContainText(`已讀取記錄 ${slot}`);
+};
 
 /** Unlock audio with the first press and land on SAY/0 KY 2 as a voiced page. */
 const reachVoicedPage = async (page: Page) => {
@@ -291,6 +316,61 @@ test("REMAKE-189: 妮雅's quit confirmation is voiced instead of beeping", asyn
   await page.getByTestId("quit-confirm-menu").getByRole("menuitem", { name: /取/u }).click();
   await expect(page.getByTestId("quit-confirm")).toBeHidden();
   await expect(app(page)).toHaveAttribute("data-voice-playing", "none");
+});
+
+test("REMAKE-189: the first confirmation after loading another stage reuses the shared voice", async ({ page }) => {
+  await useVoice(page, { voiceVolume: 4 });
+  const requests = voiceRequests(page);
+  await page.goto("/?debugScenario=stage-01-player&difficulty=0&test=1");
+  await useBattleRecord(page, "save", 2);
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  await page.waitForFunction(async (url) => (await import("/src/game/voice-transport.ts")).hasEncodedVoice(url), quitVoiceUrl);
+  await openQuitConfirmation(page);
+  await expect(app(page)).toHaveAttribute("data-voice-playing", quitVoiceUrl);
+  await cancelQuitConfirmation(page);
+  const downloadsBefore = requests.filter((url) => url === quitVoiceUrl).length;
+
+  await useBattleRecord(page, "load", 2);
+  await expect(app(page)).toHaveAttribute("data-voice-gate", "stage-01");
+  const beeps = await speechRequests(page);
+  await openQuitConfirmation(page);
+  await expect(app(page)).toHaveAttribute("data-voice-playing", quitVoiceUrl);
+  expect(await speechRequests(page)).toBe(beeps);
+  expect(requests.filter((url) => url === quitVoiceUrl)).toHaveLength(downloadsBefore);
+});
+
+test("REMAKE-189: reopening a failed line after a same-stage load retries it for the next window", async ({ page }) => {
+  await useVoice(page, { voiceVolume: 4 });
+  await page.addInitScript(() => {
+    localStorage.setItem("angel2.preferences.display.v1", JSON.stringify({ portraitStyle: "hd" }));
+  });
+  const pattern = `**${quitVoiceUrl}`;
+  let online = false;
+  await page.route(pattern, (route) => online ? route.continue() : route.fulfill({ status: 503, body: "" }));
+  const failedDownload = page.waitForResponse((response) => response.url().endsWith(quitVoiceUrl) && response.status() === 503);
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  await failedDownload;
+  await openQuitConfirmation(page);
+  await expect(app(page)).toHaveAttribute("data-voice-failed-count", "1");
+  await cancelQuitConfirmation(page);
+  online = true;
+  await useBattleRecord(page, "save", 1);
+  await useBattleRecord(page, "load", 1);
+
+  const retry = page.waitForResponse((response) => response.url().endsWith(quitVoiceUrl) && response.ok());
+  await openQuitConfirmation(page);
+  await retry;
+  await expect(app(page)).toHaveAttribute("data-voice-failed-count", "0");
+  await expect(app(page)).toHaveAttribute("data-voice-playing", "none");
+  await cancelQuitConfirmation(page);
+
+  const beeps = await speechRequests(page);
+  await openQuitConfirmation(page);
+  await expect(app(page)).toHaveAttribute("data-voice-playing", quitVoiceUrl);
+  expect(await speechRequests(page)).toBe(beeps);
+  await expect(page.getByTestId("quit-confirm").locator(".animated-portrait")).toHaveAttribute("data-portrait-style", "hd");
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/hd-voice-recovered.png" });
 });
 
 test("REMAKE-202: a kill's 得經驗值 window says 獲得經驗值 in the killer's voice instead of beeping", async ({ page }) => {

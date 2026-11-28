@@ -1307,3 +1307,50 @@ test("REMAKE-203: a 1F HD clip that cannot be decoded falls back to the original
     expect(Number(frame.mapCombatEffectTileCount), `frame ${frame.mapCombatFrame}`).toBeGreaterThan(0);
   }
 });
+
+test("REMAKE-218: stalled videos release their sources before the next batch starts", async ({ page }) => {
+  await useHdArtStyle(page);
+  let release = () => {};
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/__stalled-map-effect/*.mp4", async (route) => {
+    await pending;
+    await route.abort().catch(() => undefined);
+  });
+  await page.addInitScript(() => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "src");
+    if (!descriptor?.set) throw new Error("HTMLMediaElement.src setter missing");
+    const setSource = descriptor.set;
+    const videos: HTMLVideoElement[] = [];
+    const status = { cleared: 0, peak: 0, started: 0 };
+    Object.defineProperty(HTMLMediaElement.prototype, "src", {
+      ...descriptor,
+      set(this: HTMLVideoElement, source: string) {
+        if (!this.dataset.sourceUrl?.includes("/map-actions/hd/")) {
+          setSource.call(this, source);
+          return;
+        }
+        videos.push(this);
+        const index = videos.length;
+        setSource.call(this, index <= 4 ? `/__stalled-map-effect/${index}.mp4` : source);
+        status.started = index;
+        status.peak = Math.max(status.peak, videos.filter((video) => video.hasAttribute("src") && video.readyState < 2).length);
+        status.cleared = videos.slice(0, 4).filter((video) => !video.hasAttribute("src") && !video.isConnected).length;
+      },
+    });
+    (window as unknown as { __mapActionTimeout: typeof status }).__mapActionTimeout = status;
+  });
+  try {
+    await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+    const stalled = page.locator('video.map-action-hd-video[src*="/__stalled-map-effect/"]');
+    await expect(stalled).toHaveCount(4);
+    const progress = () => page.evaluate(() =>
+      (window as unknown as { __mapActionTimeout: { started: number; cleared: number; peak: number } }).__mapActionTimeout);
+    await expect.poll(async () => (await progress()).started, { timeout: 10_000 }).toBeGreaterThan(4);
+    await expect(stalled).toHaveCount(0);
+    const { cleared, peak } = await progress();
+    expect(cleared).toBe(4);
+    expect(peak).toBeLessThanOrEqual(4);
+  } finally {
+    release();
+  }
+});

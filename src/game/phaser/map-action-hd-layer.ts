@@ -333,11 +333,9 @@ export class MapActionHdLayer {
    */
   prepare(clips: Iterable<MapActionHdClip>): void {
     for (const clip of clips) {
+      if (mapActionHdFailed(clip.clipId)) continue;
       for (let instance = 0; instance < mapActionHdInstanceCount(clip.clipId); instance += 1) {
         const key = videoKey(clip.clipId, instance);
-        const existing = this.videos.get(key);
-        // `REMAKE-219` 出錯的視訊在片段被標成失敗期間保持原樣；玩家切換美術風格清掉失敗標記後重建一次。
-        if (existing?.error && !mapActionHdFailed(clip.clipId)) this.discardVideo(key, existing);
         if (this.videos.has(key) || this.images.has(key) || this.queued.has(key)) continue;
         if (clip.still) {
           this.prepareVideo(clip, instance);
@@ -350,17 +348,21 @@ export class MapActionHdLayer {
     this.pumpPreload();
   }
 
-  /** 拆掉一支視訊（放掉解碼器、移出文件與紋理），讓 `prepare` 之後重新建立。 */
-  private discardVideo(key: string, video: HTMLVideoElement): void {
-    this.preloadSettled(video);
+  private failVideo(clipId: string, key: string, video: HTMLVideoElement, reason: string): void {
+    if (this.videos.get(key) !== video) return;
+    this.onFailure(clipId, reason);
+    if (this.active.some((show) => show.clip.clipId === clipId)) this.setShow(undefined);
+    this.lingering = this.lingering.filter((show) => show.clip.clipId !== clipId);
+    // 逾時的媒體管線仍在載入。先解除來源，才能讓下一支視訊用這個名額。
+    this.videos.delete(key);
     video.pause();
     video.removeAttribute("src");
     video.load();
     video.remove();
-    this.videos.delete(key);
     const texture = this.textures.get(key);
     if (texture) this.glState?.gl.deleteTexture(texture.texture);
     this.textures.delete(key);
+    this.preloadSettled(video);
   }
 
   /** 名額有空就從佇列建立下一支視訊。 */
@@ -368,9 +370,14 @@ export class MapActionHdLayer {
     while (this.preloading.size < PRELOAD_CONCURRENCY) {
       const next = this.preloadQueue.shift();
       if (!next) return;
-      this.queued.delete(videoKey(next.clip.clipId, next.instance));
-      const video = this.prepareVideo(next.clip, next.instance);
-      if (video) this.preloading.set(video, setTimeout(() => this.preloadSettled(video), PRELOAD_SLOT_MS));
+      const { clip, instance } = next;
+      const key = videoKey(clip.clipId, instance);
+      this.queued.delete(key);
+      if (mapActionHdFailed(clip.clipId)) continue;
+      const video = this.prepareVideo(clip, instance);
+      if (video) this.preloading.set(video, setTimeout(() => {
+        this.failVideo(clip.clipId, key, video, "timed out waiting for the first frame");
+      }, PRELOAD_SLOT_MS));
     }
   }
 
@@ -415,10 +422,7 @@ export class MapActionHdLayer {
       this.preloadSettled(video);
     });
     video.addEventListener("error", () => {
-      this.preloadSettled(video);
-      this.onFailure(clip.clipId, video.error?.message || `media error ${video.error?.code ?? "unknown"}`);
-      if (this.active.some((show) => show.clip.clipId === clip.clipId)) this.setShow(undefined);
-      this.lingering = this.lingering.filter((show) => show.clip.clipId !== clip.clipId);
+      this.failVideo(clip.clipId, key, video, video.error?.message || `media error ${video.error?.code ?? "unknown"}`);
     });
     video.src = stagedRenderAssetSource(clip.video.source);
     video.setAttribute("aria-hidden", "true");

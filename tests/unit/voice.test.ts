@@ -3,6 +3,11 @@ import { STORY_PAGES_BY_ID } from "../../src/game/content/dialogue";
 import { contextualBattleDialogueFor } from "../../src/game/content/ai-technique-dialogue";
 import { OUTCOME_FEEDBACK_PORTRAIT, OUTCOME_FEEDBACK_TEXT } from "../../src/game/content/outcome-feedback";
 import {
+  RESOURCE_MANIFEST_IDENTITY,
+  RESOURCE_MANIFEST_URL,
+  RESOURCE_MANIFEST_VERSION,
+} from "../../src/game/content/resource-manifest.generated";
+import {
   VOICE_CLIPS,
   VOICE_GAIN_BY_VOLUME,
   battleLineVoiceUrls,
@@ -18,8 +23,10 @@ import type { VoiceVolume } from "../../src/game/preferences";
 import type { PortraitRecord } from "../../src/game/content/portrait-catalog.generated";
 import type { DialoguePage } from "../../src/game/types";
 import { debugEntryAudioAllowed } from "../../src/game/debug-audio-activation";
+import { ResourcePackLoader } from "../../src/game/resource-loader";
 import { entryVoiceDecodeUrls, VoiceDirector } from "../../src/game/voice";
 import {
+  hasEncodedVoice,
   hasPredecodedVoice,
   predecodeVoice,
   primeEncodedVoice,
@@ -151,6 +158,29 @@ describe("REMAKE-188 voice director", () => {
     // Primed bytes are reused: decoding never issues a second request.
     expect(fetchVoice).not.toHaveBeenCalled();
     expect(decode).toHaveBeenCalled();
+  });
+
+  test("a completed resource load replenishes voice bytes evicted on a stage change", async () => {
+    const [url] = gateLeadVoiceUrls("stage-00", 4);
+    const fetchAsset = vi.fn(async (input: RequestInfo | URL) => input === RESOURCE_MANIFEST_URL
+      ? Response.json({
+        version: RESOURCE_MANIFEST_VERSION,
+        identity: RESOURCE_MANIFEST_IDENTITY,
+        assets: [{ url, bytes: 1, sha256: "0".repeat(64), packages: [] }],
+        packs: [],
+      })
+      : new Response(new Uint8Array([1])));
+    const loader = new ResourcePackLoader(fetchAsset, { baseURI: "https://angel2.test/" } as Document);
+    await loader.ensureVoice([url]);
+    expect(hasEncodedVoice(url)).toBe(true);
+    await loader.ensureVoice([url]);
+    expect(fetchAsset.mock.calls.filter(([input]) => input === url)).toHaveLength(1);
+
+    retainEncodedVoice(new Set());
+    expect(hasEncodedVoice(url)).toBe(false);
+    await Promise.all([loader.ensureVoice([url]), loader.ensureVoice([url])]);
+    expect(hasEncodedVoice(url)).toBe(true);
+    expect(fetchAsset.mock.calls.filter(([input]) => input === url)).toHaveLength(2);
   });
 
   test("starts with typing, keeps playing through 補完, and fades out in 0.1 s on advance", async () => {
@@ -361,6 +391,28 @@ describe("REMAKE-189 battle lines, feedback and narration", () => {
     await flush();
     expect(fetchVoice).toHaveBeenCalledWith(voiceCueForPage(surrounded(46))!.source);
     await expect(director.lineHold()).resolves.toBeUndefined();
+  });
+
+  test("a line that failed decoding retries without silencing the next unvoiced window", async () => {
+    const { director, controller, decode, fetchVoice } = setup(4);
+    director.unlock();
+    const line = surrounded(46);
+    const cue = voiceCueForPage(line);
+    if (!cue) throw new Error("Expected a voice cue");
+    primeAll([cue.source]);
+    decode.mockRejectedValueOnce(new Error("temporary decoder error"));
+
+    expect(director.beginPage(line)).toBe(true);
+    await flush();
+    expect(director.pageVoiced).toBe(false);
+    expect(director.beginPage(line)).toBe(false);
+    expect(controller.reportVoiceUnavailable).toHaveBeenCalledTimes(1);
+    await flush();
+    expect(FakeAudioContext.instances[0].sources).toHaveLength(0);
+
+    expect(director.beginPage(line)).toBe(true);
+    expect(FakeAudioContext.instances[0].sources).toHaveLength(1);
+    expect(fetchVoice).not.toHaveBeenCalled();
   });
 
   test("a line that decodes too late is dropped, and the page still hears that it may move on", async () => {

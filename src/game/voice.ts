@@ -110,14 +110,14 @@ export class VoiceDirector {
       return;
     }
     const gate = this.controller.voiceGate;
-    if (gate !== this.requestedGate) {
+    const gateChanged = gate !== this.requestedGate;
+    if (gateChanged) {
       this.requestedGate = gate;
       const urls = gateVoiceUrls(gate, volume);
       this.retainedUrls.clear();
       this.lineVoiceUrls.clear();
       this.lineSignature = "";
       for (const url of urls) this.retainedUrls.add(url);
-      retainEncodedVoice(this.retainedUrls);
       this.transport.retain(new Set());
       this.gateDownload = this.loadUrls && urls.length > 0
         ? this.loadUrls(urls).catch((error: unknown) => {
@@ -126,6 +126,8 @@ export class VoiceDirector {
         : undefined;
     }
     this.requestBattleLines();
+    // 新棋盤和上一關共用的台詞要先列入保留範圍，讀檔後第一次開窗就能用。
+    if (gateChanged) retainEncodedVoice(this.retainedUrls);
     this.prepareUpcoming();
     this.updateDebugState();
   }
@@ -216,30 +218,26 @@ export class VoiceDirector {
   }
 
   private beginCue(cue: VoiceCue, onEnded?: () => void): boolean {
-    if (this.failedUrls.has(cue.source)) {
-      this.controller.reportVoiceUnavailable();
+    const ready = this.transport.isReady(cue.source);
+    const failed = this.failedUrls.has(cue.source);
+    // 劇情開頁前需已解碼。台詞與旁白有編碼資料就可在開頁時解碼。
+    if (!ready && (failed || cue.kind === "story" || !hasEncodedVoice(cue.source))) {
+      // 失敗後先讓本頁照常打字，再準備片段供下次開頁。
+      if (failed) this.controller.reportVoiceUnavailable();
+      const download = cue.kind === "story" ? this.gateDownload : undefined;
+      if (download) void download.then(() => this.prepare(cue.source));
+      else void this.prepare(cue.source);
+      this.updateDebugState();
       return false;
     }
-    if (!this.transport.isReady(cue.source)) {
-      if (cue.kind === "story") {
-        void (this.gateDownload ?? Promise.resolve()).then(() => this.prepare(cue.source));
-        this.updateDebugState();
-        return false;
-      }
-      // 台詞與旁白只有編碼資料已在記憶體時才算有語音：開頁再解碼，稍晚幾十毫秒開始。
-      if (!hasEncodedVoice(cue.source)) {
-        void this.prepare(cue.source);
-        this.updateDebugState();
-        return false;
-      }
-    }
+    if (ready) this.failedUrls.delete(cue.source);
     let settle = () => undefined as void;
     const settled = new Promise<void>((resolve) => {
       settle = resolve;
     });
     const page: VoicedPage = { cue, glyphs: 0, started: false, ended: false, onEnded, settled, settle };
     this.page = page;
-    if (this.transport.isReady(cue.source)) {
+    if (ready) {
       if (cue.kind !== "story" || cue.startGlyph === 0) this.start();
     } else {
       const begun = performance.now();
@@ -302,11 +300,14 @@ export class VoiceDirector {
       this.lineVoiceUrls.add(url);
       this.retainedUrls.add(url);
     }
-    retainEncodedVoice(this.retainedUrls);
     if (!this.loadUrls) return;
     // 劇情片段先下載：進關劇情馬上要用，台詞要等戰鬥開始。
+    const gate = this.requestedGate;
     const after = this.gateDownload ?? Promise.resolve();
-    void after.then(() => this.loadUrls?.(fresh)).catch((error: unknown) => {
+    void after.then(() => {
+      if (this.destroyed || this.requestedGate !== gate) return;
+      return this.loadUrls?.(fresh);
+    }).catch((error: unknown) => {
       console.warn("voice line download failed", error);
     });
   }
@@ -326,12 +327,13 @@ export class VoiceDirector {
     this.transport.retain(keep);
     const download = this.gateDownload ?? Promise.resolve();
     void download.then(() => {
-      if (this.destroyed || this.controller.voiceVolume === 0) return;
+      if (this.requestedGate !== gate) return;
       for (const clip of [...upcoming, ...leads]) void this.prepare(clip.source);
     });
   }
 
   private async prepare(url: string): Promise<void> {
+    if (this.destroyed || this.controller.voiceVolume === 0) return;
     const ready = await this.transport.prepare(url);
     if (ready) this.failedUrls.delete(url);
     else this.failedUrls.add(url);

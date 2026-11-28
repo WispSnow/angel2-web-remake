@@ -146,8 +146,12 @@ function hdPortraitLayers(entry: PortraitHdEntry, alt: string, baseTestId?: stri
 const liveHdVideos = new Set<HTMLVideoElement>();
 /** 這次執行解碼出過第一幀的高清肖像檔案（`data-source-url`）：檔案本身沒問題，之後的錯誤都是暫時的。 */
 const decodedHdSources = new Set<string>();
-/** 暫時錯誤之後的重試：第幾次，以及最早什麼時候（`performance.now()`）再接上來源。 */
-const hdVideoRetries = new WeakMap<HTMLVideoElement, { readonly count: number; readonly notBefore: number }>();
+/** 同一份資源租約的連續錯誤次數，以及最早什麼時候（`performance.now()`）再接上來源。 */
+const hdVideoRetries = new WeakMap<HTMLVideoElement, {
+  readonly source: string;
+  readonly count: number;
+  readonly notBefore: number;
+}>();
 const HD_VIDEO_RETRY_BASE_MS = 1_000;
 const HD_VIDEO_RETRY_MAX_MS = 30_000;
 
@@ -166,36 +170,40 @@ function attachHdVideoSource(video: HTMLVideoElement): void {
   if (video.hasAttribute("src")) return;
   const url = video.dataset.sourceUrl;
   if (!url || !stagedRenderAssetAvailable(url)) return;
+  const source = stagedRenderAssetSource(url);
   const retry = hdVideoRetries.get(video);
-  if (retry && performance.now() < retry.notBefore) return;
+  if (retry?.source === source && performance.now() < retry.notBefore) return;
   // 同一個函式重複加入不會重複觸發。
   video.addEventListener("loadeddata", hdVideoDecoded);
-  video.src = stagedRenderAssetSource(url);
+  video.src = source;
   liveHdVideos.add(video);
 }
 
 /**
- * `REMAKE-219` 一支高清肖像視訊出錯時怎麼辦。以前任何一次錯誤都把整條記錄在本次執行退回原版，切換美術風格也救不回來，
- * 玩家於是看到同一個畫面裡新舊肖像混在一起。可是錯誤多半與檔案無關：表面已經拆掉、租約換手後舊的物件網址被撤銷、或解碼器
- * 一時不夠（Windows 版的硬體解碼）。只有這次執行從沒解碼成功過、而且來源仍是目前租約那份的檔案才退回原版；其餘放掉這支
- * 視訊，由動畫迴圈稍後重新接上（退避 1、2、4… 秒，最多 30 秒），期間畫面停在這張臉的高清畫面上。
+ * `REMAKE-219` 硬體解碼器首次載入也可能暫時失敗，先保留高清封面並重試一次。
+ * 同一份來源連續失敗且這個檔案從未解碼成功時才退回原版；已成功的檔案繼續退避重試。
  */
 function handleHdVideoError(element: HTMLElement, video: HTMLVideoElement): void {
   // 播放器與就緒等待都聽 `error`，同一次錯誤只處理一次：放掉之後就沒有來源了。
-  if (!video.hasAttribute("src")) return;
+  const source = video.getAttribute("src");
+  if (!source) return;
   const url = video.dataset.sourceUrl;
-  const current = url !== undefined && stagedRenderAssetAvailable(url)
-    && video.getAttribute("src") === stagedRenderAssetSource(url);
-  if (video.isConnected && current && !decodedHdSources.has(url)) {
-    const record = Number(element.dataset.portraitRecord);
-    if (isPortraitRecord(record)) {
-      markPortraitHdFailed(record, video.error?.message || `media error ${video.error?.code ?? "unknown"}`);
-    }
+  if (!video.isConnected || !url || !stagedRenderAssetAvailable(url) || source !== stagedRenderAssetSource(url)) {
+    hdVideoRetries.delete(video);
+    releaseHdVideo(video);
     return;
   }
-  const count = (hdVideoRetries.get(video)?.count ?? 0) + 1;
-  const delay = current ? Math.min(HD_VIDEO_RETRY_MAX_MS, HD_VIDEO_RETRY_BASE_MS * 2 ** (count - 1)) : 0;
-  hdVideoRetries.set(video, { count, notBefore: performance.now() + delay });
+  const previous = hdVideoRetries.get(video);
+  const count = previous?.source === source ? previous.count + 1 : 1;
+  if (count >= 2 && !decodedHdSources.has(url)) {
+    const record = Number(element.dataset.portraitRecord);
+    const { error } = video;
+    releaseHdVideo(video);
+    if (isPortraitRecord(record)) markPortraitHdFailed(record, error?.message || `media error ${error?.code ?? "unknown"}`);
+    return;
+  }
+  const delay = Math.min(HD_VIDEO_RETRY_MAX_MS, HD_VIDEO_RETRY_BASE_MS * 2 ** (count - 1));
+  hdVideoRetries.set(video, { source, count, notBefore: performance.now() + delay });
   releaseHdVideo(video);
 }
 

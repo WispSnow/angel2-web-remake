@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { enterAttackTargeting } from "./command-controls";
+import { skipStoryDialogue } from "./dialogue-controls";
 import { openHostMenu, resumeFromHostMenu } from "./host-menu-helpers";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -396,11 +397,6 @@ test("REMAKE-194: in 原版 the full-screen combat panels keep the still face th
 });
 
 /**
- * `REMAKE-195` red-eye variants. Module 29 draws D/41 frame 7 in place of every
- * blink while stage 30 is undecided (S30-L); in HD the possessed face plays a
- * red-eye loop with the same layout and mouth strip and no blink.
- */
-/**
  * `REMAKE-219` A generic unit takes its new class's generic portrait the moment it promotes (S00-V: 士兵A becomes
  * a 修女 and shows D/50). The original layers were staged for the allies' whole promotion closure, but the HD files
  * only for the faces on the board, so in HD the promoted soldier fell back to the original pixel portrait.
@@ -468,6 +464,66 @@ test("REMAKE-219: a runtime error on an HD face that already played retries it i
   expect(fallbacks).toEqual([]);
 });
 
+test("REMAKE-219: a first-frame decoder error recovers and keeps HD through loading and retreating", async ({ page }) => {
+  await usePreferences(page, { hd: true, voiceVolume: 4 });
+  await page.addInitScript(() => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "src");
+    if (!descriptor?.set) throw new Error("HTMLMediaElement.src setter missing");
+    const setSource = descriptor.set;
+    let injected = false;
+    Object.defineProperty(HTMLMediaElement.prototype, "src", {
+      ...descriptor,
+      set(this: HTMLVideoElement, source: string) {
+        setSource.call(this, source);
+        if (injected || !this.matches(".portrait-hd-video") || !this.dataset.sourceUrl?.endsWith("/0046/portrait.mp4")) return;
+        injected = true;
+        queueMicrotask(() => {
+          if (this.readyState >= 2) throw new Error("Fault injection arrived after the first frame");
+          document.documentElement.dataset.firstPortraitFault = "injected";
+          this.dispatchEvent(new Event("error"));
+        });
+      },
+    });
+  });
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  await expect(page.locator("html")).toHaveAttribute("data-first-portrait-fault", "injected");
+  const hud = page.getByTestId("unit-portrait-composite");
+  await expect(hud).toHaveAttribute("data-portrait-style", "hd");
+  await expect(hud).toHaveAttribute("data-portrait-hd-video", "playing");
+
+  const board = page.getByTestId("battle-canvas");
+  await board.hover({ position: { x: 420, y: 45 } });
+  for (const action of ["save", "load"]) {
+    await page.getByTestId(`${action}-hotspot`).click();
+    await page.getByTestId("record-slot-1").click();
+    await expect(page.getByTestId("record-menu")).toBeHidden();
+  }
+  await expect(page.getByTestId("status-strip")).toContainText("已讀取記錄 1");
+  await board.hover({ position: { x: 220, y: 177 } });
+  await expect(hud).toHaveAttribute("data-portrait-record", "46");
+  await expect(hud).toHaveAttribute("data-portrait-hd-video", "playing");
+
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-retreat").click();
+  const confirm = page.locator("[data-action=retreat-confirm]");
+  await confirm.click();
+  await expect(page.getByTestId("retreat-confirm").locator(".animated-portrait")).toHaveAttribute("data-portrait-style", "hd");
+  await expect(app(page)).toHaveAttribute("data-voice-playing", /\/voice\/line\//u);
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/hd-first-frame-recovered.png" });
+  await confirm.click();
+  await page.waitForFunction(() => window.__ANGEL2__?.getState().phase === "openingStory");
+  await skipStoryDialogue(page);
+  await page.waitForFunction(() => window.__ANGEL2__?.getState().phase === "player");
+  await board.hover({ position: { x: 220, y: 177 } });
+  await expect(hud).toHaveAttribute("data-portrait-record", "46");
+  await expect(hud).toHaveAttribute("data-portrait-hd-video", "playing");
+});
+
+/**
+ * `REMAKE-195` red-eye variants. Module 29 draws D/41 frame 7 in place of every
+ * blink while stage 30 is undecided (S30-L); in HD the possessed face plays a
+ * red-eye loop with the same layout and mouth strip and no blink.
+ */
 test("REMAKE-195: in HD the possessed 維絲塔 plays her red-eye loop, and only stage 30's red-eye files are fetched", async ({ page }) => {
   const requests = hdRequests(page);
   await usePreferences(page, { hd: true });
